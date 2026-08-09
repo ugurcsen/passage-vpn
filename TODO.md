@@ -11,6 +11,40 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 ---
 
+## Backlog (current) — remaining work, prioritized
+
+> Consolidated list of everything still open. Individual items are tracked in the
+> phase sections below; this is the execution order.
+
+**P1 — finish Phase 3 gaps**
+- [ ] Static IP + CCD editor UI (backend ready: `CcdService`)
+- [ ] Group subnet allocation from pool + static IP from group settings
+- [ ] Per-user/group full-tunnel vs split-tunnel (now global only)
+- [ ] Per-daemon profile mapping (generic/auto-login daemons as first-class configs)
+- [ ] Inter-group connectivity rules + NAT-vs-routing mode
+- [ ] `CertService` restore/rotate + expiry-warning scheduler
+- [ ] Multi-daemon (`daemons` entity) + DCO detection display
+- [ ] Domain-based control via dnsmasq (advanced)
+
+**P2 — Phase 4: monitoring & dashboard**
+- [ ] `MgmtClient` (persistent TCP to `openvpn:7505`) + async event handling
+- [ ] `ConnectionRegistry` + `TrafficAggregator` + WebSocket push
+- [ ] Online users list, session duration, bytes in/out; connection history persisted
+- [ ] Dashboard: live stats + MUI X Charts, system info (actuator), DCO badge
+- [ ] Audit log entity + UI; syslog integration; `connection_logs` retention
+
+**P3 — Phase 4: API, ops, deployment**
+- [ ] OpenAPI/Swagger UI + `docs/api.md`; API tokens for automation
+- [ ] Brand settings, configuration report, backup/restore flow
+- [ ] Multi-node registry + node-aware status/kill routing
+- [ ] `install.sh` full installer, first-run wizard UI, demo/seed mode
+- [ ] PostgreSQL docker profile validation, Makefile polish
+- [ ] E2E test pass, README/docs finalization, CI workflow
+- [ ] Profile settings page (portal: password + MFA setup)
+- [ ] Post-auth Python script hook support
+
+---
+
 ## Phase 0 — Project Scaffolding
 
 - [x] `TODO.md` and `AGENTS.md` (this file + agent guide)
