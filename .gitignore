@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.gradle/
+build/
+dist/
+target/
+.vite/
+
+# Env / secrets
+.env
+.env.local
+*.pem
+*.key
+!**/testdata/**/*.pem
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+
+# Data / runtime
+data/
+var/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Logs
+*.log
+logs/
+
+# TS incremental builds
+*.tsbuildinfo

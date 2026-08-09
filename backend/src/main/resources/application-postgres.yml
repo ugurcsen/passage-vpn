@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: ${OPNL_DB_URL:jdbc:postgresql://localhost:5432/opnl}
+    username: ${OPNL_DB_USER:opnl}
+    password: ${OPNL_DB_PASSWORD:opnl}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+# PostgreSQL profile: override SQLite defaults for portable-to-PostgreSQL validation.
+# SQLite-specific migration quirks are avoided by writing portable SQL in db/migration.

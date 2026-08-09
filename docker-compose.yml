@@ -1,0 +1,81 @@
+name: opnl
+
+services:
+  # --- OpenVPN daemon(s) + management interface ---
+  openvpn:
+    build: ./openvpn
+    container_name: opnl-openvpn
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN          # iptables-based access control (documented, required)
+      - SYS_MODULE         # optional: tun module / DCO
+    volumes:
+      - opnl-pki:/etc/opnl/pki:ro        # PKI is owned by the backend (read-only here)
+      - opnl-ccd:/etc/opnl/ccd
+      - opnl-config:/etc/opnl/config
+      - opnl-logs:/var/log/opnl
+    environment:
+      OPNL_INTERNAL_BASE_URL: http://backend:8080
+    networks:
+      - opnl-net
+    ports:
+      - "${OPNL_OPENVPN_PORT:-1194}:1194/udp"
+      - "${OPNL_OPENVPN_TCP_PORT:-1195}:1195/tcp"
+    expose:
+      - "7505-7510"        # management interface per daemon (daemon 0 = 7505)
+
+  # --- Management panel backend (Spring Boot) ---
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: opnl-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      OPNL_DATA_DIR: /var/lib/opnl
+      OPNL_DB_URL: "jdbc:sqlite:/var/lib/opnl/opnl.db?journal_mode=WAL&busy_timeout=5000&foreign_keys=on"
+      OPNL_PKI_DIR: /etc/opnl/pki
+      OPNL_CCD_DIR: /etc/opnl/ccd
+      OPNL_CONFIG_DIR: /etc/opnl/config
+      OPNL_SCRIPTS_DIR: /etc/opnl/config/scripts
+      OPNL_SCRIPTS_SRC_DIR: /app/openvpn-scripts
+      OPNL_OPENVPN_MGMT_HOST: openvpn
+      OPNL_OPENVPN_MGMT_PORT: 7505
+      OPNL_INTERNAL_BASE_URL: http://backend:8080
+      OPNL_INTERNAL_TOKEN: ${OPNL_INTERNAL_TOKEN:-change-me-internal-token}
+    volumes:
+      - opnl-data:/var/lib/opnl
+      - opnl-pki:/etc/opnl/pki
+      - opnl-ccd:/etc/opnl/ccd
+      - opnl-config:/etc/opnl/config
+    depends_on:
+      - openvpn
+    networks:
+      - opnl-net
+    ports:
+      - "${OPNL_SERVER_PORT:-8080}:8080"
+
+  # --- Frontend (nginx: static React + reverse proxy to backend) ---
+  frontend:
+    build: ./frontend
+    container_name: opnl-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - opnl-net
+    ports:
+      - "${OPNL_FRONTEND_PORT:-80}:80"
+
+networks:
+  opnl-net:
+    driver: bridge
+
+volumes:
+  opnl-data:
+  opnl-pki:
+  opnl-ccd:
+  opnl-config:
+  opnl-logs:
