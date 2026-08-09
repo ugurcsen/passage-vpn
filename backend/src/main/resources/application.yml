@@ -54,9 +54,12 @@ opnl:
     access-ttl-seconds: 900
     refresh-ttl-days: 14
   auth:
+    provider: ${OPNL_AUTH_PROVIDER:local}
     lockout-max-attempts: 5
     lockout-window-seconds: 300
     lockout-duration-seconds: 300
+    rate-limit-max-requests: ${OPNL_AUTH_RATE_LIMIT_MAX:20}
+    rate-limit-window-seconds: ${OPNL_AUTH_RATE_LIMIT_WINDOW:60}
   openvpn:
     mgmt-host: ${OPNL_OPENVPN_MGMT_HOST:openvpn}
     mgmt-port: ${OPNL_OPENVPN_MGMT_PORT:7505}

@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -10,6 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  InputAdornment,
   MenuItem,
   Paper,
   Stack,
@@ -24,6 +24,7 @@ import BlockIcon from "@mui/icons-material/Block";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import KeyIcon from "@mui/icons-material/Key";
 import LockResetIcon from "@mui/icons-material/LockReset";
+import SearchIcon from "@mui/icons-material/Search";
 import { api, endpoints } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -75,14 +76,30 @@ export function UsersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<UserForm>(EMPTY_FORM);
-  const [confirm, setConfirm] = useState<{ title: string; text: string; action: () => void } | null>(null);
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    text: string;
+    confirmLabel: string;
+    action: () => void;
+  } | null>(null);
   const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
   const [resetPassword, setResetPassword] = useState("");
   const [selection, setSelection] = useState<GridRowSelectionModel>([]);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "disabled">("all");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const { data: users, isLoading } = useQuery<UserRow[]>({
-    queryKey: ["admin-users"],
-    queryFn: () => api<UserRow[]>(endpoints.users),
+    queryKey: ["admin-users", debouncedSearch],
+    queryFn: () => {
+      const query = debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : "";
+      return api<UserRow[]>(endpoints.users + query);
+    },
   });
 
   const { data: groups } = useQuery<GroupRow[]>({
@@ -148,6 +165,38 @@ export function UsersPage() {
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Delete failed"),
   });
+
+  const bulkMutation = useMutation({
+    mutationFn: ({ action, ids }: { action: "ban" | "unban" | "delete"; ids: string[] }) =>
+      api(endpoints.users + "/bulk", {
+        method: "POST",
+        body: JSON.stringify({ action: action.toUpperCase(), ids }),
+      }),
+    onSuccess: (_data, vars) => {
+      toast.success(
+        `${vars.ids.length} user${vars.ids.length === 1 ? "" : "s"} ${vars.action === "delete" ? "deleted" : vars.action + "ed"}`,
+      );
+      setSelection([]);
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Bulk operation failed"),
+  });
+
+  const confirmBulk = (action: "ban" | "unban" | "delete") => {
+    const ids = selection.map(String);
+    const config = {
+      ban: { verb: "Disable", label: "Disable" },
+      unban: { verb: "Enable", label: "Enable" },
+      delete: { verb: "Delete", label: "Delete" },
+    } as const;
+    const { verb, label } = config[action];
+    setConfirm({
+      title: `Bulk ${label.toLowerCase()}`,
+      text: `${verb} ${ids.length} selected user${ids.length === 1 ? "" : "s"}?`,
+      confirmLabel: label,
+      action: () => bulkMutation.mutate({ action, ids }),
+    });
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -248,6 +297,7 @@ export function UsersPage() {
                   setConfirm({
                     title: "Delete user",
                     text: `Delete ${row.username}? This cannot be undone.`,
+                    confirmLabel: "Delete",
                     action: () => deleteMutation.mutate(row.id),
                   })
                 }
@@ -261,6 +311,10 @@ export function UsersPage() {
     },
   ];
 
+  const filteredRows = (users ?? []).filter((u) =>
+    statusFilter === "all" ? true : statusFilter === "active" ? !u.banned : u.banned,
+  );
+
   return (
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
@@ -271,14 +325,74 @@ export function UsersPage() {
           New user
         </Button>
       </Box>
-      {selection.length > 0 && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          {selection.length} selected
-        </Alert>
-      )}
+      <Stack direction="row" spacing={1.5} sx={{ mb: 2 }} alignItems="center" flexWrap="wrap">
+        <TextField
+          size="small"
+          placeholder="Search username, name, email…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          sx={{ width: 320 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <TextField
+          select
+          size="small"
+          label="Status"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+          sx={{ width: 150 }}
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="active">Active</MenuItem>
+          <MenuItem value="disabled">Disabled</MenuItem>
+        </TextField>
+        {selection.length > 0 && (
+          <>
+            <Stack direction="row" spacing={1} sx={{ ml: 1 }}>
+              <Button
+                size="small"
+                variant="outlined"
+                color="warning"
+                startIcon={<BlockIcon />}
+                disabled={bulkMutation.isPending}
+                onClick={() => confirmBulk("ban")}
+              >
+                Disable
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="success"
+                startIcon={<CheckCircleIcon />}
+                disabled={bulkMutation.isPending}
+                onClick={() => confirmBulk("unban")}
+              >
+                Enable
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon />}
+                disabled={bulkMutation.isPending}
+                onClick={() => confirmBulk("delete")}
+              >
+                Delete
+              </Button>
+            </Stack>
+            <Chip label={`${selection.length} selected`} color="info" size="small" />
+          </>
+        )}
+      </Stack>
       <Paper sx={{ height: 620 }}>
         <DataGrid
-          rows={users ?? []}
+          rows={filteredRows}
           columns={columns}
           loading={isLoading}
           pagination
@@ -385,8 +499,9 @@ export function UsersPage() {
         open={!!confirm}
         title={confirm?.title ?? ""}
         message={confirm?.text}
-        danger
-        confirmLabel="Delete"
+        danger={confirm?.confirmLabel === "Delete"}
+        confirmLabel={confirm?.confirmLabel ?? "Confirm"}
+        loading={bulkMutation.isPending || deleteMutation.isPending}
         onCancel={() => setConfirm(null)}
         onConfirm={() => {
           confirm?.action();

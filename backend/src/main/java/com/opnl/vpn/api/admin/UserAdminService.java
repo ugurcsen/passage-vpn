@@ -47,13 +47,20 @@ public class UserAdminService {
 
   @Transactional(readOnly = true)
   public List<UserDto> listUsers() {
+    return listUsers(null);
+  }
+
+  @Transactional(readOnly = true)
+  public List<UserDto> listUsers(String search) {
     List<User> users = userRepository.findAll();
     Map<String, List<GroupMember>> byUser =
         memberRepository.findAll().stream()
             .collect(Collectors.groupingBy(m -> m.getId().getUserId()));
     Map<String, String> groupNames =
         groupRepository.findAll().stream().collect(Collectors.toMap(Group::getId, Group::getName));
+    String needle = search == null ? "" : search.trim().toLowerCase();
     return users.stream()
+        .filter(user -> matches(user, needle))
         .map(
             user -> {
               List<String> names =
@@ -71,6 +78,15 @@ public class UserAdminService {
             })
         .sorted(java.util.Comparator.comparing(UserDto::username, String.CASE_INSENSITIVE_ORDER))
         .toList();
+  }
+
+  private boolean matches(User user, String needle) {
+    if (needle.isEmpty()) {
+      return true;
+    }
+    return user.getUsername().toLowerCase().contains(needle)
+        || (user.getFullName() != null && user.getFullName().toLowerCase().contains(needle))
+        || (user.getEmail() != null && user.getEmail().toLowerCase().contains(needle));
   }
 
   @Transactional(readOnly = true)
@@ -160,6 +176,31 @@ public class UserAdminService {
         .keySet()
         .forEach(key -> settingsService.deleteUserSetting(id, key));
     userRepository.delete(user);
+  }
+
+  public enum BulkAction {
+    BAN,
+    UNBAN,
+    DELETE
+  }
+
+  /**
+   * Applies a ban/unban/delete to many users in one transaction. Guards (self-delete, last admin)
+   * are enforced per user; a failing user aborts the whole batch.
+   */
+  @Transactional
+  public int bulk(User actor, BulkAction action, List<String> ids) {
+    if (ids == null || ids.isEmpty()) {
+      throw ApiException.badRequest("empty_batch", "No user ids provided");
+    }
+    for (String id : ids) {
+      switch (action) {
+        case BAN -> setBanned(id, true);
+        case UNBAN -> setBanned(id, false);
+        case DELETE -> deleteUser(actor, id);
+      }
+    }
+    return ids.size();
   }
 
   @Transactional

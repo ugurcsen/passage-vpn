@@ -8,6 +8,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.opnl.vpn.auth.spi.AuthProviderManager;
+import com.opnl.vpn.auth.spi.LocalAuthProvider;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.security.JwtService;
@@ -18,6 +20,7 @@ import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,17 +51,21 @@ class AuthServiceTest {
     when(jwt.refreshTtl()).thenReturn(Duration.ofDays(14));
     when(properties.jwt()).thenReturn(jwt);
     OpnlProperties.Auth auth = mock(OpnlProperties.Auth.class);
+    when(auth.provider()).thenReturn("local");
     when(auth.lockoutMaxAttempts()).thenReturn(3);
     when(auth.lockoutWindowSeconds()).thenReturn(300);
     when(auth.lockoutDurationSeconds()).thenReturn(300);
     when(properties.auth()).thenReturn(auth);
     jwtService = new JwtService(properties);
     encoder = new BCryptPasswordEncoder();
+    AuthProviderManager authProviderManager =
+        new AuthProviderManager(
+            properties, List.of(new LocalAuthProvider(userRepository, encoder)));
     service =
         new AuthService(
             userRepository,
             refreshTokenRepository,
-            encoder,
+            authProviderManager,
             jwtService,
             new TotpService(),
             settingsService,

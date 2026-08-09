@@ -144,4 +144,69 @@ class UserAdminServiceTest {
     assertThat(bob.getPasswordHash()).isNotBlank();
     verify(userRepository).save(bob);
   }
+
+  @Test
+  void listUsersFiltersByUsernameFullNameOrEmail() {
+    User alice =
+        User.builder()
+            .id("u1")
+            .username("alice")
+            .fullName("Alice Wonder")
+            .email("alice@example.com")
+            .role(User.Role.USER)
+            .createdAt(Instant.now())
+            .build();
+    User bob =
+        User.builder()
+            .id("u2")
+            .username("bob")
+            .fullName("Robert Smith")
+            .email("bob@corp.io")
+            .role(User.Role.USER)
+            .createdAt(Instant.now())
+            .build();
+    when(userRepository.findAll()).thenReturn(List.of(alice, bob));
+    when(groupRepository.findAll()).thenReturn(List.of());
+    when(memberRepository.findAll()).thenReturn(List.of());
+    when(settingsService.userSettings(any())).thenReturn(java.util.Map.of());
+
+    assertThat(service.listUsers("ali")).extracting(UserDto::username).containsExactly("alice");
+    assertThat(service.listUsers("robert")).extracting(UserDto::username).containsExactly("bob");
+    assertThat(service.listUsers("corp.io")).extracting(UserDto::username).containsExactly("bob");
+    assertThat(service.listUsers(null))
+        .extracting(UserDto::username)
+        .containsExactly("alice", "bob");
+  }
+
+  @Test
+  void bulkBansMultipleUsers() {
+    User bob =
+        User.builder()
+            .id("u2")
+            .username("bob")
+            .role(User.Role.USER)
+            .createdAt(Instant.now())
+            .build();
+    User carol =
+        User.builder()
+            .id("u3")
+            .username("carol")
+            .role(User.Role.USER)
+            .createdAt(Instant.now())
+            .build();
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
+    when(userRepository.findById("u3")).thenReturn(Optional.of(carol));
+    int affected = service.bulk(admin(), UserAdminService.BulkAction.BAN, List.of("u2", "u3"));
+    assertThat(affected).isEqualTo(2);
+    assertThat(bob.isBanned()).isTrue();
+    assertThat(carol.isBanned()).isTrue();
+    verify(userRepository, org.mockito.Mockito.times(2)).save(any());
+  }
+
+  @Test
+  void bulkRejectsEmptyBatch() {
+    assertThatThrownBy(() -> service.bulk(admin(), UserAdminService.BulkAction.BAN, List.of()))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("empty_batch"));
+  }
 }

@@ -5,6 +5,8 @@ import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Admin user management API. ADMIN and RESELLER can manage users; only ADMIN manages roles. */
@@ -34,8 +37,13 @@ public class UserAdminController {
   }
 
   @GetMapping
-  public List<UserDto> list() {
-    return userAdminService.listUsers();
+  public List<UserDto> list(@RequestParam(required = false) String search) {
+    return userAdminService.listUsers(search);
+  }
+
+  @PostMapping("/bulk")
+  public int bulk(Authentication authentication, @Valid @RequestBody BulkRequest request) {
+    return userAdminService.bulk(actor(authentication), request.action(), request.ids());
   }
 
   @GetMapping("/{id}")
@@ -125,4 +133,7 @@ public class UserAdminController {
   public record PasswordRequest(@NotBlank @Size(min = 8, max = 128) String password) {}
 
   public record MfaEnableRequest(@NotBlank String code) {}
+
+  public record BulkRequest(
+      @NotNull UserAdminService.BulkAction action, @NotEmpty List<@NotBlank String> ids) {}
 }

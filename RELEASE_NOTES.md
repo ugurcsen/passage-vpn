@@ -44,16 +44,20 @@ Legend: `[x]` released, `[~]` partial.
 - [x] Brute-force lockout policy
 - [x] VPN `auth-user-pass-verify` → `/internal/auth/verify` with password + OTP,
       lockout and ban checks
+- [x] User search, status filter and bulk operations (ban/unban/delete) — API + UI
 - [x] Frontend: login + MFA screens, Users and Groups pages (MUI DataGrid),
       session handling, toasts, route guards, sign-out
-- [~] Rate limiting (bucket4j) and `AuthProvider` SPI stubs
+- [x] Rate limiting (bucket4j, per-IP) on login/MFA/refresh/VPN-verify
+- [x] `AuthProvider` SPI — `local` (BCrypt) plus LDAP/RADIUS/SAML stub interfaces
+      selectable via `opnl.auth.provider`
 
 ### Verified end-to-end
-- Backend: 31 unit tests green; `make test` and `make lint` pass.
+- Backend: 42 unit tests green; `make test` and `make lint` pass.
 - Live E2E: setup wizard → PKI provisioned → OpenVPN daemon boots from the
   generated config → management interface (`status`, `dco_enabled`) works →
   login / MFA challenge+redeem / token refresh / VPN credential verify all pass
-  through the API and the Vite dev proxy.
+  through the API and the Vite dev proxy; user search, bulk ban/unban/delete and
+  per-IP rate limiting (429 + `Retry-After`) verified live.
 
 ### Not yet released
 - Phase 3 — Access control (CCD, static IPs, iptables rules) & connection profiles

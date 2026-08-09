@@ -39,4 +39,14 @@ public class ApiError {
         .message(message)
         .build();
   }
+
+  public static ApiError of(int status, String code, String message, Map<String, Object> details) {
+    return ApiError.builder()
+        .timestamp(Instant.now())
+        .status(status)
+        .code(code)
+        .message(message)
+        .details(details)
+        .build();
+  }
 }

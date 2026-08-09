@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opnl.vpn.security.InternalTokenFilter;
 import com.opnl.vpn.security.JwtAuthFilter;
 import com.opnl.vpn.security.JwtService;
+import com.opnl.vpn.security.RateLimitFilter;
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.Duration;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,6 +42,14 @@ public class SecurityConfig {
   @Bean
   public JwtAuthFilter jwtAuthFilter() {
     return new JwtAuthFilter(jwtService);
+  }
+
+  @Bean
+  public RateLimitFilter rateLimitFilter() {
+    return new RateLimitFilter(
+        opnlProperties.auth().rateLimitMaxRequests(),
+        Duration.ofSeconds(opnlProperties.auth().rateLimitWindowSeconds()),
+        objectMapper);
   }
 
   /** Paths that never require authentication. */
@@ -83,6 +93,7 @@ public class SecurityConfig {
                                       "Authentication required")));
                     }))
         .addFilterBefore(jwtAuthFilter(), UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(rateLimitFilter(), UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(
             new InternalTokenFilter(opnlProperties), UsernamePasswordAuthenticationFilter.class);
     return http.build();

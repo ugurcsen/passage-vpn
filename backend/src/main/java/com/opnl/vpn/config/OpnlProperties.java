@@ -22,7 +22,12 @@ public record OpnlProperties(
   }
 
   public record Auth(
-      int lockoutMaxAttempts, int lockoutWindowSeconds, int lockoutDurationSeconds) {}
+      String provider,
+      int lockoutMaxAttempts,
+      int lockoutWindowSeconds,
+      int lockoutDurationSeconds,
+      int rateLimitMaxRequests,
+      int rateLimitWindowSeconds) {}
 
   public record OpenVpn(
       String mgmtHost,

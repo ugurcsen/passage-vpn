@@ -1,5 +1,7 @@
 package com.opnl.vpn.auth;
 
+import com.opnl.vpn.auth.spi.AuthProvider;
+import com.opnl.vpn.auth.spi.AuthProviderManager;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.security.JwtService;
@@ -11,7 +13,6 @@ import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,7 +22,7 @@ public class AuthService {
 
   private final UserRepository userRepository;
   private final RefreshTokenRepository refreshTokenRepository;
-  private final PasswordEncoder passwordEncoder;
+  private final AuthProvider authProvider;
   private final JwtService jwtService;
   private final TotpService totpService;
   private final SettingsService settingsService;
@@ -30,14 +31,14 @@ public class AuthService {
   public AuthService(
       UserRepository userRepository,
       RefreshTokenRepository refreshTokenRepository,
-      PasswordEncoder passwordEncoder,
+      AuthProviderManager authProviderManager,
       JwtService jwtService,
       TotpService totpService,
       SettingsService settingsService,
       OpnlProperties properties) {
     this.userRepository = userRepository;
     this.refreshTokenRepository = refreshTokenRepository;
-    this.passwordEncoder = passwordEncoder;
+    this.authProvider = authProviderManager.active();
     this.jwtService = jwtService;
     this.totpService = totpService;
     this.settingsService = settingsService;
@@ -61,7 +62,7 @@ public class AuthService {
       throw ApiException.unauthorized("invalid_credentials", "Invalid username or password");
     }
     assertAccountUsable(user, Instant.now());
-    if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+    if (!authProvider.verifyCredentials(username, password)) {
       recordFailure(user);
       throw ApiException.unauthorized("invalid_credentials", "Invalid username or password");
     }
@@ -163,7 +164,7 @@ public class AuthService {
     if (user.isLocked(now)) {
       return new VpnVerification(false, "account_locked");
     }
-    if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+    if (!authProvider.verifyCredentials(username, password)) {
       recordFailure(user);
       return new VpnVerification(false, "invalid_credentials");
     }

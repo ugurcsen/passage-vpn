@@ -67,7 +67,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] User CRUD: create, edit, delete, ban/unban, admin grant (RESELLER-scoped restrictions)
 - [x] Group CRUD + assignment, nested groups
 - [x] Per-user and per-group settings (inheritance resolution)
-- [ ] User search, filter, bulk operations (UI)
+- [x] User search (server-side), status filter, bulk operations (UI)
 - [ ] Static IP assignment (Phase 3 CCD)
 
 ### 2.3 Authentication (web UI)
@@ -76,8 +76,8 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Local password auth (BCrypt)
 - [x] TOTP MFA (Google Authenticator compatible) — enable/disable/reset (admin API)
 - [x] Brute-force lockout policy (attempts + lock duration)
-- [ ] Rate limiting (bucket4j) + CSRF protection (stateless API; bucket4j pending)
-- [ ] `AuthProvider` SPI: local now; LDAP/RADIUS/SAML stub interfaces
+- [x] Rate limiting (bucket4j) on login/MFA/refresh/internal-verify; CSRF disabled (stateless bearer API)
+- [x] `AuthProvider` SPI: local now; LDAP/RADIUS/SAML stub interfaces (selectable via `opnl.auth.provider`)
 
 ### 2.4 VPN authentication integration
 - [x] `auth-user-pass-verify` script → backend `/internal/auth/verify`
@@ -87,10 +87,10 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [ ] Post-auth Python script hook support
 
 ### 2.5 Frontend
-- [x] Login + MFA screens (dark/light) — needs wiring to real session state
-- [~] User management page (MUI DataGrid: search, filter, bulk, confirm dialogs)
-- [~] Group management page
-- [ ] Toasts, loading states, skeleton screens
+- [x] Login + MFA screens (dark/light) — wired to real session state
+- [x] User management page (MUI DataGrid: search, filter, bulk, confirm dialogs)
+- [x] Group management page
+- [x] Toasts, loading states, dialogs (data-grid loading, pending buttons)
 - [ ] Profile settings page (password, MFA setup) (portal, Phase 3)
 
 ## Phase 3 — Access Control & Connection Profiles
