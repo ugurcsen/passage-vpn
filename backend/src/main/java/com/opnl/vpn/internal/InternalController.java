@@ -1,12 +1,15 @@
 package com.opnl.vpn.internal;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.opnl.vpn.access.AccessRuleService;
+import com.opnl.vpn.access.RuleEngine.IptablesResult;
 import com.opnl.vpn.auth.AuthService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.setup.SetupService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,16 +31,19 @@ public class InternalController {
   private final PasswordEncoder passwordEncoder;
   private final SetupService setupService;
   private final AuthService authService;
+  private final AccessRuleService ruleService;
 
   public InternalController(
       UserRepository userRepository,
       PasswordEncoder passwordEncoder,
       SetupService setupService,
-      AuthService authService) {
+      AuthService authService,
+      AccessRuleService ruleService) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.setupService = setupService;
     this.authService = authService;
+    this.ruleService = ruleService;
   }
 
   /**
@@ -80,6 +86,59 @@ public class InternalController {
             request.username(), request.password(), request.otp(), request.remoteIp());
     return new VerifyResult(result.allowed(), result.reason());
   }
+
+  /**
+   * Called by client-connect.sh when a client establishes a tunnel. Authorizes the user and returns
+   * config pushes plus the per-client iptables commands to install (empty when no rules apply).
+   */
+  @PostMapping("/connect")
+  public ConnectResult connect(@RequestBody ConnectRequest request) {
+    User user =
+        request.commonName() == null || request.commonName().isBlank()
+            ? userRepository.findByUsername(request.username()).orElse(null)
+            : userRepository.findByUsername(request.commonName()).orElse(null);
+    if (user == null) {
+      return ConnectResult.deny("unknown_user");
+    }
+    if (user.isBanned() || user.isLocked(Instant.now())) {
+      return ConnectResult.deny(user.isBanned() ? "user_banned" : "user_locked");
+    }
+    IptablesResult result =
+        ruleService.iptablesFor(user.getUsername(), request.virtualIp(), user.getId());
+    return new ConnectResult(true, null, List.of(), result.apply(), result.remove());
+  }
+
+  /**
+   * Called by client-disconnect.sh. Returns the iptables teardown commands for the client's chain.
+   */
+  @PostMapping("/disconnect")
+  public DisconnectResult disconnect(@RequestBody ConnectRequest request) {
+    User user = userRepository.findByUsername(request.commonName()).orElse(null);
+    if (user == null) {
+      return new DisconnectResult(List.of());
+    }
+    IptablesResult result =
+        ruleService.iptablesFor(user.getUsername(), request.virtualIp(), user.getId());
+    return new DisconnectResult(result.remove());
+  }
+
+  public record ConnectRequest(
+      String commonName, String username, String daemonName, String remoteIp, String virtualIp) {}
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public record ConnectResult(
+      boolean allowed,
+      String reason,
+      List<String> pushes,
+      List<String> iptablesApply,
+      List<String> iptablesRemove) {
+
+    static ConnectResult deny(String reason) {
+      return new ConnectResult(false, reason, List.of(), List.of(), List.of());
+    }
+  }
+
+  public record DisconnectResult(List<String> remove) {}
 
   public record SeedRequest(String username, String password) {}
 

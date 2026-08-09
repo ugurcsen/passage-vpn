@@ -40,6 +40,7 @@ class ServerConfigGeneratorTest {
             java.util.List.of("192.168.10.0 255.255.255.0"),
             false,
             false,
+            true,
             "vpn.example.com");
     String conf = generator.render(split, "/pki", "/ccd", "/scripts", "/logs");
     assertThat(conf).doesNotContain("redirect-gateway");
@@ -63,6 +64,7 @@ class ServerConfigGeneratorTest {
             java.util.List.of("1.1.1.1"),
             null,
             java.util.List.of(),
+            true,
             true,
             true,
             "vpn.example.com");

@@ -53,7 +53,14 @@ public class ServerConfigGenerator {
             config.clientCertNotRequired() ? "client-cert-not-required" : "")
         .replace(
             "__AUTH_VERIFY__",
-            "auth-user-pass-verify " + scriptsDir + "/verify-user-pass.sh via-env")
+            config.authUserPass()
+                ? "auth-user-pass-verify " + scriptsDir + "/verify-user-pass.sh via-env"
+                : "")
+        .replace(
+            "__VERIFY_CLIENT_CERT__",
+            config.clientCertNotRequired()
+                ? "verify-client-cert none"
+                : "verify-client-cert require")
         .replace("__DNS_PUSH__", renderDnsPushes(config))
         .replace("__ROUTE_PUSH__", renderRoutePushes(config))
         .replace("__EXTRA_PUSH__", renderExtraPushes(config));

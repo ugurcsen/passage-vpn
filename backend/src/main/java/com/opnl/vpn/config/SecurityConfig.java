@@ -59,6 +59,7 @@ public class SecurityConfig {
     "/api/auth/mfa",
     "/api/setup/**",
     "/internal/**",
+    "/api/portal/share/**",
     "/actuator/health",
     "/actuator/info",
     "/v3/api-docs/**",

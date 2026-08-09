@@ -103,6 +103,16 @@ public class UserAdminController {
     return userAdminService.disableMfa(id);
   }
 
+  @PutMapping("/{id}/static-ip")
+  public UserDto setStaticIp(@PathVariable String id, @Valid @RequestBody StaticIpRequest request) {
+    return userAdminService.setStaticIp(id, request.staticIp());
+  }
+
+  @DeleteMapping("/{id}/static-ip")
+  public UserDto clearStaticIp(@PathVariable String id) {
+    return userAdminService.clearStaticIp(id);
+  }
+
   @GetMapping("/{id}/settings")
   public Map<String, Object> settings(@PathVariable String id) {
     return userAdminService.userSettings(id);
@@ -136,4 +146,6 @@ public class UserAdminController {
 
   public record BulkRequest(
       @NotNull UserAdminService.BulkAction action, @NotEmpty List<@NotBlank String> ids) {}
+
+  public record StaticIpRequest(String staticIp) {}
 }

@@ -20,6 +20,7 @@ public record ServerConfig(
     List<String> extraRoutes,
     boolean fullTunnel,
     boolean clientCertNotRequired,
+    boolean authUserPass,
     String adminHost) {
 
   public enum Protocol {
@@ -40,6 +41,7 @@ public record ServerConfig(
         List.of(),
         true,
         false,
+        true,
         "vpn.example.com");
   }
 }

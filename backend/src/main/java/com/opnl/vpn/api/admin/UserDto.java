@@ -16,7 +16,8 @@ public record UserDto(
     boolean mustChangePassword,
     List<String> groups,
     Instant createdAt,
-    Instant lastLoginAt) {
+    Instant lastLoginAt,
+    String staticIp) {
 
   public static UserDto from(User user, boolean mustChangePassword, List<String> groupNames) {
     return new UserDto(
@@ -30,7 +31,8 @@ public record UserDto(
         mustChangePassword,
         groupNames,
         user.getCreatedAt(),
-        user.getLastLoginAt());
+        user.getLastLoginAt(),
+        user.getStaticIp());
   }
 
   public static UserDto from(User user, boolean mustChangePassword) {

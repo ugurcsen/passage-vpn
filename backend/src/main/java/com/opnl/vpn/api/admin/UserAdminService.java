@@ -1,6 +1,7 @@
 package com.opnl.vpn.api.admin;
 
 import com.opnl.vpn.auth.TotpService;
+import com.opnl.vpn.ccd.CcdService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.group.Group;
 import com.opnl.vpn.group.GroupMember;
@@ -29,6 +30,7 @@ public class UserAdminService {
   private final PasswordEncoder passwordEncoder;
   private final TotpService totpService;
   private final SettingsService settingsService;
+  private final CcdService ccdService;
 
   public UserAdminService(
       UserRepository userRepository,
@@ -36,13 +38,15 @@ public class UserAdminService {
       GroupMemberRepository memberRepository,
       PasswordEncoder passwordEncoder,
       TotpService totpService,
-      SettingsService settingsService) {
+      SettingsService settingsService,
+      CcdService ccdService) {
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
     this.memberRepository = memberRepository;
     this.passwordEncoder = passwordEncoder;
     this.totpService = totpService;
     this.settingsService = settingsService;
+    this.ccdService = ccdService;
   }
 
   @Transactional(readOnly = true)
@@ -220,6 +224,20 @@ public class UserAdminService {
     }
     user.setBanned(banned);
     userRepository.save(user);
+    return getUser(id);
+  }
+
+  @Transactional
+  public UserDto setStaticIp(String id, String staticIp) {
+    requireUser(id);
+    ccdService.setStaticIp(id, staticIp);
+    return getUser(id);
+  }
+
+  @Transactional
+  public UserDto clearStaticIp(String id) {
+    requireUser(id);
+    ccdService.clearStaticIp(id);
     return getUser(id);
   }
 

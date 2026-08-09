@@ -13,6 +13,11 @@ import { SetupWizardPage } from "@/pages/SetupWizardPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { GroupsPage } from "@/pages/GroupsPage";
+import { CertsPage } from "@/pages/CertsPage";
+import { AccessRulesPage } from "@/pages/AccessRulesPage";
+import { ProfilesPage } from "@/pages/ProfilesPage";
+import { PortalPage } from "@/pages/PortalPage";
+import { SharePage } from "@/pages/SharePage";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 
 export default function App() {
@@ -30,22 +35,26 @@ export default function App() {
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/login/mfa" element={<MfaLoginPage />} />
                   <Route path="/setup" element={<SetupWizardPage />} />
+                  <Route path="/share/:token" element={<SharePage />} />
                   <Route element={<AppLayout darkMode={darkMode} onToggleDarkMode={() => setDarkMode((d) => !d)} />}>
                     <Route path="/" element={<DashboardPage />} />
                     <Route path="/users" element={<UsersPage />} />
                     <Route path="/groups" element={<GroupsPage />} />
                     <Route
                       path="/certs"
-                      element={<PlaceholderPage title="Certificates" description="PKI management lands in Phase 3." />}
+                      element={<CertsPage />}
+                    />
+                    <Route
+                      path="/rules"
+                      element={<AccessRulesPage />}
                     />
                     <Route
                       path="/profiles"
-                      element={
-                        <PlaceholderPage
-                          title="Connection profiles"
-                          description="Profile generation, QR codes and token URLs land in Phase 3."
-                        />
-                      }
+                      element={<ProfilesPage />}
+                    />
+                    <Route
+                      path="/portal"
+                      element={<PortalPage />}
                     />
                     <Route
                       path="/status"

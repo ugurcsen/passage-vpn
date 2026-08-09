@@ -36,7 +36,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] `EasyRsaService` — init-pki, build-ca, build-server-full, build-client-full, revoke, gen-crl
 - [x] `index.txt` parser → certificate metadata sync into DB
 - [~] `CertService` — issue, revoke, restore, rotate; expiry warnings (scheduler)
-- [~] Certificate entity + Flyway migration (metadata sync in Phase 2)
+- [x] Certificate entity + Flyway migration (metadata sync in Phase 2)
 - [x] Shared PKI volume mounted into openvpn container
 
 ### 1.3 Server configuration engine
@@ -68,7 +68,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Group CRUD + assignment, nested groups
 - [x] Per-user and per-group settings (inheritance resolution)
 - [x] User search (server-side), status filter, bulk operations (UI)
-- [ ] Static IP assignment (Phase 3 CCD)
+- [x] Static IP assignment (Phase 3 CCD)
 
 ### 2.3 Authentication (web UI)
 - [x] JWT access + refresh tokens, rotation, logout (hash-stored refresh tokens)
@@ -82,7 +82,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 ### 2.4 VPN authentication integration
 - [x] `auth-user-pass-verify` script → backend `/internal/auth/verify`
 - [x] Password + OTP verification, lockout, user ban checks
-- [ ] Auto-login (cert-only) + `client-connect` validation path (Phase 3)
+- [x] Auto-login (cert-only) + `client-connect` validation path (Phase 3)
 - [x] `static-challenge` handling for MFA-on-connect (challenge via verify-user-pass script)
 - [ ] Post-auth Python script hook support
 
@@ -96,31 +96,31 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 ## Phase 3 — Access Control & Connection Profiles
 
 ### 3.1 CCD (Client Config Dir)
-- [ ] `CcdService` — per-user CCD files (static IP, routes, per-user directives)
+- [x] `CcdService` — per-user CCD files (static IP, routes, per-user directives)
 - [ ] Group subnet allocation from pool
-- [ ] Static IP conflict detection
-- [ ] CCD written to shared volume, applied per connection
+- [x] Static IP conflict detection
+- [x] CCD written to shared volume, applied per connection
 
 ### 3.2 Access control / ZTNA
-- [ ] `AccessRule` entity (user/group target, action, src/dst, protocol/port, priority)
-- [ ] `RuleEngine` — evaluate rules → iptables rule set
-- [ ] iptables generator + `apply-rules.sh` (requires `NET_ADMIN`)
+- [x] `AccessRule` entity (user/group target, action, src/dst, protocol/port, priority)
+- [x] `RuleEngine` — evaluate rules → iptables rule set
+- [x] iptables generator + `apply-rules.sh` (requires `NET_ADMIN`)
 - [ ] Full-tunnel / split-tunnel per user/group
 - [ ] Inter-group connectivity rules
 - [ ] NAT vs routing mode
 - [ ] Domain-based control via dnsmasq (advanced)
 
 ### 3.3 Connection profiles (.ovpn)
-- [ ] `OvpnGenerator` — 4 profile types: user-locked, auto-login, server-locked, generic
-- [ ] Profile types mapped to daemons (generic → `client-cert-not-required` daemon)
-- [ ] Token URLs — time-limited or permanent, single/multi-use
-- [ ] QR code sharing (OpenVPN Connect import XML)
-- [ ] Client portal — users download own profiles
+- [x] `OvpnGenerator` — 4 profile types: user-locked, auto-login, server-locked, generic
+- [~] Profile types mapped to daemons (generic → `client-cert-not-required` daemon; auto-login → daemon without auth-user-pass)
+- [x] Token URLs — time-limited or permanent, single/multi-use
+- [x] QR code sharing (OpenVPN Connect import XML)
+- [x] Client portal — users download own profiles
 
 ### 3.4 Frontend
-- [ ] Access rules editor page
-- [ ] Profile download/QR/token management UI
-- [ ] Client portal UI (self-service)
+- [x] Access rules editor page
+- [x] Profile download/QR/token management UI
+- [x] Client portal UI (self-service)
 - [ ] Static IP + CCD editor UI
 
 ## Phase 4 — Monitoring, Admin & Deployment

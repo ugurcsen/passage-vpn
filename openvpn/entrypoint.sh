@@ -8,6 +8,31 @@ set -e
 
 mkdir -p "$OPNL_CONFIG_DIR" "$OPNL_CCD_DIR" "$OPNL_PKI_DIR" "$OPNL_LOG_DIR"
 
+# --- Base firewall ---
+mask_to_prefix() {
+    local m="$1" bits=0 o
+    IFS=. read -r a b c d <<<"$m"
+    for o in "$a" "$b" "$c" "$d"; do
+        while (( o > 0 )); do bits=$((bits + o % 2)); o=$((o / 2)); done
+    done
+    echo "$bits"
+}
+
+extract_pool() {
+    local conf="$1"
+    local net mask
+    net="$(grep -m1 '^server ' "$conf" | awk '{print $2}')"
+    mask="$(grep -m1 '^server ' "$conf" | awk '{print $3}')"
+    [[ -n "$net" && -n "$mask" ]] && echo "$net/$(mask_to_prefix "$mask")"
+}
+
+if [ -n "$(ls "$OPNL_CONFIG_DIR"/daemon-*.conf 2>/dev/null)" ]; then
+    pool="$(extract_pool "$(ls "$OPNL_CONFIG_DIR"/daemon-*.conf 2>/dev/null | head -1)")"
+    if [[ -n "$pool" ]]; then
+        OPNL_VPN_POOL="$pool" /etc/openvpn/scripts/apply-rules.sh
+    fi
+fi
+
 start_daemon() {
     local conf="$1"
     local name

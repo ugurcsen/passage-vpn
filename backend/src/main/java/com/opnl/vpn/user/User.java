@@ -71,6 +71,9 @@ public class User {
   @Column(name = "last_login_at")
   private Instant lastLoginAt;
 
+  @Column(name = "static_ip", length = 45)
+  private String staticIp;
+
   public boolean isLocked(Instant now) {
     return lockedUntil != null && now.isBefore(lockedUntil);
   }

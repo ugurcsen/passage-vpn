@@ -26,6 +26,8 @@ import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import DownloadIcon from "@mui/icons-material/Download";
 import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import SettingsIcon from "@mui/icons-material/Settings";
+import SecurityIcon from "@mui/icons-material/Security";
+import PersonIcon from "@mui/icons-material/Person";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,7 +39,9 @@ const NAV_ITEMS = [
   { label: "Users", path: "/users", icon: <PeopleIcon /> },
   { label: "Groups", path: "/groups", icon: <GroupIcon /> },
   { label: "Certificates", path: "/certs", icon: <VpnKeyIcon /> },
+  { label: "Access Rules", path: "/rules", icon: <SecurityIcon /> },
   { label: "Connection Profiles", path: "/profiles", icon: <DownloadIcon /> },
+  { label: "My Profiles", path: "/portal", icon: <PersonIcon /> },
   { label: "Live Status", path: "/status", icon: <MonitorHeartIcon /> },
   { label: "Settings", path: "/settings", icon: <SettingsIcon /> },
 ];

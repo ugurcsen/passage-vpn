@@ -10,4 +10,6 @@ public interface UserRepository extends JpaRepository<User, String> {
   boolean existsByUsername(String username);
 
   long countByRole(User.Role role);
+
+  Optional<User> findByStaticIp(String staticIp);
 }

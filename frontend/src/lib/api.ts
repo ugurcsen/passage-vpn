@@ -125,8 +125,30 @@ export const endpoints = {
   users: "/admin/users",
   groups: "/admin/groups",
   certs: "/admin/certs",
-  profiles: "/admin/profiles",
+  rules: "/admin/rules",
+  profileTokens: "/admin/profile-tokens",
+  portalProfiles: "/portal/profiles",
   status: "/admin/status",
   settings: "/admin/settings",
   dashboard: "/admin/dashboard",
 };
+
+export type ProfileType = "USER_LOCKED" | "AUTO_LOGIN" | "SERVER_LOCKED" | "GENERIC";
+
+export interface OvpnFile {
+  filename: string;
+  content: string;
+}
+
+/** Triggers a browser download for a backend-generated profile file. */
+export function downloadOvpn(file: OvpnFile) {
+  const blob = new Blob([file.content], { type: "application/x-openvpn-profile" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
