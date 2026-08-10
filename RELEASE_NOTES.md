@@ -69,9 +69,13 @@ Legend: `[x]` released, `[~]` partial.
       link management, self-service portal UI
 - [x] `ServerConfig.authUserPass` + `verify-client-cert none` so auto-login /
       cert-only daemons work
+- [x] Per-daemon profile mapping — generic / auto-login / user-locked daemons as
+      first-class configs (`daemons` entity, per-daemon conf + management port),
+      GENERIC daemons render `verify-client-cert none`
 
 ### Verified end-to-end
-- Backend: 104 unit tests green; `make test`, `make lint` and spotless pass.
+- Backend: 141 unit tests green; frontend: 49 component tests; `make test`,
+  `make lint` and spotless pass.
 - Live E2E (production `65.21.108.250`, docker compose): setup wizard → PKI
   provisioned → OpenVPN daemon boots from the generated config → management
   interface works → admin login (password aligned with `OPNL_ADMIN_PASSWORD`)
@@ -87,15 +91,18 @@ Legend: `[x]` released, `[~]` partial.
 - Phase 3 verified via unit tests: rule resolution (global/group/user, disabled
   rules), iptables rendering (per-client chain + teardown), certificate issue/
   reuse/revoke, and all four profile types + token use consumption.
-- Known limitation: auto-login / cert-only profiles require a daemon without
-  `auth-user-pass` (the current single daemon runs with `authUserPass=true`, so
-  an auto-login handshake is rejected with `Auth Username/Password was not
-  provided by peer`). Tracked as per-daemon profile mapping in Phase 3.3.
+- Live E2E bugfix sweep (`docs/test-findings.md` 2.1–2.7): GENERIC daemons no
+  longer emit the removed `client-cert-not-required` option; the entrypoint
+  config watcher survives failing daemons; the container healthcheck compares
+  configs to live pidfiles per daemon; profile-token create without `userId`
+  → 400 (was 500); unknown `/api/**` path → 404 `not_found` (was 500); MFA
+  challenge tokens are single-use; access rule `dstCidr` is validated as CIDR
+  (malformed values rejected with 400 `validation_failed`).
 
 ### Not yet released
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group
   connectivity rules, NAT-vs-routing mode, dnsmasq domain control, static IP/CCD
-  editor UI, per-daemon profile mapping
+  editor UI
 - Phase 4 — Monitoring/dashboard, logging & audit, Swagger, branding, backup,
   multi-node, installer polish, PostgreSQL profile validation
 
