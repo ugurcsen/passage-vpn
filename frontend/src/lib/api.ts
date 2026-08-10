@@ -161,6 +161,7 @@ export const endpoints = {
   groups: "/admin/groups",
   certs: "/admin/certs",
   rules: "/admin/rules",
+  daemons: "/admin/daemons",
   profileTokens: "/admin/profile-tokens",
   portalProfiles: "/portal/profiles",
   status: "/admin/status",
@@ -173,6 +174,26 @@ export type ProfileType = "USER_LOCKED" | "AUTO_LOGIN" | "SERVER_LOCKED" | "GENE
 export interface OvpnFile {
   filename: string;
   content: string;
+}
+
+export interface Daemon {
+  id: string;
+  daemonIndex: number;
+  name: string | null;
+  port: number;
+  proto: "udp" | "tcp";
+  subnet: string;
+  subnetMask: string;
+  dnsServers: string[];
+  domain: string | null;
+  extraRoutes: string[];
+  fullTunnel: boolean;
+  clientCertNotRequired: boolean;
+  authUserPass: boolean;
+  adminHost: string | null;
+  enabled: boolean;
+  primary: boolean;
+  createdAt: string;
 }
 
 /** Triggers a browser download for a backend-generated profile file. */

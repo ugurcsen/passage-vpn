@@ -7,15 +7,16 @@ import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.OpnlProperties;
+import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.network.ServerConfig;
 import com.opnl.vpn.pki.CertService;
 import com.opnl.vpn.pki.EasyRsaService;
 import com.opnl.vpn.profile.ProfileService.OvpnFile;
 import com.opnl.vpn.profile.ProfileService.QrPayload;
-import com.opnl.vpn.setup.SetupService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,7 @@ class ProfileServiceTest {
 
   private CertService certService;
   private EasyRsaService easyRsa;
-  private SetupService setupService;
+  private DaemonService daemonService;
   private UserRepository userRepository;
   private ProfileTokenRepository tokenRepository;
   private OpnlProperties properties;
@@ -44,7 +45,7 @@ class ProfileServiceTest {
   void setUp() {
     certService = mock(CertService.class);
     easyRsa = mock(EasyRsaService.class);
-    setupService = mock(SetupService.class);
+    daemonService = mock(DaemonService.class);
     userRepository = mock(UserRepository.class);
     tokenRepository = mock(ProfileTokenRepository.class);
     properties = mock(OpnlProperties.class);
@@ -55,18 +56,42 @@ class ProfileServiceTest {
             new OvpnGenerator(),
             certService,
             easyRsa,
-            setupService,
+            daemonService,
             userRepository,
             tokenRepository,
             properties);
 
     ServerConfig config = ServerConfig.defaults();
-    when(setupService.currentServerConfig()).thenReturn(config);
+    when(daemonService.resolveForProfile(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(config);
     when(easyRsa.caCert()).thenReturn("CA-CERT");
     when(easyRsa.taKey()).thenReturn("TA-KEY");
     when(easyRsa.clientCert("alice")).thenReturn("CERT");
     when(easyRsa.clientKey("alice")).thenReturn("KEY");
     when(userRepository.findById("u1")).thenReturn(Optional.of(alice()));
+  }
+
+  @Test
+  void profileUsesDaemonResolvedForItsType() {
+    ServerConfig certOnly =
+        new ServerConfig(
+            1,
+            1195,
+            ServerConfig.Protocol.udp,
+            "10.9.0.0",
+            "255.255.255.0",
+            List.of("1.1.1.1"),
+            null,
+            List.of(),
+            true,
+            false,
+            false,
+            "vpn.example.com");
+    when(daemonService.resolveForProfile(ProfileType.AUTO_LOGIN)).thenReturn(certOnly);
+
+    OvpnFile file = service.downloadForUser("u1", ProfileType.AUTO_LOGIN);
+
+    assertThat(file.content()).contains("remote vpn.example.com 1195");
   }
 
   @Test

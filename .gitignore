@@ -7,6 +7,9 @@ target/
 .vite/
 bin/
 
+# Local tool state
+.serena/
+
 # Env / secrets
 .env
 .env.local

@@ -17,17 +17,24 @@ public class ConnectionRegistry {
 
   /** An active client tunnel as correlated from connect/disconnect and learn-address events. */
   public record VpnSession(
-      String username, String commonName, String virtualIp, String remoteIp, Instant connectedAt) {}
+      String username,
+      String commonName,
+      String virtualIp,
+      String remoteIp,
+      String daemonName,
+      Instant connectedAt) {}
 
   private final ConcurrentHashMap<String, VpnSession> byCommonName = new ConcurrentHashMap<>();
   private final ConcurrentHashMap<String, VpnSession> byVirtualIp = new ConcurrentHashMap<>();
 
   /** Registers or refreshes a session after client-connect. */
-  public void register(String username, String commonName, String virtualIp, String remoteIp) {
+  public void register(
+      String username, String commonName, String virtualIp, String remoteIp, String daemonName) {
     if (commonName == null || commonName.isBlank()) {
       return;
     }
-    VpnSession session = new VpnSession(username, commonName, virtualIp, remoteIp, Instant.now());
+    VpnSession session =
+        new VpnSession(username, commonName, virtualIp, remoteIp, daemonName, Instant.now());
     byCommonName.put(commonName, session);
     if (virtualIp != null && !virtualIp.isBlank()) {
       byVirtualIp.put(virtualIp, session);
@@ -53,7 +60,7 @@ public class ConnectionRegistry {
     VpnSession session =
         existing != null
             ? existing
-            : new VpnSession(commonName, commonName, address, null, Instant.now());
+            : new VpnSession(commonName, commonName, address, null, null, Instant.now());
     byVirtualIp.put(address, session);
     if (commonName != null && !commonName.isBlank()) {
       byCommonName.put(commonName, session);
@@ -76,6 +83,16 @@ public class ConnectionRegistry {
     return byCommonName.values().stream()
         .sorted(Comparator.comparing(VpnSession::connectedAt))
         .toList();
+  }
+
+  /** Number of active sessions for a username (max_connections enforcement). */
+  public long countByUsername(String username) {
+    if (username == null) {
+      return 0;
+    }
+    return byCommonName.values().stream()
+        .filter(s -> username.equals(s.username()))
+        .count();
   }
 
   public Optional<VpnSession> byVirtualIp(String virtualIp) {

@@ -17,11 +17,13 @@ import com.opnl.vpn.auth.AuthService;
 import com.opnl.vpn.auth.AuthService.VpnVerification;
 import com.opnl.vpn.common.GlobalExceptionHandler;
 import com.opnl.vpn.network.ConnectionRegistry;
+import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.setup.SetupService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,6 +41,7 @@ class InternalControllerTest {
   private AuthService authService;
   private AccessRuleService ruleService;
   private ConnectionRegistry connectionRegistry;
+  private SettingsService settingsService;
   private MockMvc mvc;
 
   private User user(boolean banned, boolean locked) {
@@ -60,7 +63,9 @@ class InternalControllerTest {
     authService = mock(AuthService.class);
     ruleService = mock(AccessRuleService.class);
     connectionRegistry = new ConnectionRegistry();
+    settingsService = mock(SettingsService.class);
     when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user(false, false)));
+    when(settingsService.effectiveForUser("u1")).thenReturn(Map.of());
     when(ruleService.iptablesFor(anyString(), anyString(), anyString()))
         .thenReturn(
             new IptablesResult(List.of("iptables -N OPNL_x"), List.of("iptables -X OPNL_x")));
@@ -73,7 +78,8 @@ class InternalControllerTest {
                     setupService,
                     authService,
                     ruleService,
-                    connectionRegistry))
+                    connectionRegistry,
+                    settingsService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -245,12 +251,41 @@ class InternalControllerTest {
   }
 
   @Test
+  void connectDeniesWhenMaxConnectionsReached() throws Exception {
+    when(settingsService.effectiveForUser("u1"))
+        .thenReturn(Map.of("max_connections", 1));
+    connectionRegistry.register("alice", "alice", "10.8.0.8", "9.9.9.9", "daemon-0");
+
+    mvc.perform(
+            post("/internal/connect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.allowed").value(false))
+        .andExpect(jsonPath("$.reason").value("max_connections"));
+  }
+
+  @Test
+  void connectAllowsUnderMaxConnectionsLimit() throws Exception {
+    when(settingsService.effectiveForUser("u1"))
+        .thenReturn(Map.of("max_connections", 2));
+    connectionRegistry.register("alice", "alice", "10.8.0.8", "9.9.9.9", "daemon-0");
+
+    mvc.perform(
+            post("/internal/connect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.allowed").value(true));
+  }
+
+  @Test
   void connectRegistersActiveSession() throws Exception {
     mvc.perform(
             post("/internal/connect")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    "{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\",\"remoteIp\":\"1.2.3.4\"}"))
+                    "{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\",\"remoteIp\":\"1.2.3.4\",\"daemonName\":\"daemon-0\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.allowed").value(true));
 
@@ -259,12 +294,13 @@ class InternalControllerTest {
             s -> {
               assertThat(s.username()).isEqualTo("alice");
               assertThat(s.remoteIp()).isEqualTo("1.2.3.4");
+              assertThat(s.daemonName()).isEqualTo("daemon-0");
             });
   }
 
   @Test
   void disconnectUnregistersActiveSession() throws Exception {
-    connectionRegistry.register("alice", "alice", "10.8.0.9", "1.2.3.4");
+    connectionRegistry.register("alice", "alice", "10.8.0.9", "1.2.3.4", "daemon-0");
     mvc.perform(
             post("/internal/disconnect")
                 .contentType(MediaType.APPLICATION_JSON)

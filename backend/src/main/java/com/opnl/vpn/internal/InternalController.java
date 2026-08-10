@@ -6,11 +6,14 @@ import com.opnl.vpn.access.RuleEngine.IptablesResult;
 import com.opnl.vpn.auth.AuthService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.network.ConnectionRegistry;
+import com.opnl.vpn.setting.SettingKeys;
+import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.setup.SetupService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,6 +37,7 @@ public class InternalController {
   private final AuthService authService;
   private final AccessRuleService ruleService;
   private final ConnectionRegistry connectionRegistry;
+  private final SettingsService settingsService;
 
   public InternalController(
       UserRepository userRepository,
@@ -41,13 +45,15 @@ public class InternalController {
       SetupService setupService,
       AuthService authService,
       AccessRuleService ruleService,
-      ConnectionRegistry connectionRegistry) {
+      ConnectionRegistry connectionRegistry,
+      SettingsService settingsService) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.setupService = setupService;
     this.authService = authService;
     this.ruleService = ruleService;
     this.connectionRegistry = connectionRegistry;
+    this.settingsService = settingsService;
   }
 
   /**
@@ -107,8 +113,17 @@ public class InternalController {
     if (user.isBanned() || user.isLocked(Instant.now())) {
       return ConnectResult.deny(user.isBanned() ? "user_banned" : "user_locked");
     }
+    int maxConnections = maxConnections(user);
+    if (maxConnections > 0
+        && connectionRegistry.countByUsername(user.getUsername()) >= maxConnections) {
+      return ConnectResult.deny("max_connections");
+    }
     connectionRegistry.register(
-        user.getUsername(), user.getUsername(), request.virtualIp(), request.remoteIp());
+        user.getUsername(),
+        user.getUsername(),
+        request.virtualIp(),
+        request.remoteIp(),
+        request.daemonName());
     IptablesResult result =
         ruleService.iptablesFor(user.getUsername(), request.virtualIp(), user.getId());
     return new ConnectResult(true, null, List.of(), result.apply(), result.remove());
@@ -167,4 +182,23 @@ public class InternalController {
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public record VerifyResult(boolean allowed, String reason) {}
+
+  private int maxConnections(User user) {
+    Map<String, Object> effective = settingsService.effectiveForUser(user.getId());
+    return asInt(effective.get(SettingKeys.MAX_CONNECTIONS));
+  }
+
+  private static int asInt(Object value) {
+    if (value instanceof Number number) {
+      return number.intValue();
+    }
+    if (value instanceof String s) {
+      try {
+        return Integer.parseInt(s.trim());
+      } catch (NumberFormatException e) {
+        return 0;
+      }
+    }
+    return 0;
+  }
 }

@@ -4,8 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.common.AppMeta;
 import com.opnl.vpn.common.AppMetaRepository;
-import com.opnl.vpn.config.OpnlProperties;
-import com.opnl.vpn.network.ConfigWriter;
+import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.network.ServerConfig;
 import com.opnl.vpn.network.ServerConfigGenerator;
 import com.opnl.vpn.network.ServerSetting;
@@ -41,8 +40,7 @@ public class SetupService {
   private final PasswordEncoder passwordEncoder;
   private final EasyRsaService easyRsa;
   private final ServerConfigGenerator configGenerator;
-  private final ConfigWriter configWriter;
-  private final OpnlProperties properties;
+  private final DaemonService daemonService;
 
   public SetupService(
       AppMetaRepository metaRepository,
@@ -51,16 +49,14 @@ public class SetupService {
       PasswordEncoder passwordEncoder,
       EasyRsaService easyRsa,
       ServerConfigGenerator configGenerator,
-      ConfigWriter configWriter,
-      OpnlProperties properties) {
+      DaemonService daemonService) {
     this.metaRepository = metaRepository;
     this.userRepository = userRepository;
     this.settingRepository = settingRepository;
     this.passwordEncoder = passwordEncoder;
     this.easyRsa = easyRsa;
     this.configGenerator = configGenerator;
-    this.configWriter = configWriter;
-    this.properties = properties;
+    this.daemonService = daemonService;
   }
 
   public State state() {
@@ -119,6 +115,7 @@ public class SetupService {
   private void saveServerConfig(ServerConfig config) {
     requireState(State.ADMIN_DONE);
     settingRepository.save(new ServerSetting("network", configGenerator.toJson(config)));
+    daemonService.ensurePrimary();
     setState(State.SERVER_DONE);
     log.info("Setup step 'server' completed: {}", config);
   }
@@ -129,10 +126,9 @@ public class SetupService {
     easyRsa.buildServerCert("server");
     easyRsa.genCrl();
 
-    ServerConfig config = currentServerConfig();
-    configWriter.writeDaemon(config, configGenerator, properties);
+    daemonService.writeAll();
     setState(State.COMPLETE);
-    log.info("Setup step 'pki' completed; PKI provisioned and config written");
+    log.info("Setup step 'pki' completed; PKI provisioned and daemon configs written");
   }
 
   public ServerConfig currentServerConfig() {

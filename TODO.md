@@ -20,10 +20,10 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [ ] Static IP + CCD editor UI (backend ready: `CcdService`)
 - [ ] Group subnet allocation from pool + static IP from group settings
 - [ ] Per-user/group full-tunnel vs split-tunnel (now global only)
-- [ ] Per-daemon profile mapping (generic/auto-login daemons as first-class configs)
+- [x] Per-daemon profile mapping (generic/auto-login daemons as first-class configs)
 - [ ] Inter-group connectivity rules + NAT-vs-routing mode
 - [ ] `CertService` restore/rotate + expiry-warning scheduler
-- [ ] Multi-daemon (`daemons` entity) + DCO detection display
+- [~] Multi-daemon (`daemons` entity) + DCO detection display
 - [ ] Domain-based control via dnsmasq (advanced)
 
 **P2 — Phase 4: monitoring & dashboard**
@@ -76,7 +76,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 ### 1.3 Server configuration engine
 - [x] `ServerSettings` entity (port, proto, pool, DNS, routes, cipher, DCO, ...)
 - [x] `ServerConfigGenerator` — renders `server.conf` from settings
-- [~] Multi-daemon support (`daemons` entity) — per-daemon conf + management port
+- [x] Multi-daemon support (`daemons` entity) — per-daemon conf + management port
 - [x] Apply flow: write conf → management `signal` reload / container restart
 - [~] DCO (Data Channel Offload) detection + display (status-based, UI in Phase 4)
 
@@ -147,7 +147,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 ### 3.3 Connection profiles (.ovpn)
 - [x] `OvpnGenerator` — 4 profile types: user-locked, auto-login, server-locked, generic
-- [~] Profile types mapped to daemons (generic → `client-cert-not-required` daemon; auto-login → daemon without auth-user-pass)
+- [x] Profile types mapped to daemons (generic → `client-cert-not-required` daemon; auto-login → daemon without auth-user-pass)
 - [x] Token URLs — time-limited or permanent, single/multi-use
 - [x] QR code sharing (OpenVPN Connect import XML)
 - [x] Client portal — users download own profiles

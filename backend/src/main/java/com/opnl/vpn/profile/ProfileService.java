@@ -2,10 +2,10 @@ package com.opnl.vpn.profile;
 
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.OpnlProperties;
+import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.network.ServerConfig;
 import com.opnl.vpn.pki.CertService;
 import com.opnl.vpn.pki.EasyRsaService;
-import com.opnl.vpn.setup.SetupService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Duration;
@@ -28,7 +28,7 @@ public class ProfileService {
   private final OvpnGenerator generator;
   private final CertService certService;
   private final EasyRsaService easyRsa;
-  private final SetupService setupService;
+  private final DaemonService daemonService;
   private final UserRepository userRepository;
   private final ProfileTokenRepository tokenRepository;
   private final OpnlProperties properties;
@@ -37,14 +37,14 @@ public class ProfileService {
       OvpnGenerator generator,
       CertService certService,
       EasyRsaService easyRsa,
-      SetupService setupService,
+      DaemonService daemonService,
       UserRepository userRepository,
       ProfileTokenRepository tokenRepository,
       OpnlProperties properties) {
     this.generator = generator;
     this.certService = certService;
     this.easyRsa = easyRsa;
-    this.setupService = setupService;
+    this.daemonService = daemonService;
     this.userRepository = userRepository;
     this.tokenRepository = tokenRepository;
     this.properties = properties;
@@ -158,7 +158,7 @@ public class ProfileService {
   }
 
   private OvpnFile build(User user, ProfileType type, String[] certMaterial) {
-    ServerConfig config = setupService.currentServerConfig();
+    ServerConfig config = daemonService.resolveForProfile(type);
     String adminHost = properties.openvpn().adminHost();
     String content =
         generator.render(

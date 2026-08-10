@@ -5,7 +5,12 @@ import java.time.Instant;
 
 /** Admin-facing view of an active VPN connection (Phase 4 dashboard data source). */
 public record ConnectionDto(
-    String username, String commonName, String virtualIp, String remoteIp, Instant connectedAt) {
+    String username,
+    String commonName,
+    String virtualIp,
+    String remoteIp,
+    String daemonName,
+    Instant connectedAt) {
 
   public static ConnectionDto from(VpnSession session) {
     return new ConnectionDto(
@@ -13,6 +18,7 @@ public record ConnectionDto(
         session.commonName(),
         session.virtualIp(),
         session.remoteIp(),
+        session.daemonName(),
         session.connectedAt());
   }
 }

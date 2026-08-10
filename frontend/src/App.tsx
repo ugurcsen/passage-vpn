@@ -16,6 +16,7 @@ import { GroupsPage } from "@/pages/GroupsPage";
 import { CertsPage } from "@/pages/CertsPage";
 import { AccessRulesPage } from "@/pages/AccessRulesPage";
 import { ProfilesPage } from "@/pages/ProfilesPage";
+import { DaemonsPage } from "@/pages/DaemonsPage";
 import { PortalPage } from "@/pages/PortalPage";
 import { SharePage } from "@/pages/SharePage";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
@@ -51,6 +52,10 @@ export default function App() {
                     <Route
                       path="/profiles"
                       element={<ProfilesPage />}
+                    />
+                    <Route
+                      path="/daemons"
+                      element={<DaemonsPage />}
                     />
                     <Route
                       path="/portal"

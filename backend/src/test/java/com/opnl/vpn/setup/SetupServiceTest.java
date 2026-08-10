@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,8 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.common.AppMeta;
 import com.opnl.vpn.common.AppMetaRepository;
-import com.opnl.vpn.config.OpnlProperties;
-import com.opnl.vpn.network.ConfigWriter;
+import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.network.ServerConfig;
 import com.opnl.vpn.network.ServerConfigGenerator;
 import com.opnl.vpn.network.ServerSetting;
@@ -32,8 +30,7 @@ class SetupServiceTest {
   private UserRepository userRepository;
   private ServerSettingRepository settingRepository;
   private EasyRsaService easyRsa;
-  private ConfigWriter configWriter;
-  private OpnlProperties properties;
+  private DaemonService daemonService;
   private SetupService service;
   private java.util.Map<String, String> metaStore;
 
@@ -43,14 +40,7 @@ class SetupServiceTest {
     userRepository = mock(UserRepository.class);
     settingRepository = mock(ServerSettingRepository.class);
     easyRsa = mock(EasyRsaService.class);
-    configWriter = mock(ConfigWriter.class);
-    properties = mock(OpnlProperties.class);
-    OpnlProperties.OpenVpn ov = mock(OpnlProperties.OpenVpn.class);
-    lenient().when(properties.openvpn()).thenReturn(ov);
-    lenient().when(ov.pkiDir()).thenReturn("/pki");
-    lenient().when(ov.ccdDir()).thenReturn("/ccd");
-    lenient().when(ov.scriptsDir()).thenReturn("/scripts");
-    lenient().when(ov.configDir()).thenReturn("/config");
+    daemonService = mock(DaemonService.class);
 
     // In-memory AppMeta store so state transitions are observable.
     metaStore = new java.util.HashMap<>();
@@ -76,8 +66,7 @@ class SetupServiceTest {
             new BCryptPasswordEncoder(),
             easyRsa,
             new ServerConfigGenerator(new ObjectMapper()),
-            configWriter,
-            properties);
+            daemonService);
   }
 
   @Test
@@ -96,13 +85,14 @@ class SetupServiceTest {
     when(settingRepository.findById("network")).thenReturn(Optional.empty());
     service.runStep("server", json(serverJson()));
     assertThat(service.state()).isEqualTo(SetupService.State.SERVER_DONE);
+    verify(daemonService).ensurePrimary();
 
     // step 3: pki
     service.runStep("pki", null);
     verify(easyRsa).initPki();
     verify(easyRsa).buildServerCert("server");
     verify(easyRsa).genCrl();
-    verify(configWriter).writeDaemon(any(), any(), any());
+    verify(daemonService).writeAll();
     assertThat(service.state()).isEqualTo(SetupService.State.COMPLETE);
   }
 
