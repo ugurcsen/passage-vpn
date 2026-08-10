@@ -195,7 +195,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 ### 4.7 Deployment & polish
 - [ ] Complete `Makefile` targets
 - [ ] `install.sh` full installer (preflight, env, build, up, wizard)
-- [ ] First-run wizard UI (frontend)
+- [x] First-run wizard UI (frontend) — admin → VPN server → PKI → complete; login gated on `COMPLETE`
 - [ ] PostgreSQL docker profile + `application-postgres.yml` validation
 - [ ] Seed data + demo mode
 - [ ] E2E test pass (backend unit+integration, frontend unit)

@@ -1,5 +1,20 @@
 import { useState } from "react";
-import { Box, Button, Paper, Step, StepContent, StepLabel, Stepper, TextField, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  CircularProgress,
+  FormControlLabel,
+  MenuItem,
+  Paper,
+  Stack,
+  Step,
+  StepContent,
+  StepLabel,
+  Stepper,
+  Switch,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { api, endpoints } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
@@ -11,13 +26,46 @@ const STEPS = [
   { label: "Done", description: "The panel is ready to use." },
 ];
 
-/** First-run wizard. Backend state machine consumed in Phase 1.5. */
+const DEFAULTS = {
+  port: "1194",
+  proto: "udp" as "udp" | "tcp",
+  subnet: "10.8.0.0",
+  subnetMask: "255.255.255.0",
+  dns: "1.1.1.1, 8.8.8.8",
+  domain: "",
+  fullTunnel: true,
+  clientCertNotRequired: false,
+  authUserPass: true,
+  adminHost: "vpn.example.com",
+};
+
+/** First-run wizard driving the backend setup state machine (admin → server → pki → complete). */
 export function SetupWizardPage() {
   const [activeStep, setActiveStep] = useState(0);
   const navigate = useNavigate();
   const { error: toastError, success: toastSuccess } = useToast();
 
   const [admin, setAdmin] = useState({ username: "admin", password: "" });
+  const [server, setServer] = useState(DEFAULTS);
+  const [pkiRunning, setPkiRunning] = useState(false);
+  const [pkiDone, setPkiDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const runStep = async (step: string, payload: unknown) => {
+    setSubmitting(true);
+    try {
+      await api(endpoints.setupWizard, {
+        method: "POST",
+        body: JSON.stringify({ step, payload }),
+      });
+      return true;
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "Setup step failed");
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const next = async () => {
     if (activeStep === 0) {
@@ -25,23 +73,63 @@ export function SetupWizardPage() {
         toastError("Password must be at least 8 characters");
         return;
       }
-      try {
-        await api(endpoints.setupWizard, {
-          method: "POST",
-          body: JSON.stringify({ step: "admin", payload: admin }),
-        });
-      } catch (err) {
-        toastError(err instanceof Error ? err.message : "Setup step failed");
+      if (await runStep("admin", admin)) setActiveStep((s) => s + 1);
+      return;
+    }
+    if (activeStep === 1) {
+      const port = Number(server.port);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        toastError("Port must be between 1 and 65535");
         return;
       }
+      if (!server.subnet.trim() || !server.subnetMask.trim()) {
+        toastError("Subnet and subnet mask are required");
+        return;
+      }
+      const payload = {
+        daemonIndex: 0,
+        port,
+        proto: server.proto,
+        subnet: server.subnet.trim(),
+        subnetMask: server.subnetMask.trim(),
+        dnsServers: server.dns
+          .split(",")
+          .map((d) => d.trim())
+          .filter((d) => d.length > 0),
+        domain: server.domain.trim() || null,
+        extraRoutes: [],
+        fullTunnel: server.fullTunnel,
+        clientCertNotRequired: server.clientCertNotRequired,
+        authUserPass: server.authUserPass,
+        adminHost: server.adminHost.trim() || DEFAULTS.adminHost,
+      };
+      if (await runStep("server", payload)) setActiveStep((s) => s + 1);
+      return;
+    }
+    if (activeStep === 2) {
+      if (!pkiDone) return;
+      setActiveStep((s) => s + 1);
+      return;
     }
     if (activeStep === 3) {
       toastSuccess("Setup complete");
       navigate("/");
-      return;
     }
-    setActiveStep((s) => s + 1);
   };
+
+  const provisionPki = async () => {
+    setPkiRunning(true);
+    try {
+      if (await runStep("pki", {})) {
+        setPkiDone(true);
+      }
+    } finally {
+      setPkiRunning(false);
+    }
+  };
+
+  const update = <K extends keyof typeof DEFAULTS>(key: K, value: (typeof DEFAULTS)[K]) =>
+    setServer((prev) => ({ ...prev, [key]: value }));
 
   return (
     <Box sx={{ maxWidth: 640, mx: "auto", mt: 6 }}>
@@ -58,7 +146,7 @@ export function SetupWizardPage() {
                   {step.description}
                 </Typography>
                 {index === 0 && (
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <Stack spacing={2} sx={{ mb: 2 }}>
                     <TextField
                       label="Username"
                       value={admin.username}
@@ -71,10 +159,105 @@ export function SetupWizardPage() {
                       onChange={(e) => setAdmin({ ...admin, password: e.target.value })}
                       helperText="Minimum 8 characters"
                     />
+                  </Stack>
+                )}
+                {index === 1 && (
+                  <Stack spacing={2} sx={{ mb: 2 }}>
+                    <Box sx={{ display: "flex", gap: 2 }}>
+                      <TextField
+                        label="Port"
+                        type="number"
+                        value={server.port}
+                        onChange={(e) => update("port", e.target.value)}
+                        sx={{ width: 140 }}
+                      />
+                      <TextField
+                        select
+                        label="Protocol"
+                        value={server.proto}
+                        onChange={(e) => update("proto", e.target.value as "udp" | "tcp")}
+                        sx={{ width: 140 }}
+                      >
+                        <MenuItem value="udp">UDP</MenuItem>
+                        <MenuItem value="tcp">TCP</MenuItem>
+                      </TextField>
+                    </Box>
+                    <Box sx={{ display: "flex", gap: 2 }}>
+                      <TextField
+                        label="Subnet"
+                        value={server.subnet}
+                        onChange={(e) => update("subnet", e.target.value)}
+                      />
+                      <TextField
+                        label="Subnet mask"
+                        value={server.subnetMask}
+                        onChange={(e) => update("subnetMask", e.target.value)}
+                      />
+                    </Box>
+                    <TextField
+                      label="DNS servers"
+                      value={server.dns}
+                      onChange={(e) => update("dns", e.target.value)}
+                      helperText="Comma-separated list"
+                    />
+                    <TextField
+                      label="Domain (optional)"
+                      value={server.domain}
+                      onChange={(e) => update("domain", e.target.value)}
+                    />
+                    <TextField
+                      label="Admin host"
+                      value={server.adminHost}
+                      onChange={(e) => update("adminHost", e.target.value)}
+                      helperText="Hostname/IP pushed to clients as VPN server address"
+                    />
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={server.fullTunnel}
+                          onChange={(e) => update("fullTunnel", e.target.checked)}
+                        />
+                      }
+                      label="Full tunnel (redirect all client traffic)"
+                    />
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={server.authUserPass}
+                          onChange={(e) => update("authUserPass", e.target.checked)}
+                        />
+                      }
+                      label="Require username/password in addition to certificates"
+                    />
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={server.clientCertNotRequired}
+                          onChange={(e) => update("clientCertNotRequired", e.target.checked)}
+                        />
+                      }
+                      label="Allow connections without a client certificate"
+                    />
+                  </Stack>
+                )}
+                {index === 2 && (
+                  <Box sx={{ mb: 2 }}>
+                    {pkiDone ? (
+                      <Typography color="success.main">Certificate authority initialized.</Typography>
+                    ) : (
+                      <Button variant="outlined" onClick={provisionPki} disabled={pkiRunning || submitting}>
+                        {pkiRunning ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+                        {pkiRunning ? "Provisioning PKI…" : "Provision PKI"}
+                      </Button>
+                    )}
                   </Box>
                 )}
                 <Box sx={{ mt: 2 }}>
-                  <Button variant="contained" onClick={next}>
+                  <Button
+                    variant="contained"
+                    onClick={next}
+                    disabled={submitting || (index === 2 && !pkiDone) || (index === 2 && pkiRunning)}
+                  >
                     {index === STEPS.length - 1 ? "Finish" : "Continue"}
                   </Button>
                 </Box>

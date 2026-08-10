@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { darkTheme } from "@/theme";
@@ -15,8 +15,11 @@ function renderLogin() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <ToastProvider>
-            <MemoryRouter>
-              <LoginPage />
+            <MemoryRouter initialEntries={["/login"]}>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/setup" element={<div>wizard page</div>} />
+              </Routes>
             </MemoryRouter>
           </ToastProvider>
         </AuthProvider>
@@ -26,10 +29,48 @@ function renderLogin() {
 }
 
 describe("LoginPage", () => {
-  it("renders the sign-in form", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("renders the sign-in form when setup is complete", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ state: "COMPLETE" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      ),
+    );
+
     renderLogin();
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
+  });
+
+  it("redirects to the setup wizard while setup is incomplete", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ state: "ADMIN_DONE", adminStepRequired: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      ),
+    );
+
+    renderLogin();
+    expect(await screen.findByText("wizard page")).toBeInTheDocument();
   });
 });

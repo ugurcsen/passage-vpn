@@ -46,6 +46,15 @@ start_daemon() {
 }
 
 shopt -s nullglob
+
+conf_sig() {
+    local sig="" conf
+    for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do
+        [ -f "$conf" ] && sig+="$(md5sum "$conf" | cut -d' ' -f1)"
+    done
+    echo "$sig"
+}
+
 restart_all() {
     # SIGTERM running daemons gracefully; configs are re-read on next connect.
     for pidfile in "$OPNL_LOG_DIR"/daemon-*.pid; do
@@ -58,13 +67,30 @@ restart_all() {
 }
 
 # Start whatever is present on boot.
+boot_sig=""
 for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do
     start_daemon "$conf"
+    boot_sig="$(conf_sig)"
 done
 
-if [ -z "$(ls "$OPNL_CONFIG_DIR"/daemon-*.conf 2>/dev/null)" ]; then
+if [ -z "$boot_sig" ]; then
     echo "[entrypoint] no daemon configs found; waiting for backend to provision."
 fi
+
+# Watch the shared config volume: when the backend writes/updates daemon configs
+# (first-run wizard, settings changes), reload the daemons without a restart.
+(
+    last_sig="$boot_sig"
+    while :; do
+        cur="$(conf_sig)"
+        if [ -n "$cur" ] && [ "$cur" != "$last_sig" ]; then
+            echo "[entrypoint] daemon config changed; restarting daemons"
+            restart_all
+            last_sig="$cur"
+        fi
+        sleep 2
+    done
+) &
 
 # Keep the container alive; a config watcher can later trigger restart_all.
 trap 'restart_all' USR1

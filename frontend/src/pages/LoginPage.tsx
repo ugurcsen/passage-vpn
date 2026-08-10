@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Box, Button, CircularProgress, Paper, TextField, Typography } from "@mui/material";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/useToast";
+import { apiPublic, endpoints } from "@/lib/api";
 
 /** Login page. MFA step handled after password verification. */
 export function LoginPage() {
@@ -14,6 +15,20 @@ export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiPublic<{ state: string; adminStepRequired: boolean }>(endpoints.setupState)
+      .then((s) => {
+        if (!cancelled && s.state !== "COMPLETE") navigate("/setup");
+      })
+      .catch(() => {
+        /* offline or not reachable; stay on login */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
