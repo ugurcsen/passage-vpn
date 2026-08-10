@@ -28,7 +28,7 @@ class DaemonServiceTest {
   private DaemonService service;
 
   private Daemon primary() {
-    return daemon("d0", 0, "Primary", 1194, "10.8.0.0", true, true);
+    return daemon("d0", 0, "Primary", 1194, "10.8.0.0", false, true);
   }
 
   private Daemon daemon(
