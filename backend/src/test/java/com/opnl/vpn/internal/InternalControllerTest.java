@@ -240,7 +240,8 @@ class InternalControllerTest {
                     setupService,
                     authService,
                     ruleService,
-                    connectionRegistry))
+                    connectionRegistry,
+                    settingsService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .addFilters(filter)
             .build();
