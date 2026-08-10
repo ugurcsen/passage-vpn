@@ -99,10 +99,10 @@ describe("DaemonsPage", () => {
     fireEvent.change(within(dialog).getByLabelText(/^name$/i), {
       target: { value: "Generic access" },
     });
-    fireEvent.change(within(dialog).getByLabelText(/^port$/i), {
+    fireEvent.change(within(dialog).getByLabelText(/^port\s*\*?$/i), {
       target: { value: "1196" },
     });
-    fireEvent.change(within(dialog).getByLabelText(/^subnet$/i), {
+    fireEvent.change(within(dialog).getByLabelText(/^subnet\s*\*?$/i), {
       target: { value: "10.10.0.0" },
     });
     await user.click(within(dialog).getByRole("button", { name: /^create$/i }));
