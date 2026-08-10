@@ -4,7 +4,7 @@ FROM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace
 
 COPY backend/gradle/ gradle/
-COPY backend/gradlew backend/settings.gradle.kts backend/build.gradle.kts ./
+COPY backend/gradlew backend/settings.gradle.kts backend/build.gradle.kts backend/gradle.properties ./
 RUN ./gradlew --no-daemon dependencies > /dev/null 2>&1 || true
 
 COPY backend/src src
