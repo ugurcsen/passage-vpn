@@ -1,7 +1,9 @@
 package com.opnl.vpn.access;
 
 import com.opnl.vpn.common.ApiException;
+import com.opnl.vpn.group.Group;
 import com.opnl.vpn.group.GroupRepository;
+import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +54,8 @@ public class AccessRuleService {
     AccessRule rule = new AccessRule();
     apply(rule, dto);
     rule.setPriority(nextPriority());
-    return AccessRuleDto.from(ruleRepository.save(rule), dto.targetName());
+    return AccessRuleDto.from(
+        ruleRepository.save(rule), targetName(dto.targetType(), dto.targetId()));
   }
 
   @Transactional
@@ -60,7 +63,8 @@ public class AccessRuleService {
     AccessRule rule = requireRule(id);
     validateTarget(dto.targetType(), dto.targetId());
     apply(rule, dto);
-    return AccessRuleDto.from(ruleRepository.save(rule), dto.targetName());
+    return AccessRuleDto.from(
+        ruleRepository.save(rule), targetName(dto.targetType(), dto.targetId()));
   }
 
   @Transactional
@@ -115,5 +119,14 @@ public class AccessRuleService {
     if (type == AccessRule.TargetType.GROUP && groupRepository.findById(targetId).isEmpty()) {
       throw ApiException.notFound("group_not_found", "Target group not found");
     }
+  }
+
+  private String targetName(AccessRule.TargetType type, String targetId) {
+    if (type == AccessRule.TargetType.GLOBAL) {
+      return null;
+    }
+    return type == AccessRule.TargetType.USER
+        ? userRepository.findById(targetId).map(User::getUsername).orElse(null)
+        : groupRepository.findById(targetId).map(Group::getName).orElse(null);
   }
 }

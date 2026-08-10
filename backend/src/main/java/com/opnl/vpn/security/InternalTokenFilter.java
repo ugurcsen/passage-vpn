@@ -18,7 +18,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class InternalTokenFilter extends OncePerRequestFilter {
 
   private final String expectedToken;
-  private final ObjectMapper objectMapper = new ObjectMapper();
+
+  /** Supports the java.time.Instant timestamp on {@link ApiError}. */
+  private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
   public InternalTokenFilter(OpnlProperties properties) {
     this.expectedToken = properties.internalToken();
