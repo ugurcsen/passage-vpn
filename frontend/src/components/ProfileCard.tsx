@@ -20,13 +20,17 @@ interface ProfileCardProps {
   subtitle: string;
   disabled?: boolean;
   fetch: () => Promise<OvpnFile>;
+  /** When provided, the QR code encodes this payload (e.g. OpenVPN Connect import XML)
+   *  instead of the full profile content, which exceeds QR capacity. */
+  qrFetch?: () => Promise<string>;
 }
 
 /** A profile tile with download and QR-code share actions. */
-export function ProfileCard({ title, subtitle, disabled, fetch }: ProfileCardProps) {
+export function ProfileCard({ title, subtitle, disabled, fetch, qrFetch }: ProfileCardProps) {
   const [qrOpen, setQrOpen] = useState(false);
   const [content, setContent] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState(false);
 
   const download = async () => {
     try {
@@ -42,9 +46,12 @@ export function ProfileCard({ title, subtitle, disabled, fetch }: ProfileCardPro
       return;
     }
     setQrLoading(true);
+    setQrError(false);
     try {
-      setContent((await fetch()).content);
+      setContent(qrFetch ? await qrFetch() : (await fetch()).content);
       setQrOpen(true);
+    } catch {
+      setQrError(true);
     } finally {
       setQrLoading(false);
     }
@@ -88,6 +95,11 @@ export function ProfileCard({ title, subtitle, disabled, fetch }: ProfileCardPro
           {content ? <QRCodeSVG value={content} size={168} level="M" /> : null}
         </Box>
       </Collapse>
+      {qrError ? (
+        <Typography variant="caption" color="error" sx={{ px: 2, pb: 1, display: "block" }}>
+          Could not generate QR code.
+        </Typography>
+      ) : null}
     </Card>
   );
 }

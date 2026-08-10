@@ -34,6 +34,12 @@ public class PortalProfileController {
     return profileService.downloadForUser(userId, type);
   }
 
+  @GetMapping("/{type}/qr")
+  public ProfileService.QrPayload qr(
+      @PathVariable ProfileType type, Authentication authentication) {
+    return profileService.createQrPayload(principal(authentication), type);
+  }
+
   private String principal(Authentication authentication) {
     if (authentication == null || authentication.getName() == null) {
       throw ApiException.unauthorized("unauthorized", "Authentication required");

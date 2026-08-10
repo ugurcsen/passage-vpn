@@ -5,6 +5,7 @@ import com.opnl.vpn.access.AccessRuleService;
 import com.opnl.vpn.access.RuleEngine.IptablesResult;
 import com.opnl.vpn.auth.AuthService;
 import com.opnl.vpn.common.ApiException;
+import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.setup.SetupService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
@@ -32,18 +33,21 @@ public class InternalController {
   private final SetupService setupService;
   private final AuthService authService;
   private final AccessRuleService ruleService;
+  private final ConnectionRegistry connectionRegistry;
 
   public InternalController(
       UserRepository userRepository,
       PasswordEncoder passwordEncoder,
       SetupService setupService,
       AuthService authService,
-      AccessRuleService ruleService) {
+      AccessRuleService ruleService,
+      ConnectionRegistry connectionRegistry) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.setupService = setupService;
     this.authService = authService;
     this.ruleService = ruleService;
+    this.connectionRegistry = connectionRegistry;
   }
 
   /**
@@ -103,6 +107,8 @@ public class InternalController {
     if (user.isBanned() || user.isLocked(Instant.now())) {
       return ConnectResult.deny(user.isBanned() ? "user_banned" : "user_locked");
     }
+    connectionRegistry.register(
+        user.getUsername(), user.getUsername(), request.virtualIp(), request.remoteIp());
     IptablesResult result =
         ruleService.iptablesFor(user.getUsername(), request.virtualIp(), user.getId());
     return new ConnectResult(true, null, List.of(), result.apply(), result.remove());
@@ -117,13 +123,25 @@ public class InternalController {
     if (user == null) {
       return new DisconnectResult(List.of());
     }
+    connectionRegistry.unregister(user.getUsername());
     IptablesResult result =
         ruleService.iptablesFor(user.getUsername(), request.virtualIp(), user.getId());
     return new DisconnectResult(result.remove());
   }
 
+  /**
+   * Records learn-address events (add/update/delete) so active virtual IPs can be correlated with
+   * users. Fire-and-forget by design; failures are non-fatal.
+   */
+  @PostMapping("/learn-address")
+  public void learnAddress(@RequestBody LearnAddressRequest request) {
+    connectionRegistry.learn(request.operation(), request.address(), request.commonName());
+  }
+
   public record ConnectRequest(
       String commonName, String username, String daemonName, String remoteIp, String virtualIp) {}
+
+  public record LearnAddressRequest(String operation, String address, String commonName) {}
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public record ConnectResult(

@@ -33,13 +33,24 @@ public class OvpnGenerator {
   /**
    * Generates the profile. Locked types embed the client certificate and key; GENERIC uses
    * username/password against a client-cert-not-required daemon.
+   *
+   * @param adminHost override for the remote endpoint host; falls back to the server config when
+   *     blank/null.
    */
   public String render(
-      ProfileType type, ServerConfig config, String caCert, String taKey, String cert, String key) {
+      ProfileType type,
+      ServerConfig config,
+      String adminHost,
+      String caCert,
+      String taKey,
+      String cert,
+      String key) {
     String host =
-        config.adminHost() == null || config.adminHost().isBlank()
-            ? "vpn.example.com"
-            : config.adminHost();
+        adminHost == null || adminHost.isBlank()
+            ? (config.adminHost() == null || config.adminHost().isBlank()
+                ? "vpn.example.com"
+                : config.adminHost())
+            : adminHost;
     int port = config.port();
     Protocol proto = config.proto();
 

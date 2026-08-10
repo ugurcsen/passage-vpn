@@ -6,10 +6,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.common.ApiException;
+import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.network.ServerConfig;
 import com.opnl.vpn.pki.CertService;
 import com.opnl.vpn.pki.EasyRsaService;
 import com.opnl.vpn.profile.ProfileService.OvpnFile;
+import com.opnl.vpn.profile.ProfileService.QrPayload;
 import com.opnl.vpn.setup.SetupService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
@@ -25,6 +27,8 @@ class ProfileServiceTest {
   private SetupService setupService;
   private UserRepository userRepository;
   private ProfileTokenRepository tokenRepository;
+  private OpnlProperties properties;
+  private OpnlProperties.OpenVpn openvpn;
   private ProfileService service;
 
   private User alice() {
@@ -43,6 +47,9 @@ class ProfileServiceTest {
     setupService = mock(SetupService.class);
     userRepository = mock(UserRepository.class);
     tokenRepository = mock(ProfileTokenRepository.class);
+    properties = mock(OpnlProperties.class);
+    openvpn = mock(OpnlProperties.OpenVpn.class);
+    when(properties.openvpn()).thenReturn(openvpn);
     service =
         new ProfileService(
             new OvpnGenerator(),
@@ -50,7 +57,8 @@ class ProfileServiceTest {
             easyRsa,
             setupService,
             userRepository,
-            tokenRepository);
+            tokenRepository,
+            properties);
 
     ServerConfig config = ServerConfig.defaults();
     when(setupService.currentServerConfig()).thenReturn(config);
@@ -80,6 +88,36 @@ class ProfileServiceTest {
     OvpnFile file = service.downloadForUser("u1", ProfileType.AUTO_LOGIN);
 
     assertThat(file.content()).doesNotContain("auth-user-pass").contains("<cert>\nCERT");
+  }
+
+  @Test
+  void configuredAdminHostOverridesServerConfigHost() {
+    when(openvpn.adminHost()).thenReturn("65.21.108.250");
+
+    OvpnFile file = service.downloadForUser("u1", ProfileType.USER_LOCKED);
+
+    assertThat(file.content()).contains("remote 65.21.108.250 1194");
+  }
+
+  @Test
+  void qrPayloadCreatesSingleUseToken() {
+    ProfileToken token =
+        ProfileToken.builder()
+            .id("t1")
+            .token("qr-tok")
+            .userId("u1")
+            .profileType(ProfileType.USER_LOCKED)
+            .usesLeft(1)
+            .expiresAt(Instant.now().plusSeconds(3600))
+            .createdAt(Instant.now())
+            .build();
+    when(tokenRepository.save(org.mockito.ArgumentMatchers.any(ProfileToken.class)))
+        .thenReturn(token);
+
+    QrPayload payload = service.createQrPayload("u1", ProfileType.USER_LOCKED);
+
+    assertThat(payload.token()).isEqualTo("qr-tok");
+    assertThat(payload.expiresAt()).isNotNull();
   }
 
   @Test

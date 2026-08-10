@@ -17,6 +17,13 @@ const TYPE_HINTS: Record<ProfileType, string> = {
   GENERIC: "No certificate; username and password only.",
 };
 
+/** Builds a compact OpenVPN Connect import XML referencing the share URL (fits in a QR code). */
+function qrPayload(type: ProfileType, token: string): string {
+  const name = type.replaceAll("_", " ");
+  const uri = `${window.location.origin}/share/${token}`;
+  return `<openvpn-connect-profile>\n  <name>${name}</name>\n  <uri>${uri}</uri>\n</openvpn-connect-profile>`;
+}
+
 export function PortalPage() {
   const { user } = useAuth();
 
@@ -41,6 +48,10 @@ export function PortalPage() {
               title={t.type.replaceAll("_", " ")}
               subtitle={TYPE_HINTS[t.type]}
               fetch={() => api(`/portal/profiles/${t.type}/download`)}
+              qrFetch={async () => {
+                const { token } = await api<{ token: string }>(`/portal/profiles/${t.type}/qr`);
+                return qrPayload(t.type, token);
+              }}
             />
           </Grid2>
         ))}

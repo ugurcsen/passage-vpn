@@ -7,6 +7,7 @@ import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +53,8 @@ public class AccessRuleService {
   public AccessRuleDto create(AccessRuleDto dto) {
     validateTarget(dto.targetType(), dto.targetId());
     AccessRule rule = new AccessRule();
+    rule.setId(UUID.randomUUID().toString());
+    rule.setCreatedAt(java.time.Instant.now());
     apply(rule, dto);
     rule.setPriority(nextPriority());
     return AccessRuleDto.from(

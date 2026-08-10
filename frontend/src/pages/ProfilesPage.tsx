@@ -28,6 +28,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import BlockIcon from "@mui/icons-material/Block";
 import {
   api,
+  copyToClipboard,
   downloadOvpn,
   endpoints,
   type OvpnFile,
@@ -132,12 +133,10 @@ export function ProfilesPage() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Revoke failed"),
   });
 
-  const copyLink = (token: string) => {
-    const url = `${window.location.origin}/share/${token}`;
-    navigator.clipboard.writeText(url).then(
-      () => toast.success("Link copied"),
-      () => toast.error("Copy failed"),
-    );
+  const copyLink = async (token: string) => {
+    const ok = await copyToClipboard(`${window.location.origin}/share/${token}`);
+    if (ok) toast.success("Link copied");
+    else toast.error("Copy failed");
   };
 
   const shareUrl = (token: string) => `${window.location.origin}/share/${token}`;

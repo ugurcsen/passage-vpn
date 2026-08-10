@@ -88,7 +88,14 @@ export async function api<T = unknown>(
     throw new ApiError(res.status, message, code);
   }
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  return (await parseJson(res)) as T;
+}
+
+/** Parses a JSON body, returning undefined for empty (200 without content) responses. */
+async function parseJson<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  if (!text.trim()) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 /** Unauthenticated call (login, mfa, refresh, setup state). */
@@ -110,8 +117,36 @@ export function apiPublic<T = unknown>(path: string, options: RequestInit = {}):
       }
       throw new ApiError(res.status, message);
     }
-    return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
+    return res.status === 204 ? (undefined as T) : parseJson(res);
   });
+}
+
+/** Copies text to the clipboard, falling back to a hidden-textarea execCommand for non-secure
+ *  (HTTP) contexts where the async Clipboard API is unavailable. Returns whether it succeeded. */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      /* fall through to legacy path */
+    }
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+  textarea.remove();
+  return ok;
 }
 
 export const endpoints = {

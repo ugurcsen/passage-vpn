@@ -1,12 +1,14 @@
 package com.opnl.vpn.profile;
 
 import com.opnl.vpn.common.ApiException;
+import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.network.ServerConfig;
 import com.opnl.vpn.pki.CertService;
 import com.opnl.vpn.pki.EasyRsaService;
 import com.opnl.vpn.setup.SetupService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -20,12 +22,16 @@ public class ProfileService {
 
   public record OvpnFile(String filename, String content) {}
 
+  /** Short-lived single-use token used to build the QR-code sharing payload. */
+  public record QrPayload(String token, Instant expiresAt) {}
+
   private final OvpnGenerator generator;
   private final CertService certService;
   private final EasyRsaService easyRsa;
   private final SetupService setupService;
   private final UserRepository userRepository;
   private final ProfileTokenRepository tokenRepository;
+  private final OpnlProperties properties;
 
   public ProfileService(
       OvpnGenerator generator,
@@ -33,13 +39,15 @@ public class ProfileService {
       EasyRsaService easyRsa,
       SetupService setupService,
       UserRepository userRepository,
-      ProfileTokenRepository tokenRepository) {
+      ProfileTokenRepository tokenRepository,
+      OpnlProperties properties) {
     this.generator = generator;
     this.certService = certService;
     this.easyRsa = easyRsa;
     this.setupService = setupService;
     this.userRepository = userRepository;
     this.tokenRepository = tokenRepository;
+    this.properties = properties;
   }
 
   /** Downloads a profile for a user; locked types ensure a client certificate exists. */
@@ -77,6 +85,13 @@ public class ProfileService {
     }
     User generic = requireUserForGeneric();
     return build(generic, token.getProfileType(), null);
+  }
+
+  /** Creates a short-lived single-use token for QR-code sharing of the user's own profile. */
+  @Transactional
+  public QrPayload createQrPayload(String userId, ProfileType type) {
+    ProfileToken token = createToken(userId, type, Instant.now().plus(Duration.ofHours(1)), 1);
+    return new QrPayload(token.getToken(), token.getExpiresAt());
   }
 
   @Transactional
@@ -144,10 +159,12 @@ public class ProfileService {
 
   private OvpnFile build(User user, ProfileType type, String[] certMaterial) {
     ServerConfig config = setupService.currentServerConfig();
+    String adminHost = properties.openvpn().adminHost();
     String content =
         generator.render(
             type,
             config,
+            adminHost,
             easyRsa.caCert(),
             easyRsa.taKey(),
             certMaterial == null ? null : certMaterial[0],

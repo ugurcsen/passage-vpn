@@ -39,7 +39,8 @@ public record OpnlProperties(
       String scriptsDir,
       String scriptsSrcDir,
       String internalBaseUrl,
-      String easyrsaBin) {
+      String easyrsaBin,
+      String logDir) {
     public String mgmtEndpoint() {
       return mgmtHost + ":" + mgmtPort;
     }

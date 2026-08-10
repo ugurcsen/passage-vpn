@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class AccessRuleServiceTest {
 
@@ -57,6 +58,18 @@ class AccessRuleServiceTest {
 
     assertThat(created.priority()).isEqualTo(8);
     assertThat(created.targetType()).isEqualTo(TargetType.GLOBAL);
+  }
+
+  @Test
+  void createAssignsManualIdBeforePersist() {
+    when(ruleRepository.findAll()).thenReturn(List.of());
+
+    service.create(dto(TargetType.GLOBAL, null, Action.ALLOW));
+
+    ArgumentCaptor<AccessRule> captor = ArgumentCaptor.forClass(AccessRule.class);
+    verify(ruleRepository).save(captor.capture());
+    assertThat(captor.getValue().getId()).isNotBlank();
+    assertThat(captor.getValue().getCreatedAt()).isNotNull();
   }
 
   @Test

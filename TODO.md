@@ -139,6 +139,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] `AccessRule` entity (user/group target, action, src/dst, protocol/port, priority)
 - [x] `RuleEngine` — evaluate rules → iptables rule set
 - [x] iptables generator + `apply-rules.sh` (requires `NET_ADMIN`)
+- [x] End-to-end validated: ALLOW/DENY → ACCEPT/DROP targets; per-client chain enforced over live tunnel
 - [ ] Full-tunnel / split-tunnel per user/group
 - [ ] Inter-group connectivity rules
 - [ ] NAT vs routing mode
@@ -162,7 +163,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 ### 4.1 Real-time monitoring
 - [ ] Management interface TCP client (`MgmtClient`) — async events + `status 3` poll
 - [ ] Event handling: `>CLIENT:ESTABLISHED`, `>CLIENT:DISCONNECT`, `>BYTECOUNT:`
-- [ ] In-memory `ConnectionRegistry` + `TrafficAggregator` (per-minute metrics)
+- [~] In-memory `ConnectionRegistry` (fed by `client-connect`/`learn-address`, read via `/api/admin/connections`); `TrafficAggregator` pending
 - [ ] WebSocket push to frontend (native WS, tiny JSON protocol)
 - [ ] Online users list (live), session duration, bytes in/out
 - [ ] Connection history (session logs) persisted

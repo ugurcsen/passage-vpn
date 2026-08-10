@@ -68,7 +68,7 @@ public class RuleEngine {
 
     String src = virtualIp == null || virtualIp.isBlank() ? "" : "-s " + virtualIp + " ";
     for (AccessRule rule : rules) {
-      apply.add("iptables -A " + chain + " " + args(rule, src) + " -j " + rule.getAction().name());
+      apply.add("iptables -A " + chain + " " + args(rule, src) + " -j " + target(rule.getAction()));
     }
     // Default deny for clients with any rule.
     apply.add("iptables -A " + chain + " -j DROP");
@@ -78,6 +78,14 @@ public class RuleEngine {
     remove.add("iptables -F " + chain);
     remove.add("iptables -X " + chain);
     return new IptablesResult(apply, remove);
+  }
+
+  /** Maps a rule action to a real iptables target (ALLOW/DENY are panel-level concepts). */
+  private String target(AccessRule.Action action) {
+    return switch (action) {
+      case ALLOW -> "ACCEPT";
+      case DENY -> "DROP";
+    };
   }
 
   /** Computes the stable iptables chain name for a common name. */

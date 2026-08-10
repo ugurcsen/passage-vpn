@@ -16,6 +16,7 @@ import com.opnl.vpn.access.RuleEngine.IptablesResult;
 import com.opnl.vpn.auth.AuthService;
 import com.opnl.vpn.auth.AuthService.VpnVerification;
 import com.opnl.vpn.common.GlobalExceptionHandler;
+import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.setup.SetupService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
@@ -37,6 +38,7 @@ class InternalControllerTest {
   private SetupService setupService;
   private AuthService authService;
   private AccessRuleService ruleService;
+  private ConnectionRegistry connectionRegistry;
   private MockMvc mvc;
 
   private User user(boolean banned, boolean locked) {
@@ -57,6 +59,7 @@ class InternalControllerTest {
     setupService = mock(SetupService.class);
     authService = mock(AuthService.class);
     ruleService = mock(AccessRuleService.class);
+    connectionRegistry = new ConnectionRegistry();
     when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user(false, false)));
     when(ruleService.iptablesFor(anyString(), anyString(), anyString()))
         .thenReturn(
@@ -65,7 +68,12 @@ class InternalControllerTest {
     mvc =
         MockMvcBuilders.standaloneSetup(
                 new InternalController(
-                    userRepository, passwordEncoder, setupService, authService, ruleService))
+                    userRepository,
+                    passwordEncoder,
+                    setupService,
+                    authService,
+                    ruleService,
+                    connectionRegistry))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -221,7 +229,12 @@ class InternalControllerTest {
     var filtered =
         MockMvcBuilders.standaloneSetup(
                 new InternalController(
-                    userRepository, passwordEncoder, setupService, authService, ruleService))
+                    userRepository,
+                    passwordEncoder,
+                    setupService,
+                    authService,
+                    ruleService,
+                    connectionRegistry))
             .setControllerAdvice(new GlobalExceptionHandler())
             .addFilters(filter)
             .build();
@@ -229,6 +242,65 @@ class InternalControllerTest {
         .perform(post("/internal/connect").contentType(MediaType.APPLICATION_JSON).content("{}"))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.code").value("invalid_internal_token"));
+  }
+
+  @Test
+  void connectRegistersActiveSession() throws Exception {
+    mvc.perform(
+            post("/internal/connect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\",\"remoteIp\":\"1.2.3.4\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.allowed").value(true));
+
+    assertThat(connectionRegistry.byVirtualIp("10.8.0.9"))
+        .hasValueSatisfying(
+            s -> {
+              assertThat(s.username()).isEqualTo("alice");
+              assertThat(s.remoteIp()).isEqualTo("1.2.3.4");
+            });
+  }
+
+  @Test
+  void disconnectUnregistersActiveSession() throws Exception {
+    connectionRegistry.register("alice", "alice", "10.8.0.9", "1.2.3.4");
+    mvc.perform(
+            post("/internal/disconnect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
+        .andExpect(status().isOk());
+    assertThat(connectionRegistry.sessions()).isEmpty();
+  }
+
+  @Test
+  void learnAddressRecordsAddressMapping() throws Exception {
+    mvc.perform(
+            post("/internal/learn-address")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"operation\":\"add\",\"address\":\"10.8.0.50\",\"commonName\":\"alice\"}"))
+        .andExpect(status().isOk());
+    assertThat(connectionRegistry.byVirtualIp("10.8.0.50"))
+        .hasValueSatisfying(s -> assertThat(s.commonName()).isEqualTo("alice"));
+  }
+
+  @Test
+  void learnAddressDeleteRemovesMapping() throws Exception {
+    mvc.perform(
+            post("/internal/learn-address")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"operation\":\"add\",\"address\":\"10.8.0.50\",\"commonName\":\"alice\"}"))
+        .andExpect(status().isOk());
+    mvc.perform(
+            post("/internal/learn-address")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"operation\":\"delete\",\"address\":\"10.8.0.50\",\"commonName\":\"alice\"}"))
+        .andExpect(status().isOk());
+    assertThat(connectionRegistry.byVirtualIp("10.8.0.50")).isEmpty();
+    assertThat(connectionRegistry.sessions()).isEmpty();
   }
 
   @Test

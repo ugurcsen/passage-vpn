@@ -118,6 +118,21 @@ describe("api token refresh", () => {
     expect(tokenStore.refresh).toBeNull();
   });
 
+  it("returns undefined for an empty 200 body (void endpoints)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(null, {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    const data = await api("/admin/users/u1/reset-password", { method: "POST" });
+    expect(data).toBeUndefined();
+  });
+
   it("surfaces ApiError with code from error body", async () => {
     vi.stubGlobal(
       "fetch",

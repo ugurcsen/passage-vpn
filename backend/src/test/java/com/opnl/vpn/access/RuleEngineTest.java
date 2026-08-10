@@ -103,7 +103,7 @@ class RuleEngineTest {
         .anyMatch(cmd -> cmd.contains("iptables -N " + chain))
         .anyMatch(cmd -> cmd.contains("--dport 443"))
         .anyMatch(cmd -> cmd.contains("-d 10.0.0.0/8"))
-        .anyMatch(cmd -> cmd.contains("-j ALLOW"))
+        .anyMatch(cmd -> cmd.contains("-j ACCEPT"))
         .anyMatch(cmd -> cmd.contains("-j DROP"))
         .anyMatch(cmd -> cmd.contains("-I FORWARD -s 10.8.0.5 -j " + chain));
     assertThat(result.remove())

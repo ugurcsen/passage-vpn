@@ -62,6 +62,7 @@ describe("PortalPage", () => {
       "fetch",
       vi.fn().mockImplementation((url: string) => {
         if (url === "/api/auth/me") return Promise.resolve(json(meBody));
+        if (url.endsWith("/qr")) return Promise.resolve(json({ token: "qr-tok", expiresAt: null }));
         if (url.startsWith("/api/portal/profiles/"))
           return Promise.resolve(
             json({ filename: "user-locked-alice.ovpn", content: "client\nremote vpn.example.com" }),
@@ -101,5 +102,26 @@ describe("PortalPage", () => {
       ).toBe(true);
     });
     expect(URL.createObjectURL).toHaveBeenCalled();
+  });
+
+  it("renders a compact QR payload via the /qr token endpoint", async () => {
+    const user = userEvent.setup();
+    const { container } = renderPage();
+    await screen.findByText("USER LOCKED");
+
+    const qrButtons = screen.getAllByRole("button", { name: /qr/i });
+    await user.click(qrButtons[0]);
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([url]) => url === "/api/portal/profiles/USER_LOCKED/qr",
+        ),
+      ).toBe(true);
+    });
+    await waitFor(() => {
+      expect(container.querySelector("svg")).not.toBeNull();
+    });
   });
 });

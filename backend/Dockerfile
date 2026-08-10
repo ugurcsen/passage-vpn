@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         bash \
         curl \
         ca-certificates \
+    && ln -s /usr/share/easy-rsa/easyrsa /usr/local/bin/easyrsa \
     && rm -rf /var/lib/apt/lists/*
 
 ENV OPNL_DATA_DIR=/var/lib/opnl \

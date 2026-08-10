@@ -6,16 +6,19 @@ services:
     build: ./openvpn
     container_name: opnl-openvpn
     restart: unless-stopped
+    devices:
+      - /dev/net/tun          # TUN device for the VPN tunnel
     cap_add:
       - NET_ADMIN          # iptables-based access control (documented, required)
       - SYS_MODULE         # optional: tun module / DCO
     volumes:
-      - opnl-pki:/etc/opnl/pki:ro        # PKI is owned by the backend (read-only here)
+      - opnl-pki:/etc/opnl/pki        # PKI lives in pki/run (easyrsa cannot rm -rf a mountpoint)
       - opnl-ccd:/etc/opnl/ccd
       - opnl-config:/etc/opnl/config
       - opnl-logs:/var/log/opnl
     environment:
       OPNL_INTERNAL_BASE_URL: http://backend:8080
+      OPNL_PKI_DIR: /etc/opnl/pki/run
     networks:
       - opnl-net
     ports:
@@ -36,11 +39,12 @@ services:
     environment:
       OPNL_DATA_DIR: /var/lib/opnl
       OPNL_DB_URL: "jdbc:sqlite:/var/lib/opnl/opnl.db?journal_mode=WAL&busy_timeout=5000&foreign_keys=on"
-      OPNL_PKI_DIR: /etc/opnl/pki
+      OPNL_PKI_DIR: /etc/opnl/pki/run
       OPNL_CCD_DIR: /etc/opnl/ccd
       OPNL_CONFIG_DIR: /etc/opnl/config
       OPNL_SCRIPTS_DIR: /etc/opnl/config/scripts
       OPNL_SCRIPTS_SRC_DIR: /app/openvpn-scripts
+      OPNL_LOG_DIR: /var/log/opnl
       OPNL_OPENVPN_MGMT_HOST: openvpn
       OPNL_OPENVPN_MGMT_PORT: 7505
       OPNL_INTERNAL_BASE_URL: http://backend:8080

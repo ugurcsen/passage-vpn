@@ -19,10 +19,7 @@ public class ConfigWriter {
 
   public ConfigWriter(OpnlProperties properties) {
     this.configDir = Path.of(properties.openvpn().configDir()).toAbsolutePath();
-    // OpenVPN writes its logs inside the container; keep the log dir next to
-    // the config dir for easy inspection.
-    this.logDir =
-        Path.of(properties.openvpn().configDir()).toAbsolutePath().getParent().resolve("logs");
+    this.logDir = Path.of(properties.openvpn().logDir()).toAbsolutePath();
   }
 
   /**
