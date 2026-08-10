@@ -5,6 +5,7 @@ build/
 dist/
 target/
 .vite/
+bin/
 
 # Env / secrets
 .env
