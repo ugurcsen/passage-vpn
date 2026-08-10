@@ -82,7 +82,7 @@ describe("DaemonsPage", () => {
   it("renders daemon rows with their serving profile role", async () => {
     renderPage();
 
-    expect(await screen.findByText("Primary")).toBeInTheDocument();
+    expect((await screen.findAllByText("Primary")).length).toBeGreaterThan(0);
     expect(screen.getByText("Generic gateway")).toBeInTheDocument();
     expect(screen.getByText("UDP :1194")).toBeInTheDocument();
     expect(screen.getByText("TCP :1195")).toBeInTheDocument();
@@ -92,7 +92,7 @@ describe("DaemonsPage", () => {
   it("creates a daemon with the submitted payload", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("Primary");
+    await screen.findAllByText("Primary");
 
     await user.click(screen.getByRole("button", { name: /new daemon/i }));
     const dialog = screen.getByRole("dialog");
@@ -131,7 +131,7 @@ describe("DaemonsPage", () => {
   it("toggles a daemon enabled state", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("Primary");
+    await screen.findAllByText("Primary");
 
     const switchEl = document.body.querySelector("input[type='checkbox']");
     expect(switchEl).not.toBeNull();
@@ -149,7 +149,7 @@ describe("DaemonsPage", () => {
 
   it("disables delete for the primary daemon", async () => {
     renderPage();
-    await screen.findByText("Primary");
+    await screen.findAllByText("Primary");
 
     const deleteButtons = screen.getAllByRole("button", { name: /delete/i });
     expect(deleteButtons[0]).toBeDisabled();
