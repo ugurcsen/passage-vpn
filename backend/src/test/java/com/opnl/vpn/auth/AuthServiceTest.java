@@ -13,6 +13,7 @@ import com.opnl.vpn.auth.spi.LocalAuthProvider;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.security.JwtService;
+import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.user.RefreshToken;
 import com.opnl.vpn.user.RefreshTokenRepository;
@@ -195,5 +196,91 @@ class AuthServiceTest {
     var result = service.verifyVpnLogin("bob", "supersecret1", null, "1.2.3.4");
     assertThat(result.allowed()).isFalse();
     assertThat(result.reason()).isEqualTo("account_disabled");
+  }
+
+  @Test
+  void refreshRejectsBannedAccount() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    var challenge = service.login("alice", "supersecret1");
+    when(refreshTokenRepository.findByTokenHash(JwtService.hash(challenge.refreshToken())))
+        .thenReturn(
+            Optional.of(
+                RefreshToken.builder()
+                    .userId("u1")
+                    .tokenHash(JwtService.hash(challenge.refreshToken()))
+                    .createdAt(Instant.now())
+                    .expiresAt(Instant.now().plus(Duration.ofDays(14)))
+                    .build()));
+    User banned = user("alice", false, null);
+    banned.setBanned(true);
+    when(userRepository.findById("u1")).thenReturn(Optional.of(banned));
+
+    assertThatThrownBy(() -> service.refresh(challenge.refreshToken()))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("invalid_token"));
+  }
+
+  @Test
+  void refreshRejectsExpiredToken() {
+    RefreshToken expired =
+        RefreshToken.builder()
+            .userId("u1")
+            .tokenHash("hash")
+            .createdAt(Instant.now().minus(Duration.ofDays(2)))
+            .expiresAt(Instant.now().minus(Duration.ofDays(1)))
+            .build();
+    when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(expired));
+    assertThatThrownBy(() -> service.refresh("some-token"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("invalid_token"));
+  }
+
+  @Test
+  void vpnVerifyRequiresMfaWhenSettingEnforces() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    when(settingsService.effectiveForUser(anyString()))
+        .thenReturn(Map.of(SettingKeys.REQUIRE_MFA_ON_CONNECT, true));
+    var withoutOtp = service.verifyVpnLogin("alice", "supersecret1", null, "1.2.3.4");
+    assertThat(withoutOtp.allowed()).isFalse();
+    assertThat(withoutOtp.reason()).isEqualTo("mfa_required");
+  }
+
+  @Test
+  void vpnVerifyRejectsWrongTotpWhenMfaRequired() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", true, "JBSWY3DPEHPK3PXP")));
+    var wrongOtp = service.verifyVpnLogin("alice", "supersecret1", "000000", "1.2.3.4");
+    assertThat(wrongOtp.allowed()).isFalse();
+    assertThat(wrongOtp.reason()).isEqualTo("invalid_code");
+  }
+
+  @Test
+  void vpnVerifyAllowsValidTotpWhenMfaRequired() {
+    String secret = new TotpService().generateSecret();
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", true, secret)));
+    String code;
+    try {
+      code =
+          new dev.samstevens.totp.code.DefaultCodeGenerator(
+                  dev.samstevens.totp.code.HashingAlgorithm.SHA1, 6)
+              .generate(secret, new dev.samstevens.totp.time.SystemTimeProvider().getTime() / 30);
+    } catch (dev.samstevens.totp.exceptions.CodeGenerationException e) {
+      throw new RuntimeException(e);
+    }
+    var result = service.verifyVpnLogin("alice", "supersecret1", code, "1.2.3.4");
+    assertThat(result.allowed()).isTrue();
+  }
+
+  @Test
+  void vpnVerifyRejectsLockedAccount() {
+    User locked = user("carol", false, null);
+    locked.setLockedUntil(Instant.now().plusSeconds(300));
+    when(userRepository.findByUsername("carol")).thenReturn(Optional.of(locked));
+    var result = service.verifyVpnLogin("carol", "supersecret1", null, "1.2.3.4");
+    assertThat(result.allowed()).isFalse();
+    assertThat(result.reason()).isEqualTo("account_locked");
   }
 }

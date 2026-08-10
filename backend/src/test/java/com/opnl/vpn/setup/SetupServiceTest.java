@@ -15,7 +15,9 @@ import com.opnl.vpn.common.AppMeta;
 import com.opnl.vpn.common.AppMetaRepository;
 import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.network.ConfigWriter;
+import com.opnl.vpn.network.ServerConfig;
 import com.opnl.vpn.network.ServerConfigGenerator;
+import com.opnl.vpn.network.ServerSetting;
 import com.opnl.vpn.network.ServerSettingRepository;
 import com.opnl.vpn.pki.EasyRsaService;
 import com.opnl.vpn.user.UserRepository;
@@ -128,6 +130,40 @@ class SetupServiceTest {
     assertThatThrownBy(() -> service.runStep("server", json(serverJson())))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("setup_state"));
+  }
+
+  @Test
+  void reRunningCompletedAdminStepReturnsConflict() {
+    service.runStep("admin", json("{\"username\":\"admin\",\"password\":\"supersecret1\"}"));
+
+    assertThatThrownBy(
+            () -> service.runStep("admin", json("{\"username\":\"admin\",\"password\":\"x2\"}")))
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            e -> assertThat(((ApiException) e).getCode()).isEqualTo("setup_already_started"));
+  }
+
+  @Test
+  void unknownStepIsRejected() {
+    assertThatThrownBy(() -> service.runStep("nonsense", null))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("setup_step"));
+  }
+
+  @Test
+  void currentServerConfigFallsBackToDefaults() {
+    when(settingRepository.findById("network")).thenReturn(Optional.empty());
+    assertThat(service.currentServerConfig()).isEqualTo(ServerConfig.defaults());
+  }
+
+  @Test
+  void currentServerConfigReadsStoredSetting() {
+    when(settingRepository.findById("network"))
+        .thenReturn(Optional.of(new ServerSetting("network", serverJson())));
+    var config = service.currentServerConfig();
+    assertThat(config.port()).isEqualTo(1194);
+    assertThat(config.fullTunnel()).isTrue();
+    assertThat(config.dnsServers()).containsExactly("1.1.1.1");
   }
 
   private String serverJson() {

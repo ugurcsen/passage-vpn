@@ -129,4 +129,108 @@ class ProfileServiceTest {
         .isInstanceOf(ApiException.class)
         .hasFieldOrPropertyWithValue("code", "token_revoked");
   }
+
+  @Test
+  void exhaustedTokenIsRejected() {
+    ProfileToken token =
+        ProfileToken.builder()
+            .id("t1")
+            .token("tok-abc")
+            .userId("u1")
+            .profileType(ProfileType.USER_LOCKED)
+            .usesLeft(0)
+            .createdAt(Instant.now())
+            .build();
+    when(tokenRepository.findByToken("tok-abc")).thenReturn(Optional.of(token));
+
+    assertThatThrownBy(() -> service.downloadFromToken("tok-abc"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "token_exhausted");
+  }
+
+  @Test
+  void tokenWithSingleUseLeftIsConsumedToZero() {
+    ProfileToken token =
+        ProfileToken.builder()
+            .id("t1")
+            .token("tok-abc")
+            .userId("u1")
+            .profileType(ProfileType.USER_LOCKED)
+            .usesLeft(1)
+            .createdAt(Instant.now())
+            .build();
+    when(tokenRepository.findByToken("tok-abc")).thenReturn(Optional.of(token));
+    when(tokenRepository.save(token)).thenReturn(token);
+
+    service.downloadFromToken("tok-abc");
+
+    assertThat(token.getUsesLeft()).isEqualTo(0);
+  }
+
+  @Test
+  void expiredTokenIsRejected() {
+    ProfileToken token =
+        ProfileToken.builder()
+            .id("t1")
+            .token("tok-abc")
+            .userId("u1")
+            .profileType(ProfileType.USER_LOCKED)
+            .expiresAt(Instant.now().minusSeconds(1))
+            .createdAt(Instant.now())
+            .build();
+    when(tokenRepository.findByToken("tok-abc")).thenReturn(Optional.of(token));
+
+    assertThatThrownBy(() -> service.downloadFromToken("tok-abc"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "token_expired");
+  }
+
+  @Test
+  void tokenNotYetPastExpiryIsUsable() {
+    ProfileToken token =
+        ProfileToken.builder()
+            .id("t1")
+            .token("tok-abc")
+            .userId("u1")
+            .profileType(ProfileType.USER_LOCKED)
+            .expiresAt(Instant.now().plusSeconds(30))
+            .createdAt(Instant.now())
+            .build();
+    when(tokenRepository.findByToken("tok-abc")).thenReturn(Optional.of(token));
+
+    OvpnFile file = service.downloadFromToken("tok-abc");
+
+    assertThat(file.filename()).isEqualTo("user-locked-alice.ovpn");
+  }
+
+  @Test
+  void genericTokenRequiresANonAdminUser() {
+    when(userRepository.findAll())
+        .thenReturn(
+            java.util.List.of(
+                User.builder().id("a1").username("root").role(User.Role.ADMIN).build()));
+
+    assertThatThrownBy(() -> service.createToken(null, ProfileType.GENERIC, null, 3))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "no_user");
+  }
+
+  @Test
+  void genericTokenDownloadWithNoNonAdminUserIsRejected() {
+    ProfileToken token =
+        ProfileToken.builder()
+            .id("t1")
+            .token("tok-abc")
+            .userId(null)
+            .profileType(ProfileType.GENERIC)
+            .usesLeft(3)
+            .createdAt(Instant.now())
+            .build();
+    when(tokenRepository.findByToken("tok-abc")).thenReturn(Optional.of(token));
+    when(userRepository.findAll()).thenReturn(java.util.List.of());
+
+    assertThatThrownBy(() -> service.downloadFromToken("tok-abc"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "no_user");
+  }
 }

@@ -3,6 +3,7 @@ package com.opnl.vpn.network;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -83,5 +84,29 @@ class ServerConfigGeneratorTest {
   @Test
   void invalidJsonFallsBackToDefaults() {
     assertThat(generator.fromJson("{not-json")).isEqualTo(ServerConfig.defaults());
+  }
+
+  @Test
+  void renderSubstitutesEveryPlaceholder() {
+    String conf = generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs");
+    for (String token :
+        List.of(
+            "__PORT__",
+            "__PROTO__",
+            "__MGMT_PORT__",
+            "__SUBNET__",
+            "__SUBNET_MASK__",
+            "__PKI_DIR__",
+            "__CCD_DIR__",
+            "__SCRIPTS_DIR__",
+            "__LOG_DIR__",
+            "__CLIENT_CERT_NOT_REQUIRED__",
+            "__AUTH_VERIFY__",
+            "__VERIFY_CLIENT_CERT__",
+            "__DNS_PUSH__",
+            "__ROUTE_PUSH__",
+            "__EXTRA_PUSH__")) {
+      assertThat(conf).doesNotContain(token);
+    }
   }
 }

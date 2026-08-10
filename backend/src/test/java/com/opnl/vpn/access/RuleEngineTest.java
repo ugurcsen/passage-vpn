@@ -110,4 +110,65 @@ class RuleEngineTest {
         .anyMatch(cmd -> cmd.contains("-D FORWARD -s 10.8.0.5 -j " + chain))
         .anyMatch(cmd -> cmd.contains("-X " + chain));
   }
+
+  @Test
+  void nestedGroupRulesAreCollectedChildFirst() {
+    AccessRuleRepository repo = mock(AccessRuleRepository.class);
+    when(repo.findByTargetTypeOrderByPriorityAsc(TargetType.GLOBAL)).thenReturn(List.of());
+    when(repo.findByTargetTypeAndTargetIdOrderByPriorityAsc(TargetType.GROUP, "g2"))
+        .thenReturn(List.of(rule(TargetType.GROUP, "g2", Action.ALLOW, 1, true)));
+    when(repo.findByTargetTypeAndTargetIdOrderByPriorityAsc(TargetType.GROUP, "g1"))
+        .thenReturn(List.of(rule(TargetType.GROUP, "g1", Action.DENY, 2, true)));
+    when(repo.findByTargetTypeAndTargetIdOrderByPriorityAsc(TargetType.GROUP, "g0"))
+        .thenReturn(List.of(rule(TargetType.GROUP, "g0", Action.ALLOW, 3, true)));
+
+    GroupMemberRepository members = mock(GroupMemberRepository.class);
+    when(members.findById_UserId("u1")).thenReturn(List.of(new GroupMember("g2", "u1")));
+    GroupRepository groups = mock(GroupRepository.class);
+    when(groups.findById("g2"))
+        .thenReturn(Optional.of(Group.builder().id("g2").name("g2").parentId("g1").build()));
+    when(groups.findById("g1"))
+        .thenReturn(Optional.of(Group.builder().id("g1").name("g1").parentId("g0").build()));
+    when(groups.findById("g0"))
+        .thenReturn(Optional.of(Group.builder().id("g0").name("g0").build()));
+
+    RuleEngine engine = engine(repo, members, groups);
+    List<AccessRule> rules = engine.effectiveFor("u1");
+
+    assertThat(rules).extracting(AccessRule::getTargetId).containsExactly("g2", "g1", "g0");
+  }
+
+  @Test
+  void groupAncestryCycleIsTerminated() {
+    AccessRuleRepository repo = mock(AccessRuleRepository.class);
+    when(repo.findByTargetTypeOrderByPriorityAsc(TargetType.GLOBAL)).thenReturn(List.of());
+    when(repo.findByTargetTypeAndTargetIdOrderByPriorityAsc(TargetType.GROUP, "g1"))
+        .thenReturn(List.of());
+    when(repo.findByTargetTypeAndTargetIdOrderByPriorityAsc(TargetType.GROUP, "g2"))
+        .thenReturn(List.of());
+
+    GroupMemberRepository members = mock(GroupMemberRepository.class);
+    when(members.findById_UserId("u1")).thenReturn(List.of(new GroupMember("g1", "u1")));
+    GroupRepository groups = mock(GroupRepository.class);
+    when(groups.findById("g1"))
+        .thenReturn(Optional.of(Group.builder().id("g1").name("g1").parentId("g2").build()));
+    when(groups.findById("g2"))
+        .thenReturn(Optional.of(Group.builder().id("g2").name("g2").parentId("g1").build()));
+
+    RuleEngine engine = engine(repo, members, groups);
+    List<AccessRule> rules = engine.effectiveFor("u1");
+
+    assertThat(rules).isEmpty();
+  }
+
+  @Test
+  void chainNameIsStableAndPrefixed() {
+    RuleEngine engine =
+        engine(
+            mock(AccessRuleRepository.class),
+            mock(GroupMemberRepository.class),
+            mock(GroupRepository.class));
+    assertThat(engine.chainName("alice")).isEqualTo(engine.chainName("alice"));
+    assertThat(engine.chainName("alice")).startsWith("OPNL_").hasSizeGreaterThan(4);
+  }
 }

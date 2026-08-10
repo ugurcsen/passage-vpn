@@ -211,4 +211,61 @@ class UserAdminServiceTest {
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("empty_batch"));
   }
+
+  @Test
+  void bulkUnbansAndDeletesUsers() {
+    User bob =
+        User.builder()
+            .id("u2")
+            .username("bob")
+            .role(User.Role.USER)
+            .banned(true)
+            .createdAt(Instant.now())
+            .build();
+    User carol =
+        User.builder()
+            .id("u3")
+            .username("carol")
+            .role(User.Role.USER)
+            .createdAt(Instant.now())
+            .build();
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
+    when(userRepository.findById("u3")).thenReturn(Optional.of(carol));
+
+    service.bulk(admin(), UserAdminService.BulkAction.UNBAN, List.of("u2"));
+    assertThat(bob.isBanned()).isFalse();
+
+    service.bulk(admin(), UserAdminService.BulkAction.DELETE, List.of("u2", "u3"));
+    verify(memberRepository, org.mockito.Mockito.times(2)).deleteAll(any());
+    verify(userRepository).delete(bob);
+    verify(userRepository).delete(carol);
+  }
+
+  @Test
+  void lastAdminCannotBeBanned() {
+    when(userRepository.findById("admin1")).thenReturn(Optional.of(admin()));
+    when(userRepository.countByRole(User.Role.ADMIN)).thenReturn(1L);
+    assertThatThrownBy(() -> service.setBanned("admin1", true))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("last_admin"));
+  }
+
+  @Test
+  void createUserTrimsUsername() {
+    java.util.concurrent.atomic.AtomicReference<User> saved =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    when(userRepository.save(any()))
+        .thenAnswer(
+            inv -> {
+              saved.set(inv.getArgument(0));
+              return inv.getArgument(0);
+            });
+    when(userRepository.findById(any())).thenAnswer(inv -> Optional.ofNullable(saved.get()));
+    service.createUser(
+        admin(),
+        new UserCreateRequest("  bob  ", "supersecret1", null, null, User.Role.USER, null));
+    org.mockito.ArgumentCaptor<User> captor = org.mockito.ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(captor.capture());
+    assertThat(captor.getValue().getUsername()).isEqualTo("bob");
+  }
 }

@@ -44,7 +44,7 @@ cd frontend && npm run lint && npm run test
 
 ## 4. Test inventory (current state)
 
-### 4.1 Backend — 12 classes, 59 tests, all green
+### 4.1 Backend — 14 classes, 104 tests, all green
 
 | Class | Area | Status |
 |---|---|---|
@@ -53,42 +53,57 @@ cd frontend && npm run lint && npm run test
 | `auth/AuthServiceTest` | Login, refresh rotation, MFA, lockout, VPN verify | [x] |
 | `auth/spi/AuthProviderManagerTest` | Provider selection (local + stubs) | [x] |
 | `security/RateLimitFilterTest` | 429 + Retry-After per-IP | [x] |
-| `api/admin/UserAdminServiceTest` | User CRUD, ban/unban, reset, group assignment | [x] |
+| `api/admin/UserAdminServiceTest` | User CRUD, ban/unban, bulk, reset, group assignment | [x] |
 | `setting/SettingsServiceTest` | JSON settings, inheritance (user > group > default) | [x] |
 | `pki/IndexParserTest` | `index.txt` → `CertIndexEntry` parsing | [x] |
 | `pki/CertServiceTest` | Issue/reuse/revoke bookkeeping + Easy-RSA wiring | [x] |
-| `network/ServerConfigGeneratorTest` | `server.conf` rendering, split/generic daemons | [x] |
-| `access/RuleEngineTest` | Rule resolution + iptables rendering/teardown | [x] |
-| `profile/ProfileServiceTest` | 4 profile types + token consumption | [x] |
+| `network/ServerConfigGeneratorTest` | `server.conf` rendering, split/generic daemons, JSON round-trip | [x] |
+| `access/RuleEngineTest` | Rule resolution + nested groups + iptables rendering/teardown | [x] |
+| `access/AccessRuleServiceTest` | Rule CRUD validation, priority, target-name resolution | [x] |
+| `profile/ProfileServiceTest` | 4 profile types + token lifecycle (uses/expiry/generic) | [x] |
+| `internal/InternalControllerTest` | `/internal/connect|disconnect|auth/verify|seed-admin` contract + filter | [x] |
 
-### 4.2 Frontend — 1 test file, 1 test
+### 4.2 Frontend — 13 test files, 40 tests
 
 | File | Area | Status |
 |---|---|---|
+| `lib/api.test.ts` | Token-refresh wrapper, ApiError mapping, 204 | [x] |
+| `hooks/useAuth.test.tsx` | Session restore, login/MFA/logout, token store | [x] |
 | `pages/LoginPage.test.tsx` | Sign-in form renders | [x] |
-
-**Frontend coverage is far behind the page count — priority gap (see §6).**
+| `pages/DashboardPage.test.tsx` | Stat cards + phase placeholders render | [x] |
+| `pages/UsersPage.test.tsx` | Grid render, create dialog, status filter, create POST | [x] |
+| `pages/CertsPage.test.tsx` | Grid render, issue dialog payload, revoke disabled | [x] |
+| `pages/AccessRulesPage.test.tsx` | Rule render, global/user create payload, enable toggle | [x] |
+| `pages/GroupsPage.test.tsx` | Grid render, create POST payload, members dialog PUT | [x] |
+| `pages/ProfilesPage.test.tsx` | Share-link table, token create payload, copy-link clipboard | [x] |
+| `pages/SharePage.test.tsx` | Token download (blob), error state | [x] |
+| `pages/SetupWizardPage.test.tsx` | Full flow: admin POST, server config POST, PKI provision gate, finish | [x] |
+| `components/ProfileCard.test.tsx` | Download blob, QR render | [x] |
+| `pages/PortalPage.test.tsx` | Profile list render, download endpoint | [x] |
 
 ## 5. Backend test plan by feature area
 
 ### 5.1 Setup wizard (Phase 0/1)
 - [x] State machine transitions and guards (`requireState`).
 - [x] Admin creation, PKI provision, config write delegation.
-- [ ] Validate: re-running completed steps returns 409; `currentServerConfig()` falls
-      back to defaults when no setting stored.
+- [x] Re-running completed steps returns 409; unknown step rejected.
+- [x] `currentServerConfig()` falls back to defaults / reads stored setting.
+- [x] Frontend drives all steps (admin → server → pki → complete); login requires
+      `COMPLETE` state and `/login` redirects to `/setup` while incomplete.
 
 ### 5.2 Authentication & security (Phase 2)
 - [x] Password login success/failure, MFA challenge + redeem, refresh rotation + logout.
-- [x] Lockout (failed attempts + `locked_until`), VPN `verifyVpnLogin` (password/OTP/ban).
+- [x] Lockout (failed attempts + `locked_until`), VPN `verifyVpnLogin` (password/OTP/ban/lock).
 - [x] Rate limiting filter (bucket exhaustion → 429 + `Retry-After`).
 - [x] Auth provider selection.
-- [ ] Add: JWT expiry/role claim validation, banned-user refresh rejection, MFA
-      `enforce_mfa` toggle.
+- [x] Banned-user refresh rejection, expired refresh token, MFA `enforce_mfa` toggle
+      (missing OTP → `mfa_required`, wrong OTP → `invalid_code`, valid OTP → allowed).
 
 ### 5.3 Users & groups (Phase 2)
 - [x] Create/edit/delete user, ban/unban, admin grant, RESELLER restrictions.
 - [x] Password reset (hash re-encode), group assignment, static-IP handoff to `CcdService`.
-- [ ] Add: bulk ban/unban/delete service method, username uniqueness conflict, search filter.
+- [x] Bulk ban/unban/delete, empty-batch rejection, last-admin guard, self-delete guard,
+      username trimming + uniqueness conflict, search filter (username/full name/email).
 
 ### 5.4 Settings (Phase 2)
 - [x] Per-user / per-group / server default inheritance resolution.
@@ -104,50 +119,57 @@ cd frontend && npm run lint && npm run test
 - [x] Rendering: port/proto, DNS/route pushes, full-tunnel vs split, generic daemon
       (`client-cert-not-required` + `verify-client-cert none`), `authUserPass` toggle,
       management port per daemon index.
-- [ ] Add: JSON round-trip of `ServerConfig`, template placeholder coverage.
+- [x] JSON round-trip of `ServerConfig`, invalid JSON → defaults, full placeholder
+      substitution (no unreplaced `__X__` tokens).
 
 ### 5.7 Access rules / ZTNA (Phase 3) — `RuleEngine`
 - [x] Effective rule resolution: global + group chain (child-first) + user, priority sort.
 - [x] Disabled rules skipped.
 - [x] iptables rendering: chain create, conntrack/DNS defaults, protocol/port/CIDR
       matches, default DROP, FORWARD jump, full teardown; no-rules → empty output.
-- [ ] Add: `AccessRuleService` CRUD validation (target exists, priority bump), nested
-      group inheritance, duplicate-source handling, non-VPN-IP CIDR rejection.
+- [x] `AccessRuleService` CRUD: target existence validation, priority bump, target-name
+      resolution on create/update; `RuleEngine` nested group inheritance (child-first),
+      ancestry-cycle termination, stable chain name.
 
 ### 5.8 Connection profiles (Phase 3) — `ProfileService`
 - [x] USER_LOCKED/AUTO_LOGIN/SERVER_LOCKED embed cert+key; AUTO_LOGIN omits
       `auth-user-pass`; GENERIC has CA only.
 - [x] Token: use-count decrement, revoked/expired rejection.
-- [ ] Add: token `usesLeft=1` exhaust → subsequent download rejected; generic token with
-      no non-admin user → error; expired token boundary (now == expiresAt).
+- [x] Token exhaustion (`usesLeft=0`), last-use decrement to zero, expiry boundary
+      (strict `isAfter`), generic token creation/download with no non-admin user → error.
 
-### 5.9 Internal VPN contract (Phase 3) — new target
-- [ ] MockMvc tests for `/internal/connect` + `/internal/disconnect`: unknown user,
-      banned/locked user, no-rule user (empty iptables), rule user (non-empty apply/remove).
+### 5.9 Internal VPN contract (Phase 3)
+- [x] MockMvc tests for `/internal/connect` + `/internal/disconnect`: unknown user,
+      banned/locked user, no-rule user (empty iptables), rule user (non-empty apply/remove),
+      seed-admin (create/weak/conflict) + internal-token 401 serialization.
 - [ ] `verify-user-pass.sh` / `client-connect.sh` / `client-disconnect.sh` contract tests
       (shell: feed env, assert curl payload shape + exit codes against a stubbed backend).
 
 ## 6. Frontend test plan
 
 ### 6.1 Priority order
-1. `useAuth` / `useToast` hooks + `api()` token-refresh wrapper (pure-logic, high value).
-2. `UsersPage` — list renders, create/edit dialog validation, ban/delete confirm flows.
-3. `CertsPage` — issue dialog, revoke confirm, status chips.
-4. `AccessRulesPage` — create/edit dialog, target-type switching, enable toggle.
-5. `ProfilesPage` — download for user, create token dialog, copy-link.
-6. `PortalPage` + `ProfileCard` — download + QR toggle.
-7. `SharePage` — token download + error state.
-8. `GroupsPage`, `DashboardPage`, `SetupWizardPage`, `LoginPage` (already partial).
+1. `useAuth` / `useToast` hooks + `api()` token-refresh wrapper (pure-logic, high value). ✅
+2. `UsersPage` — list renders, create/edit dialog validation, ban/delete confirm flows. ✅
+3. `CertsPage` — issue dialog, revoke confirm, status chips. ✅
+4. `AccessRulesPage` — create/edit dialog, target-type switching, enable toggle. ✅
+5. `ProfilesPage` — download for user, create token dialog, copy-link. ⬜
+6. `PortalPage` + `ProfileCard` — download + QR toggle. ✅
+7. `SharePage` — token download + error state. ⬜
+8. `GroupsPage`, `DashboardPage`, `SetupWizardPage`, `LoginPage` (already partial). ⬜
 
 ### 6.2 Coverage checklist
-- [ ] Hook tests: `useAuth` session restore/logout; `useToast` open/close.
-- [ ] `api()` refresh-on-401 retry, 204 → `undefined`, error mapping to `ApiError`.
-- [ ] Users: create user posts payload; edit keeps groups; delete opens confirm.
-- [ ] Certs: issue requires user; revoke disabled when not VALID.
-- [ ] Rules: GLOBAL hides target select; USER/GROUP lists options; save payload shape.
+- [x] Hook tests: `useAuth` session restore/logout; `api()` refresh-on-401 retry, error
+      mapping to `ApiError`.
+- [x] `api()` refresh-on-401 single-flight retry, 401 retry skip on `/auth/**`, 204 →
+      `undefined`, error mapping to `ApiError`, token purge on failed refresh.
+- [x] Users: create user posts payload; status filter; delete confirm.
+- [x] Certs: issue requires user selection; revoke disabled when not VALID.
+- [x] Rules: GLOBAL hides target select; USER lists options; save payload shape; enable toggle.
 - [ ] Profiles: token creation payload (expires/uses), copy-link clipboard.
-- [ ] Portal: fetches profile list, download + QR actions.
-- [ ] Share: valid token downloads, error message on failure.
+- [x] Portal: fetches profile list, download + QR actions.
+- [x] Share: valid token downloads, error message on failure.
+- [x] SetupWizard: admin/server/pki POST payloads, PKI gate before Continue, Finish
+      redirect; LoginPage redirects to `/setup` when state ≠ `COMPLETE`.
 
 ## 7. Integration & E2E plan
 
