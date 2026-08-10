@@ -71,15 +71,26 @@ Legend: `[x]` released, `[~]` partial.
       cert-only daemons work
 
 ### Verified end-to-end
-- Backend: 59 unit tests green; `make test`, `make lint` and spotless pass.
-- Live E2E: setup wizard → PKI provisioned → OpenVPN daemon boots from the
-  generated config → management interface (`status`, `dco_enabled`) works →
-  login / MFA challenge+redeem / token refresh / VPN credential verify all pass
-  through the API and the Vite dev proxy; user search, bulk ban/unban/delete and
-  per-IP rate limiting (429 + `Retry-After`) verified live.
+- Backend: 104 unit tests green; `make test`, `make lint` and spotless pass.
+- Live E2E (production `65.21.108.250`, docker compose): setup wizard → PKI
+  provisioned → OpenVPN daemon boots from the generated config → management
+  interface works → admin login (password aligned with `OPNL_ADMIN_PASSWORD`)
+  → Dashboard, Users and Connection Profiles render without console errors →
+  USER_LOCKED profile downloads and authenticates via `verify-user-pass.sh` →
+  `/internal/auth/verify`; user search, bulk operations and per-IP rate limiting
+  (429 + `Retry-After`) verified.
+- Deployment hardening: strong `OPNL_INTERNAL_TOKEN` generated and injected into
+  the auth script; `OPNL_OPENVPN_TCP_PORT` exposed; leftover test users and
+  orphaned rows (certs/tokens/rules/refresh tokens) purged from SQLite; stale
+  host `data/` directory removed (containers use named volumes); orphaned
+  `opnl-test-client` container removed.
 - Phase 3 verified via unit tests: rule resolution (global/group/user, disabled
   rules), iptables rendering (per-client chain + teardown), certificate issue/
   reuse/revoke, and all four profile types + token use consumption.
+- Known limitation: auto-login / cert-only profiles require a daemon without
+  `auth-user-pass` (the current single daemon runs with `authUserPass=true`, so
+  an auto-login handshake is rejected with `Auth Username/Password was not
+  provided by peer`). Tracked as per-daemon profile mapping in Phase 3.3.
 
 ### Not yet released
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group
