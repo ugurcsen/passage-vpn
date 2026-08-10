@@ -73,6 +73,30 @@ services:
     ports:
       - "${OPNL_FRONTEND_PORT:-80}:80"
 
+  # --- CI / test runners (build stage; activate with --profile ci) ---
+  # docker compose --profile ci run --rm backend-build test
+  # docker compose --profile ci run --rm frontend-build run test
+  backend-build:
+    profiles: ["ci"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: build
+    image: opnl-backend-build
+    entrypoint: ["./gradlew"]
+    networks:
+      - opnl-net
+
+  frontend-build:
+    profiles: ["ci"]
+    build:
+      context: ./frontend
+      target: build
+    image: opnl-frontend-build
+    entrypoint: ["npm"]
+    networks:
+      - opnl-net
+
 networks:
   opnl-net:
     driver: bridge
