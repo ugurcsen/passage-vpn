@@ -17,9 +17,10 @@ import { CertsPage } from "@/pages/CertsPage";
 import { AccessRulesPage } from "@/pages/AccessRulesPage";
 import { ProfilesPage } from "@/pages/ProfilesPage";
 import { DaemonsPage } from "@/pages/DaemonsPage";
+import { StatusPage } from "@/pages/StatusPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 import { PortalPage } from "@/pages/PortalPage";
 import { SharePage } from "@/pages/SharePage";
-import { PlaceholderPage } from "@/pages/PlaceholderPage";
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(true);
@@ -63,18 +64,11 @@ export default function App() {
                     />
                     <Route
                       path="/status"
-                      element={
-                        <PlaceholderPage
-                          title="Live status"
-                          description="Real-time monitoring lands in Phase 4."
-                        />
-                      }
+                      element={<StatusPage />}
                     />
                     <Route
                       path="/settings"
-                      element={
-                        <PlaceholderPage title="Settings" description="Server settings, branding and backup land in Phase 4." />
-                      }
+                      element={<SettingsPage />}
                     />
                   </Route>
                   <Route path="*" element={<Navigate to="/" replace />} />

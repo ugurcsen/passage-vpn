@@ -73,8 +73,17 @@ Legend: `[x]` released, `[~]` partial.
       first-class configs (`daemons` entity, per-daemon conf + management port),
       GENERIC daemons render `verify-client-cert none`
 
+### Phase 4 — Operations dashboard, live status & server settings
+- [~] Admin dashboard — live stat cards (active connections, users, groups,
+      active certificates), per-daemon running summary and recent connections
+- [~] Live status page — brand/version/uptime chips, per-daemon health table
+      (config present + management socket reachable via TCP probe),
+      active connections, 10s auto-refresh and manual refresh
+- [~] Server settings store — generic JSON key/value admin CRUD (list, upsert
+      with key validation, delete) with settings management UI
+
 ### Verified end-to-end
-- Backend: 141 unit tests green; frontend: 49 component tests; `make test`,
+- Backend: 150 unit tests green; frontend: 56 component tests; `make test`,
   `make lint` and spotless pass.
 - Live E2E (production `65.21.108.250`, docker compose): setup wizard → PKI
   provisioned → OpenVPN daemon boots from the generated config → management
@@ -83,6 +92,13 @@ Legend: `[x]` released, `[~]` partial.
   USER_LOCKED profile downloads and authenticates via `verify-user-pass.sh` →
   `/internal/auth/verify`; user search, bulk operations and per-IP rate limiting
   (429 + `Retry-After`) verified.
+- Live E2E (dashboard/status/settings): redeployed on production
+  `65.21.108.250` with the dashboard, live status and settings pages; admin
+  login → Dashboard stat cards and "Daemons 3 / 3 running" summary render →
+  Live Status shows all daemons `Enabled/Present/Reachable` (real management
+  socket probe) → Settings lists stored JSON values, add/delete round-trips
+  with toasts, persistence survives reload; invalid setting keys rejected with
+  400 `invalid_setting_key`; no console errors.
 - Deployment hardening: strong `OPNL_INTERNAL_TOKEN` generated and injected into
   the auth script; `OPNL_OPENVPN_TCP_PORT` exposed; leftover test users and
   orphaned rows (certs/tokens/rules/refresh tokens) purged from SQLite; stale
@@ -103,8 +119,8 @@ Legend: `[x]` released, `[~]` partial.
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group
   connectivity rules, NAT-vs-routing mode, dnsmasq domain control, static IP/CCD
   editor UI
-- Phase 4 — Monitoring/dashboard, logging & audit, Swagger, branding, backup,
-  multi-node, installer polish, PostgreSQL profile validation
+- Phase 4 — logging & audit, Swagger, branding, backup, multi-node, installer
+  polish, PostgreSQL profile validation
 
 ---
 

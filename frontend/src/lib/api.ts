@@ -164,6 +164,7 @@ export const endpoints = {
   daemons: "/admin/daemons",
   profileTokens: "/admin/profile-tokens",
   portalProfiles: "/portal/profiles",
+  connections: "/admin/connections",
   status: "/admin/status",
   settings: "/admin/settings",
   dashboard: "/admin/dashboard",
@@ -194,6 +195,52 @@ export interface Daemon {
   enabled: boolean;
   primary: boolean;
   createdAt: string;
+}
+
+/** Health view of a single OpenVPN daemon (live status). */
+export interface DaemonHealth {
+  index: number;
+  name: string | null;
+  port: number;
+  proto: "udp" | "tcp";
+  enabled: boolean;
+  configPresent: boolean;
+  mgmtReachable: boolean;
+}
+
+/** Snapshot returned by the live status endpoint. */
+export interface ServerStatus {
+  brand: string;
+  version: string;
+  uptimeSeconds: number;
+  activeConnections: number;
+  daemons: DaemonHealth[];
+}
+
+/** Active VPN session as tracked from connect/disconnect events. */
+export interface VpnConnection {
+  username: string | null;
+  commonName: string;
+  virtualIp: string | null;
+  remoteIp: string | null;
+  daemonName: string | null;
+  connectedAt: string;
+}
+
+/** Aggregate counts and recent activity for the dashboard. */
+export interface DashboardStats {
+  users: number;
+  groups: number;
+  activeCertificates: number;
+  activeConnections: number;
+  runningDaemons: number;
+  totalDaemons: number;
+  recentConnections: VpnConnection[];
+}
+
+/** Server-level settings store: arbitrary JSON values keyed by string. */
+export interface ServerSettings {
+  [key: string]: unknown;
 }
 
 /** Triggers a browser download for a backend-generated profile file. */

@@ -63,7 +63,7 @@ public class SettingsService {
 
   @Transactional
   public void deleteServerSetting(String key) {
-    serverRepository.deleteById(key);
+    serverRepository.findById(key).ifPresent(serverRepository::delete);
   }
 
   // ---- group level --------------------------------------------------------
