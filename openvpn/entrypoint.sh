@@ -41,7 +41,10 @@ start_daemon() {
         --daemon "$name" \
         --log-append "$OPNL_LOG_DIR/$name.log" \
         --status "$OPNL_LOG_DIR/$name.status" 5 \
-        --writepid "$OPNL_LOG_DIR/$name.pid"
+        --writepid "$OPNL_LOG_DIR/$name.pid" || {
+        echo "[entrypoint] ERROR starting $name (config: $conf)" >&2
+        return 1
+    }
     echo "[entrypoint] started $name (pid $(cat "$OPNL_LOG_DIR/$name.pid"))"
 }
 
@@ -62,7 +65,7 @@ restart_all() {
     done
     sleep 1
     for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do
-        start_daemon "$conf"
+        start_daemon "$conf" || true
     done
 }
 

@@ -35,6 +35,16 @@ RUN chmod +x /usr/local/bin/opnl-entrypoint
 
 EXPOSE 1194/udp 1194/tcp 7505
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
-    CMD bash -c 'if [ -n "$(ls "$OPNL_CONFIG_DIR"/daemon-*.conf 2>/dev/null)" ]; then pgrep -f "openvpn --config.*daemon" >/dev/null || exit 1; fi; exit 0'
+    CMD bash -c 'set -- "$OPNL_CONFIG_DIR"/daemon-*.conf; \
+      if [ "$1" = "$OPNL_CONFIG_DIR/daemon-*.conf" ]; then exit 0; fi; \
+      for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do \
+        name="$(basename "$conf" .conf)"; \
+        pidfile="$OPNL_LOG_DIR/$name.pid"; \
+        if [ ! -f "$pidfile" ] || ! kill -0 "$(cat "$pidfile")" 2>/dev/null \
+          || ! grep -qa "$name" "/proc/$(cat "$pidfile")/cmdline" 2>/dev/null; then \
+          echo "daemon $name not running"; exit 1; \
+        fi; \
+      done; \
+      exit 0'
 
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/opnl-entrypoint"]

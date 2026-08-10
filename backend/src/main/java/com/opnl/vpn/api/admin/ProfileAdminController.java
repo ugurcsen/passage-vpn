@@ -7,6 +7,7 @@ import com.opnl.vpn.profile.ProfileTokenRepository;
 import com.opnl.vpn.profile.ProfileType;
 import com.opnl.vpn.user.UserRepository;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.List;
@@ -75,5 +76,14 @@ public class ProfileAdminController {
   }
 
   public record CreateTokenRequest(
-      String userId, @NotNull ProfileType profileType, Instant expiresAt, Integer usesLeft) {}
+      String userId, @NotNull ProfileType profileType, Instant expiresAt, Integer usesLeft) {
+
+    /** GENERIC tokens are user-less; every other profile type needs a concrete user. */
+    @AssertTrue(message = "userId is required for non-generic profile tokens")
+    public boolean isUserIdRequired() {
+      return profileType == null
+          || profileType == ProfileType.GENERIC
+          || (userId != null && !userId.isBlank());
+    }
+  }
 }

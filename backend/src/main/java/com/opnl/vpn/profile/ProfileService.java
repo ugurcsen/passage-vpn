@@ -180,6 +180,9 @@ public class ProfileService {
   }
 
   private User requireUser(String userId) {
+    if (userId == null || userId.isBlank()) {
+      throw ApiException.badRequest("user_required", "User id is required");
+    }
     return userRepository
         .findById(userId)
         .orElseThrow(() -> ApiException.notFound("user_not_found", "User not found"));

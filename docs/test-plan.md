@@ -4,6 +4,8 @@ Living test strategy for the management panel (backend Java 21 + Spring Boot, fr
 React + TypeScript + MUI). Companion to `TODO.md` and `RELEASE_NOTES.md`. Update this file
 whenever the suite or the feature set changes.
 
+Confirmed defects and their remediation live in `docs/test-findings.md`.
+
 Legend: `[x]` covered, `[~]` partially covered, `[ ]` missing / to add.
 
 ---

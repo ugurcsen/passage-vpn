@@ -164,6 +164,24 @@ class AuthServiceTest {
   }
 
   @Test
+  void mfaChallengeIsSingleUse() {
+    String secret = new TotpService().generateSecret();
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", true, secret)));
+    var challenge = service.login("alice", "supersecret1");
+    assertThat(challenge.mfaRequired()).isTrue();
+
+    when(userRepository.findById("u1")).thenReturn(Optional.of(user("alice", true, secret)));
+    var first = service.mfa(challenge.preAuthToken(), totpCode(secret));
+    assertThat(first.accessToken()).isNotBlank();
+
+    assertThatThrownBy(() -> service.mfa(challenge.preAuthToken(), totpCode(secret)))
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            e -> assertThat(((ApiException) e).getCode()).isEqualTo("mfa_challenge_invalid"));
+  }
+
+  @Test
   void refreshRejectsRevokedToken() {
     RefreshToken revoked =
         RefreshToken.builder()
@@ -282,5 +300,15 @@ class AuthServiceTest {
     var result = service.verifyVpnLogin("carol", "supersecret1", null, "1.2.3.4");
     assertThat(result.allowed()).isFalse();
     assertThat(result.reason()).isEqualTo("account_locked");
+  }
+
+  private String totpCode(String secret) {
+    try {
+      return new dev.samstevens.totp.code.DefaultCodeGenerator(
+              dev.samstevens.totp.code.HashingAlgorithm.SHA1, 6)
+          .generate(secret, new dev.samstevens.totp.time.SystemTimeProvider().getTime() / 30);
+    } catch (dev.samstevens.totp.exceptions.CodeGenerationException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

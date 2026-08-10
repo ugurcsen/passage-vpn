@@ -26,11 +26,37 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [~] Multi-daemon (`daemons` entity) + DCO detection display
 - [ ] Domain-based control via dnsmasq (advanced)
 
-**P2 — Phase 4: monitoring & dashboard**
+**P0.5 — Bugfix sweep (live E2E findings, `docs/test-findings.md`)**
+- [x] 2.1 CRIT — drop removed `client-cert-not-required` from config generator; GENERIC daemons use `verify-client-cert none`
+- [x] 2.2 CRIT — entrypoint config watcher survives a failing daemon (no `set -e` death; auto-recovery verified)
+- [x] 2.3 HIGH — per-daemon healthcheck compares configs ↔ live pidfiles (`/proc/<pid>/cmdline`)
+- [x] 2.4 MED — profile-token create without `userId` → 400 `validation_failed` (was 500); bogus UUID → 404
+- [x] 2.5 MED — unknown `/api/**` path → 404 `not_found` (was 500)
+- [x] 2.6 LOW — MFA challenge tokens are single-use (redeemed `jti` set, TTL-pruned)
+- [x] 2.7 LOW — access rule `dstCidr` validated as CIDR (was storing `not-a-cidr`)
+
+**P1.5 — Status / Settings / Dashboard phase (live E2E finding 2.5)**
+> Scoped from live E2E testing (`docs/test-findings.md` §2.5): the frontend defined
+> `/admin/status`, `/admin/settings`, `/admin/dashboard` but no backend controller existed.
+> Instead of removing the dead endpoints, implement them as a dedicated phase.
+- [ ] `GET /api/admin/status` — `ServerStatusDto`: brand/version, per-daemon
+      `{index,name,port,proto,enabled,configPresent,mgmtReachable}` (TCP probe to
+      `openvpn:7505+index`), active connections from `ConnectionRegistry`, backend uptime
+- [ ] `GET/PUT/DELETE /api/admin/settings` — `SettingsAdminController` over the
+      `SettingsService` server-level store (generic JSON key-value, same shape as per-user)
+- [ ] `GET /api/admin/dashboard` — `DashboardDto`: user/group/cert/connection counts,
+      running-daemon count, recent connections
+- [ ] Frontend: `DashboardPage` consumes `/admin/dashboard` (live stat cards + daemon status
+      + recent connections); new `StatusPage` (daemon table + active connections) and
+      `SettingsPage` (server settings editor) replace the placeholders
+- [ ] Unit/component tests for the three endpoints and pages
+- [ ] Live E2E verification against staging (local Vite dev proxy → remote backend)
+
+**P2 — Phase 4: monitoring & dashboard (advanced)**
 - [ ] `MgmtClient` (persistent TCP to `openvpn:7505`) + async event handling
-- [ ] `ConnectionRegistry` + `TrafficAggregator` + WebSocket push
-- [ ] Online users list, session duration, bytes in/out; connection history persisted
-- [ ] Dashboard: live stats + MUI X Charts, system info (actuator), DCO badge
+- [ ] `TrafficAggregator` + WebSocket push (bytes in/out per session)
+- [ ] Online users list, session duration, connection history persisted
+- [ ] Dashboard: MUI X Charts traffic, system info (actuator), DCO badge
 - [ ] Audit log entity + UI; syslog integration; `connection_logs` retention
 
 **P3 — Phase 4: API, ops, deployment**
@@ -147,7 +173,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 ### 3.3 Connection profiles (.ovpn)
 - [x] `OvpnGenerator` — 4 profile types: user-locked, auto-login, server-locked, generic
-- [x] Profile types mapped to daemons (generic → `client-cert-not-required` daemon; auto-login → daemon without auth-user-pass)
+- [x] Profile types mapped to daemons (generic → `verify-client-cert none` daemon; auto-login → daemon without auth-user-pass)
 - [x] Token URLs — time-limited or permanent, single/multi-use
 - [x] QR code sharing (OpenVPN Connect import XML)
 - [x] Client portal — users download own profiles

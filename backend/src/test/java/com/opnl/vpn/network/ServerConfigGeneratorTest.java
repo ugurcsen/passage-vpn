@@ -54,7 +54,7 @@ class ServerConfigGeneratorTest {
   }
 
   @Test
-  void genericDaemonAddsClientCertNotRequired() {
+  void genericDaemonDisablesClientCertVerification() {
     ServerConfig generic =
         new ServerConfig(
             2,
@@ -70,7 +70,8 @@ class ServerConfigGeneratorTest {
             true,
             "vpn.example.com");
     String conf = generator.render(generic, "/pki", "/ccd", "/scripts", "/logs");
-    assertThat(conf).contains("client-cert-not-required");
+    assertThat(conf).contains("verify-client-cert none");
+    assertThat(conf).doesNotContain("client-cert-not-required");
   }
 
   @Test
@@ -100,7 +101,6 @@ class ServerConfigGeneratorTest {
             "__CCD_DIR__",
             "__SCRIPTS_DIR__",
             "__LOG_DIR__",
-            "__CLIENT_CERT_NOT_REQUIRED__",
             "__AUTH_VERIFY__",
             "__VERIFY_CLIENT_CERT__",
             "__DNS_PUSH__",

@@ -12,13 +12,18 @@ import com.opnl.vpn.user.RefreshTokenRepository;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Web session and VPN credential flows: login, MFA, refresh, logout, vpn verify. */
 @Service
 public class AuthService {
+
+  /** Challenge tokens are valid for 300s (see {@link JwtService#issueMfaChallenge}). */
+  private static final long MFA_CHALLENGE_TTL_SECONDS = 300;
 
   private final UserRepository userRepository;
   private final RefreshTokenRepository refreshTokenRepository;
@@ -27,6 +32,9 @@ public class AuthService {
   private final TotpService totpService;
   private final SettingsService settingsService;
   private final OpnlProperties properties;
+
+  /** Redeemed MFA challenge ids (jti) → redemption epoch-second, for single-use enforcement. */
+  private final Map<String, Long> redeemedChallenges = new ConcurrentHashMap<>();
 
   public AuthService(
       UserRepository userRepository,
@@ -83,6 +91,12 @@ public class AuthService {
     var claims = jwtService.parse(preAuthToken);
     if (claims == null || !jwtService.isMfaChallenge(claims)) {
       throw ApiException.unauthorized("mfa_challenge_invalid", "MFA challenge expired");
+    }
+    long now = Instant.now().getEpochSecond();
+    pruneExpiredChallenges(now);
+    String challengeKey = claims.getId() != null ? claims.getId() : JwtService.hash(preAuthToken);
+    if (redeemedChallenges.putIfAbsent(challengeKey, now) != null) {
+      throw ApiException.unauthorized("mfa_challenge_invalid", "MFA challenge already used");
     }
     User user =
         userRepository
@@ -183,6 +197,10 @@ public class AuthService {
   }
 
   // ---- helpers ------------------------------------------------------------
+
+  private void pruneExpiredChallenges(long now) {
+    redeemedChallenges.entrySet().removeIf(e -> now - e.getValue() > MFA_CHALLENGE_TTL_SECONDS);
+  }
 
   private TokenResponse issueTokens(User user) {
     String access =

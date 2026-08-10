@@ -49,9 +49,6 @@ public class ServerConfigGenerator {
         .replace("__SCRIPTS_DIR__", scriptsDir)
         .replace("__LOG_DIR__", logDir)
         .replace(
-            "__CLIENT_CERT_NOT_REQUIRED__",
-            config.clientCertNotRequired() ? "client-cert-not-required" : "")
-        .replace(
             "__AUTH_VERIFY__",
             config.authUserPass()
                 ? "auth-user-pass-verify " + scriptsDir + "/verify-user-pass.sh via-env"

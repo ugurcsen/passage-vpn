@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.springframework.stereotype.Service;
 
@@ -53,6 +54,7 @@ public class JwtService {
     return Jwts.builder()
         .issuer(ISSUER)
         .subject(userId)
+        .id(UUID.randomUUID().toString())
         .claim(MFA_CLAIM, true)
         .issuedAt(Date.from(now))
         .expiration(Date.from(now.plusSeconds(300)))

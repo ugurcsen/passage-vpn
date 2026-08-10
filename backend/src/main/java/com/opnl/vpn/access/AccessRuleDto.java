@@ -4,6 +4,7 @@ import com.opnl.vpn.access.AccessRule.Action;
 import com.opnl.vpn.access.AccessRule.Protocol;
 import com.opnl.vpn.access.AccessRule.TargetType;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 
 /** Admin-facing access rule representation. */
 public record AccessRuleDto(
@@ -13,7 +14,10 @@ public record AccessRuleDto(
     String targetName,
     @NotNull Action action,
     Protocol protocol,
-    String dstCidr,
+    @Pattern(
+            regexp = "^\\d{1,3}(\\.\\d{1,3}){3}/(3[0-2]|[0-2]?[0-9])$",
+            message = "dstCidr must be a valid CIDR like 192.168.0.0/24")
+        String dstCidr,
     Integer dstPort,
     Boolean enabled,
     Integer priority) {
