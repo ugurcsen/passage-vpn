@@ -253,8 +253,7 @@ class InternalControllerTest {
 
   @Test
   void connectDeniesWhenMaxConnectionsReached() throws Exception {
-    when(settingsService.effectiveForUser("u1"))
-        .thenReturn(Map.of("max_connections", 1));
+    when(settingsService.effectiveForUser("u1")).thenReturn(Map.of("max_connections", 1));
     connectionRegistry.register("alice", "alice", "10.8.0.8", "9.9.9.9", "daemon-0");
 
     mvc.perform(
@@ -268,8 +267,7 @@ class InternalControllerTest {
 
   @Test
   void connectAllowsUnderMaxConnectionsLimit() throws Exception {
-    when(settingsService.effectiveForUser("u1"))
-        .thenReturn(Map.of("max_connections", 2));
+    when(settingsService.effectiveForUser("u1")).thenReturn(Map.of("max_connections", 2));
     connectionRegistry.register("alice", "alice", "10.8.0.8", "9.9.9.9", "daemon-0");
 
     mvc.perform(

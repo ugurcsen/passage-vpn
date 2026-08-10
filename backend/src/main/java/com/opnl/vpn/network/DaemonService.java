@@ -2,8 +2,8 @@ package com.opnl.vpn.network;
 
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.OpnlProperties;
-import com.opnl.vpn.profile.ProfileType;
 import com.opnl.vpn.network.ServerConfig.Protocol;
+import com.opnl.vpn.profile.ProfileType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -55,8 +55,10 @@ public class DaemonService {
     this.properties = properties;
   }
 
-  /** Lists daemons in index order. Seeds the primary daemon from the legacy network setting when
-   * the table is empty (fresh install or pre-multi-daemon upgrade). */
+  /**
+   * Lists daemons in index order. Seeds the primary daemon from the legacy network setting when the
+   * table is empty (fresh install or pre-multi-daemon upgrade).
+   */
   @Transactional
   public List<Daemon> list() {
     if (repository.count() == 0) {
@@ -174,10 +176,7 @@ public class DaemonService {
           case GENERIC -> firstMatching(d -> d.isEnabled() && d.isClientCertNotRequired());
           case AUTO_LOGIN ->
               firstMatching(
-                  d ->
-                      d.isEnabled()
-                          && !d.isClientCertNotRequired()
-                          && !d.isAuthUserPass());
+                  d -> d.isEnabled() && !d.isClientCertNotRequired() && !d.isAuthUserPass());
           case USER_LOCKED, SERVER_LOCKED ->
               firstMatching(
                   d -> d.isEnabled() && !d.isClientCertNotRequired() && d.isAuthUserPass());
@@ -232,7 +231,8 @@ public class DaemonService {
         .ifPresent(
             d -> {
               throw ApiException.conflict(
-                  "daemon_index_taken", "Daemon index " + request.daemonIndex() + " is already in use");
+                  "daemon_index_taken",
+                  "Daemon index " + request.daemonIndex() + " is already in use");
             });
     repository.findAll().stream()
         .filter(d -> !d.getId().equals(excludedId))
@@ -250,8 +250,7 @@ public class DaemonService {
         .ifPresent(
             d -> {
               throw ApiException.conflict(
-                  "daemon_subnet_taken",
-                  "Subnet " + request.subnet() + " is already in use");
+                  "daemon_subnet_taken", "Subnet " + request.subnet() + " is already in use");
             });
   }
 

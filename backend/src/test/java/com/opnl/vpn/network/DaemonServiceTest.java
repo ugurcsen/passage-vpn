@@ -54,8 +54,7 @@ class DaemonServiceTest {
   private void stubNonEmpty() {
     when(repository.count()).thenReturn(1L);
     when(repository.findByDaemonIndex(0)).thenReturn(Optional.of(primary()));
-    when(repository.findAllByOrderByDaemonIndexAsc())
-        .thenAnswer(inv -> List.of(primary()));
+    when(repository.findAllByOrderByDaemonIndexAsc()).thenAnswer(inv -> List.of(primary()));
   }
 
   @BeforeEach
@@ -173,8 +172,20 @@ class DaemonServiceTest {
             () ->
                 service.create(
                     new DaemonService.DaemonRequest(
-                        0, "dup", 9999, Protocol.udp, "10.9.0.0", "255.255.255.0",
-                        List.of(), null, List.of(), true, false, true, null, true)))
+                        0,
+                        "dup",
+                        9999,
+                        Protocol.udp,
+                        "10.9.0.0",
+                        "255.255.255.0",
+                        List.of(),
+                        null,
+                        List.of(),
+                        true,
+                        false,
+                        true,
+                        null,
+                        true)))
         .isInstanceOf(ApiException.class)
         .hasFieldOrPropertyWithValue("code", "daemon_index_taken");
   }
@@ -188,8 +199,20 @@ class DaemonServiceTest {
             () ->
                 service.create(
                     new DaemonService.DaemonRequest(
-                        1, "dup", 1194, Protocol.udp, "10.9.0.0", "255.255.255.0",
-                        List.of(), null, List.of(), true, false, true, null, true)))
+                        1,
+                        "dup",
+                        1194,
+                        Protocol.udp,
+                        "10.9.0.0",
+                        "255.255.255.0",
+                        List.of(),
+                        null,
+                        List.of(),
+                        true,
+                        false,
+                        true,
+                        null,
+                        true)))
         .isInstanceOf(ApiException.class)
         .hasFieldOrPropertyWithValue("code", "daemon_port_taken");
   }
@@ -203,8 +226,20 @@ class DaemonServiceTest {
 
     service.create(
         new DaemonService.DaemonRequest(
-            1, "Generic", 1195, Protocol.udp, "10.9.0.0", "255.255.255.0",
-            List.of(), null, List.of(), true, true, true, null, true));
+            1,
+            "Generic",
+            1195,
+            Protocol.udp,
+            "10.9.0.0",
+            "255.255.255.0",
+            List.of(),
+            null,
+            List.of(),
+            true,
+            true,
+            true,
+            null,
+            true));
 
     verify(configWriter).writeDaemon(any(), any(), any());
   }

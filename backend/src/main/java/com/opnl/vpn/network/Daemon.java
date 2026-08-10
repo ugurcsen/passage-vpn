@@ -16,7 +16,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** A configurable OpenVPN daemon. Daemon index 0 is the primary daemon created by the setup wizard. */
+/**
+ * A configurable OpenVPN daemon. Daemon index 0 is the primary daemon created by the setup wizard.
+ */
 @Entity
 @Table(name = "daemons")
 @Data

@@ -90,9 +90,7 @@ public class ConnectionRegistry {
     if (username == null) {
       return 0;
     }
-    return byCommonName.values().stream()
-        .filter(s -> username.equals(s.username()))
-        .count();
+    return byCommonName.values().stream().filter(s -> username.equals(s.username())).count();
   }
 
   public Optional<VpnSession> byVirtualIp(String virtualIp) {

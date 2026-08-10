@@ -62,8 +62,7 @@ class ProfileServiceTest {
             properties);
 
     ServerConfig config = ServerConfig.defaults();
-    when(daemonService.resolveForProfile(org.mockito.ArgumentMatchers.any()))
-        .thenReturn(config);
+    when(daemonService.resolveForProfile(org.mockito.ArgumentMatchers.any())).thenReturn(config);
     when(easyRsa.caCert()).thenReturn("CA-CERT");
     when(easyRsa.taKey()).thenReturn("TA-KEY");
     when(easyRsa.clientCert("alice")).thenReturn("CERT");

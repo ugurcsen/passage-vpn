@@ -85,7 +85,8 @@ class DaemonAdminControllerTest {
 
   @Test
   void createDelegatesToService() throws Exception {
-    when(daemonService.create(any(DaemonRequest.class))).thenReturn(daemon(1, "Generic", 1195, true));
+    when(daemonService.create(any(DaemonRequest.class)))
+        .thenReturn(daemon(1, "Generic", 1195, true));
 
     mvc.perform(
             post("/api/admin/daemons")

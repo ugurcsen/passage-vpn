@@ -55,8 +55,7 @@ public class DaemonAdminController {
   }
 
   @PostMapping("/{id}/enabled")
-  public DaemonDto setEnabled(
-      @PathVariable String id, @RequestParam boolean enabled) {
+  public DaemonDto setEnabled(@PathVariable String id, @RequestParam boolean enabled) {
     return DaemonDto.from(daemonService.setEnabled(id, enabled));
   }
 }
