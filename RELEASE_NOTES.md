@@ -79,8 +79,12 @@ Legend: `[x]` released, `[~]` partial.
 - [~] Live status page — brand/version/uptime chips, per-daemon health table
       (config present + management socket reachable via TCP probe),
       active connections, 10s auto-refresh and manual refresh
-- [~] Server settings store — generic JSON key/value admin CRUD (list, upsert
+- [x] Server settings store — generic JSON key/value admin CRUD (list, upsert
       with key validation, delete) with settings management UI
+- [x] Settings page redesign — friendly typed editors for well-known server
+      defaults (boolean switches, validated numbers, comma-separated lists,
+      strings) with human labels and descriptions, add/edit dialog, empty state
+      and a collapsible raw-JSON "Advanced" section for custom keys
 
 ### Phase 4b — Real-time monitoring (management interface + WebSocket)
 - [x] `MgmtClient` — persistent TCP client to the OpenVPN management interface
@@ -109,7 +113,7 @@ Legend: `[x]` released, `[~]` partial.
       DCO column and Recent sessions table
 
 ### Verified end-to-end
-- Backend: 181 unit tests green; frontend: 63 component tests; `make test`,
+- Backend: 181 unit tests green; frontend: 69 component tests; `make test`,
   `make lint` and spotless pass.
 - Live E2E (production `65.21.108.250`, docker compose): setup wizard → PKI
   provisioned → OpenVPN daemon boots from the generated config → management
@@ -185,6 +189,12 @@ Legend: `[x]` released, `[~]` partial.
   form controls (`username`, `password`, MFA `code`) now carry explicit
   `id`/`name` attributes with labelled-controls regression tests. Frontend suite
   61/61 green, lint clean, `vite build` passes (verified on staging host).
+- Settings page typed-editor redesign: frontend suite green (69 tests across
+  17 files, SettingsPage coverage for typed rendering, boolean toggle PUT,
+  list/number serialization + validation, add-default flow, advanced add/delete
+  and confirmation deletes), `npm run lint` clean (0 errors), `tsc -b` and
+  `vite build` pass; backend suite unaffected and green. SSH-verified on
+  production `65.21.108.250` (tests run on the deployed checkout).
 
 ### Not yet released
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group
