@@ -1,5 +1,6 @@
 import {
   Alert,
+  Avatar,
   Box,
   Chip,
   Grid,
@@ -17,23 +18,50 @@ import {
 } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { LineChart } from "@mui/x-charts/LineChart";
+import GroupsIcon from "@mui/icons-material/Groups";
+import LanIcon from "@mui/icons-material/Lan";
+import MemoryIcon from "@mui/icons-material/Memory";
+import PeopleIcon from "@mui/icons-material/People";
+import SpeedIcon from "@mui/icons-material/Speed";
+import StorageIcon from "@mui/icons-material/Storage";
+import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
+import type { ReactNode } from "react";
 import { api, endpoints, type DashboardStats, type DaemonHealth, type SystemInfo } from "@/lib/api";
 import { useLiveStatus } from "@/hooks/useLiveStatus";
 
-function StatCard({ title, value, loading }: { title: string; value: number; loading: boolean }) {
+function StatCard({
+  title,
+  value,
+  loading,
+  icon,
+  color,
+}: {
+  title: string;
+  value: number;
+  loading: boolean;
+  icon: ReactNode;
+  color: "primary" | "secondary" | "success" | "warning" | "error" | "info";
+}) {
   return (
     <Grid item xs={12} sm={6} md={3}>
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="body2" color="text.secondary">
-          {title}
-        </Typography>
-        {loading ? (
-          <Skeleton variant="text" width="50%" sx={{ fontSize: "2.25rem" }} />
-        ) : (
-          <Typography variant="h4" fontWeight={700}>
-            {value}
+      <Paper sx={{ p: 2.5, display: "flex", alignItems: "center", gap: 2, height: "100%" }}>
+        <Avatar sx={{ bgcolor: `${color}.main`, width: 46, height: 46 }}>
+          <Box component="span" sx={{ display: "flex", color: "#fff" }}>
+            {icon}
+          </Box>
+        </Avatar>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="body2" color="text.secondary" noWrap>
+            {title}
           </Typography>
-        )}
+          {loading ? (
+            <Skeleton variant="text" width="50%" sx={{ fontSize: "2rem" }} />
+          ) : (
+            <Typography variant="h4" fontWeight={700}>
+              {value}
+            </Typography>
+          )}
+        </Box>
       </Paper>
     </Grid>
   );
@@ -55,11 +83,24 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 ** i).toFixed(1)} ${units[i]}`;
 }
 
-function formatRate(bytesPerSec: number) {
-  if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return "—";
+/** Rate with an explicit "no data" marker (used by the live chips). */
+function formatRate(bytesPerSec: number | null | undefined) {
+  if (bytesPerSec === null || bytesPerSec === undefined || !Number.isFinite(bytesPerSec) || bytesPerSec <= 0) {
+    return "—";
+  }
+  return formatRateLabel(bytesPerSec);
+}
+
+/** Always-formatted rate (used by chart ticks and tooltips; 0 renders as "0 B/s"). */
+function formatRateLabel(bytesPerSec: number) {
   if (bytesPerSec < 1024) return `${bytesPerSec.toFixed(0)} B/s`;
   if (bytesPerSec < 1024 ** 2) return `${(bytesPerSec / 1024).toFixed(1)} KB/s`;
   return `${(bytesPerSec / 1024 ** 2).toFixed(2)} MB/s`;
+}
+
+/** Compact clock label for the x-axis: "3:04 PM", no seconds. */
+function formatTime(value: number | Date) {
+  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function TrafficChart({ history }: { history: { at: string; bytesInPerSec: number; bytesOutPerSec: number }[] }) {
@@ -70,36 +111,98 @@ function TrafficChart({ history }: { history: { at: string; bytesInPerSec: numbe
       </Typography>
     );
   }
+  const seriesValueFormatter = (value: number | null) => (value == null ? "—" : formatRateLabel(value));
   return (
-    <Box data-testid="traffic-chart" sx={{ width: "100%" }}>
+    <Box
+      data-testid="traffic-chart"
+      sx={{
+        width: "100%",
+        "& .MuiLineElement-root": { strokeWidth: 2.5 },
+        "& .MuiAreaElement-root": { opacity: 0.25 },
+      }}
+    >
       <LineChart
-        height={260}
+        height={280}
+        skipAnimation
+        grid={{ horizontal: true }}
+        margin={{ top: 44, right: 16, bottom: 30, left: 72 }}
         xAxis={[
           {
             data: history.map((p) => new Date(p.at)),
             scaleType: "time",
-            valueFormatter: (value: number | Date) => new Date(value).toLocaleTimeString(),
+            valueFormatter: (value: number | Date) => formatTime(value),
+          },
+        ]}
+        yAxis={[
+          {
+            valueFormatter: (value: number) => formatRateLabel(value),
           },
         ]}
         series={[
-          { data: history.map((p) => p.bytesOutPerSec), label: "Download", color: "#66bb6a" },
-          { data: history.map((p) => p.bytesInPerSec), label: "Upload", color: "#42a5f5" },
+          {
+            data: history.map((p) => p.bytesOutPerSec),
+            label: "Download",
+            color: "#66bb6a",
+            area: true,
+            baseline: "min",
+            showMark: false,
+            valueFormatter: seriesValueFormatter,
+          },
+          {
+            data: history.map((p) => p.bytesInPerSec),
+            label: "Upload",
+            color: "#42a5f5",
+            area: true,
+            baseline: "min",
+            showMark: false,
+            valueFormatter: seriesValueFormatter,
+          },
         ]}
+        slotProps={{
+          legend: {
+            position: { vertical: "top", horizontal: "middle" },
+            direction: "row",
+            itemMarkWidth: 14,
+            itemMarkHeight: 14,
+          },
+        }}
       />
     </Box>
   );
 }
 
-function ResourceBar({ label, percent, detail }: { label: string; percent: number; detail: string }) {
+function ResourceBar({
+  label,
+  percent,
+  detail,
+  icon,
+  color,
+}: {
+  label: string;
+  percent: number;
+  detail: string;
+  icon: ReactNode;
+  color: "primary" | "success" | "warning" | "info";
+}) {
   return (
-    <Box sx={{ mb: 1.5 }}>
+    <Box sx={{ mb: 2 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-        <Typography variant="body2">{label}</Typography>
+        <Stack direction="row" spacing={0.75} alignItems="center">
+          <Box component="span" sx={{ display: "flex", color: "text.secondary" }}>
+            {icon}
+          </Box>
+          <Typography variant="body2">{label}</Typography>
+        </Stack>
         <Typography variant="body2" color="text.secondary">
           {detail}
         </Typography>
       </Box>
-      <LinearProgress variant="determinate" value={Math.min(100, Math.max(0, percent))} />
+      <LinearProgress
+        variant="determinate"
+        value={Math.min(100, Math.max(0, percent))}
+        color={color}
+        sx={{ height: 6, borderRadius: 3 }}
+      />
     </Box>
   );
 }
@@ -136,16 +239,26 @@ function SystemCard({ system, loading }: { system: SystemInfo | null; loading: b
       <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
         System
       </Typography>
-      <ResourceBar label="CPU" percent={system.cpuLoadPercent} detail={`${Math.round(system.cpuLoadPercent)}%`} />
+      <ResourceBar
+        label="CPU"
+        percent={system.cpuLoadPercent}
+        detail={`${Math.round(system.cpuLoadPercent)}%`}
+        icon={<SpeedIcon fontSize="small" />}
+        color="info"
+      />
       <ResourceBar
         label="Memory"
         percent={ramPct}
         detail={`${formatBytes(ramUsed)} / ${formatBytes(system.totalMemory)}`}
+        icon={<MemoryIcon fontSize="small" />}
+        color="primary"
       />
       <ResourceBar
         label="Disk"
         percent={diskPct}
         detail={`${formatBytes(diskUsed)} / ${formatBytes(system.diskTotal)}`}
+        icon={<StorageIcon fontSize="small" />}
+        color="warning"
       />
       <Typography variant="caption" color="text.secondary">
         {system.availableProcessors} logical CPUs
@@ -156,16 +269,38 @@ function SystemCard({ system, loading }: { system: SystemInfo | null; loading: b
 
 function DaemonChip({ daemon }: { daemon: DaemonHealth }) {
   const ok = daemon.mgmtReachable && daemon.enabled && daemon.configPresent;
-  const label = `#${daemon.index} ${daemon.name ?? "unnamed"} (${daemon.proto.toUpperCase()} :${daemon.port})`;
+  const status = !daemon.enabled
+    ? "Disabled"
+    : !daemon.configPresent
+      ? "Config missing"
+      : daemon.mgmtReachable
+        ? "Online"
+        : "Management down";
+  const label = `#${daemon.index} ${daemon.name ?? "unnamed"}`;
   return (
-    <Tooltip title={ok ? "Management reachable" : "Management unreachable / disabled"}>
+    <Tooltip title={`${label} · ${daemon.proto.toUpperCase()} :${daemon.port} · ${status}${daemon.dco ? " · DCO" : ""}`}>
       <Chip
         size="small"
-        color={ok ? "success" : "error"}
+        color={ok ? "success" : daemon.enabled ? "warning" : "default"}
         variant={ok ? "filled" : "outlined"}
         label={
           <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
-            {label}
+            <Box
+              component="span"
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                bgcolor: ok ? "success.main" : daemon.enabled ? "warning.main" : "text.disabled",
+                display: "inline-block",
+              }}
+            />
+            <Box component="span" sx={{ fontWeight: 500 }}>
+              {label}
+            </Box>
+            <Box component="span" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
+              {daemon.proto.toUpperCase()} :{daemon.port}
+            </Box>
             {daemon.dco ? (
               <Box
                 component="span"
@@ -203,6 +338,13 @@ export function DashboardPage() {
   const daemons = snapshot?.daemons ?? [];
   const recentConnections = data?.recentConnections ?? [];
 
+  const spanLabel =
+    history.length > 1
+      ? `Last ${Math.max(1, Math.round((new Date(history[history.length - 1].at).getTime() - new Date(history[0].at).getTime()) / 60_000))} min`
+      : history.length === 1
+        ? "Live"
+        : "";
+
   const counts = {
     connections: snapshot?.activeConnections ?? data?.activeConnections ?? 0,
     users: data?.users ?? 0,
@@ -228,18 +370,33 @@ export function DashboardPage() {
         </Alert>
       )}
       <Grid container spacing={3}>
-        <StatCard title="Active connections" value={counts.connections} loading={isLoading} />
-        <StatCard title="Total users" value={counts.users} loading={isLoading} />
-        <StatCard title="Groups" value={counts.groups} loading={isLoading} />
-        <StatCard title="Active certificates" value={counts.certificates} loading={isLoading} />
+        <StatCard
+          title="Active connections"
+          value={counts.connections}
+          loading={isLoading}
+          icon={<LanIcon />}
+          color="success"
+        />
+        <StatCard title="Total users" value={counts.users} loading={isLoading} icon={<PeopleIcon />} color="primary" />
+        <StatCard title="Groups" value={counts.groups} loading={isLoading} icon={<GroupsIcon />} color="secondary" />
+        <StatCard
+          title="Active certificates"
+          value={counts.certificates}
+          loading={isLoading}
+          icon={<VerifiedUserIcon />}
+          color="warning"
+        />
 
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
               <Typography variant="h6" fontWeight={600}>
-                Traffic (last 15 min)
+                Network traffic
               </Typography>
-              <Stack direction="row" spacing={1}>
+              {spanLabel && (
+                <Chip size="small" variant="outlined" label={`${spanLabel} · ${history.length} samples`} />
+              )}
+              <Stack direction="row" spacing={1} sx={{ ml: "auto" }}>
                 <Chip size="small" variant="outlined" label={`↓ ${formatRate(snapshot?.bytesOutPerSec ?? 0)}`} />
                 <Chip size="small" variant="outlined" label={`↑ ${formatRate(snapshot?.bytesInPerSec ?? 0)}`} />
               </Stack>
@@ -303,7 +460,7 @@ export function DashboardPage() {
                 </TableHead>
                 <TableBody>
                   {recentConnections.map((c) => (
-                    <TableRow key={c.commonName}>
+                    <TableRow key={c.commonName} hover>
                       <TableCell>{c.username ?? "—"}</TableCell>
                       <TableCell>{c.commonName}</TableCell>
                       <TableCell>{c.virtualIp ?? "—"}</TableCell>

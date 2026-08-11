@@ -94,6 +94,13 @@ describe("DashboardPage", () => {
     expect(await screen.findByText("boom")).toBeInTheDocument();
   });
 
+  it("shows the traffic chart placeholder until the monitor delivers samples", async () => {
+    renderPage();
+
+    expect(await screen.findByText(/collecting traffic data/i)).toBeInTheDocument();
+    expect(screen.getByText("Network traffic")).toBeInTheDocument();
+  });
+
   it("renders the live traffic chart and host system card from the monitor feed", async () => {
     const monitor = {
       at: new Date().toISOString(),
@@ -135,5 +142,14 @@ describe("DashboardPage", () => {
     expect(screen.getByText("CPU")).toBeInTheDocument();
     expect(screen.getByText("12%")).toBeInTheDocument();
     expect(container.querySelector('[data-testid="traffic-chart"]')).not.toBeNull();
+    // When the SVG renders in jsdom, its axis ticks and legend must be readable
+    // (unit-formatted rates + Download/Upload series).
+    const svg = container.querySelector('[data-testid="traffic-chart"] svg');
+    if (svg) {
+      const text = svg.textContent ?? "";
+      expect(text).toContain("Download");
+      expect(text).toContain("Upload");
+      expect(text).toMatch(/B\/s/);
+    }
   });
 });
