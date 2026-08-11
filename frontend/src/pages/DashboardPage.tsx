@@ -291,14 +291,14 @@ function DaemonChip({ daemon }: { daemon: DaemonHealth }) {
                 width: 8,
                 height: 8,
                 borderRadius: "50%",
-                bgcolor: ok ? "success.main" : daemon.enabled ? "warning.main" : "text.disabled",
+                bgcolor: ok ? "success.contrastText" : daemon.enabled ? "warning.main" : "text.disabled",
                 display: "inline-block",
               }}
             />
             <Box component="span" sx={{ fontWeight: 500 }}>
               {label}
             </Box>
-            <Box component="span" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
+            <Box component="span" sx={{ fontSize: "0.7rem", opacity: 0.9 }}>
               {daemon.proto.toUpperCase()} :{daemon.port}
             </Box>
             {daemon.dco ? (
