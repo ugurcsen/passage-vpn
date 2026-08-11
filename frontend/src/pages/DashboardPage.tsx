@@ -436,7 +436,7 @@ export function DashboardPage() {
         </Grid>
 
         <Grid item xs={12}>
-          <Paper sx={{ p: 3 }}>
+          <Paper sx={{ p: 3, overflowX: "auto" }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
               <Typography variant="h6" fontWeight={600}>
                 Recent connections
