@@ -7,13 +7,15 @@ import com.opnl.vpn.api.admin.ServerStatusDto.DaemonStatus;
 import com.opnl.vpn.api.admin.TrafficPointDto;
 import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.network.ConnectionRegistry;
+import com.opnl.vpn.network.ConnectionRegistry.VpnSession;
 import com.opnl.vpn.network.Daemon;
 import com.opnl.vpn.network.DaemonService;
-import com.opnl.vpn.network.ConnectionRegistry.VpnSession;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ public class MonitorService {
   private final MonitorBroadcaster broadcaster;
   private final SystemInfoService systemInfoService;
   private final OpnlProperties properties;
+  private final ConnectionLogService connectionLogService;
   private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
   private volatile MonitorSnapshotDto latest;
@@ -46,6 +49,7 @@ public class MonitorService {
       MonitorBroadcaster broadcaster,
       SystemInfoService systemInfoService,
       OpnlProperties properties,
+      ConnectionLogService connectionLogService,
       com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
     this.clientManager = clientManager;
     this.aggregator = aggregator;
@@ -54,12 +58,16 @@ public class MonitorService {
     this.broadcaster = broadcaster;
     this.systemInfoService = systemInfoService;
     this.properties = properties;
+    this.connectionLogService = connectionLogService;
     this.objectMapper = objectMapper;
   }
 
   /** Polls management interfaces and broadcasts the fresh snapshot. */
   @Scheduled(fixedDelay = 5_000, initialDelay = 3_000)
   public void poll() {
+    Set<String> liveCommonNames = new HashSet<>();
+    boolean allDaemonsVisible = true;
+    boolean anyDaemonVisible = false;
     try {
       for (Daemon daemon : daemonService.list()) {
         if (!daemon.isEnabled()) {
@@ -67,11 +75,25 @@ public class MonitorService {
         }
         MgmtStatus status = clientManager.status(daemon.getDaemonIndex());
         if (status != null) {
+          anyDaemonVisible = true;
           aggregator.update(status.clients(), Instant.now());
+          status.clients().forEach(client -> liveCommonNames.add(client.commonName()));
+        } else {
+          // A daemon's view is missing: never reconcile against a partial picture
+          // (an unreachable daemon would look like "zero clients" and wrongly close
+          // its live sessions).
+          allDaemonsVisible = false;
         }
       }
     } catch (Exception e) {
       log.debug("Monitor poll interrupted: {}", e.getMessage());
+    }
+    // Reconcile only against a trustworthy, complete picture: at least one enabled daemon
+    // answered and no daemon was unreachable. An empty client set is a valid view (no
+    // clients connected) and must still close rows left open by a lost disconnect callback.
+    if (allDaemonsVisible && anyDaemonVisible) {
+      connectionLogService.reconcileOpenSessions(liveCommonNames);
+      connectionRegistry.retainOnly(liveCommonNames);
     }
     latest = currentSnapshot();
     if (broadcaster.sessionCount() > 0) {
@@ -87,11 +109,8 @@ public class MonitorService {
   public MonitorSnapshotDto currentSnapshot() {
     Instant now = Instant.now();
     List<ConnectionDto> connections =
-        connectionRegistry.sessions().stream()
-            .map(this::withTraffic)
-            .toList();
-    List<DaemonStatus> daemons =
-        daemonService.list().stream().map(this::toDaemonStatus).toList();
+        connectionRegistry.sessions().stream().map(this::withTraffic).toList();
+    List<DaemonStatus> daemons = daemonService.list().stream().map(this::toDaemonStatus).toList();
     List<TrafficPointDto> history =
         aggregator.history().stream()
             .map(
@@ -123,7 +142,8 @@ public class MonitorService {
   }
 
   private ConnectionDto withTraffic(VpnSession session) {
-    TrafficAggregator.SessionTraffic traffic = aggregator.trafficFor(session.commonName()).orElse(null);
+    TrafficAggregator.SessionTraffic traffic =
+        aggregator.trafficFor(session.commonName()).orElse(null);
     if (traffic == null) {
       return ConnectionDto.from(session);
     }
@@ -145,7 +165,9 @@ public class MonitorService {
         daemon.getPort(),
         daemon.getProto().name().toLowerCase(),
         daemon.isEnabled(),
-        Files.exists(Path.of(properties.openvpn().configDir()).resolve("daemon-" + daemon.getDaemonIndex() + ".conf")),
+        Files.exists(
+            Path.of(properties.openvpn().configDir())
+                .resolve("daemon-" + daemon.getDaemonIndex() + ".conf")),
         reachable,
         dco);
   }

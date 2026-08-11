@@ -35,6 +35,20 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] 2.6 LOW — MFA challenge tokens are single-use (redeemed `jti` set, TTL-pruned)
 - [x] 2.7 LOW — access rule `dstCidr` validated as CIDR (was storing `not-a-cidr`)
 
+**P0.5 — Minor follow-up sweep (live E2E round 2, `docs/test-findings.md` 2.8–2.12)**
+> Separate work item for the minor findings from the round-2 live E2E pass. Everything
+> here is polish/robustness — no core flow is broken (the CRIT/HIGH/MED of round 1 are
+> fixed and verified above).
+- [x] 2.8 MED — reconcile stale "Active" session rows when a daemon restarts (close rows
+      whose session is gone from the live `status 3` view; unit + integration test)
+- [ ] 2.9 LOW — eliminate 401 bursts from background polls at token expiry (proactive
+      refresh at ~80% TTL or retry-once-with-fresh-token; frontend test)
+- [ ] 2.10 LOW — fix empty `#root` flash on `/login` after hard reload (router/Suspense
+      hydration race; regression step)
+- [ ] 2.11 LOW — a11y: give the flagged login form control an `id`/`name`/`aria-label`
+- [x] 2.12 LOW — purge legacy `not-a-cidr:443` access rule from the staging DB; regression:
+      re-create → 400 (finding 2.7 holds)
+
 **P1.5 — Status / Settings / Dashboard phase (live E2E finding 2.5)** — DONE
 > Scoped from live E2E testing (`docs/test-findings.md` §2.5): the frontend defined
 > `/admin/status`, `/admin/settings`, `/admin/dashboard` but no backend controller existed.

@@ -13,6 +13,8 @@ public interface ConnectionLogRepository extends JpaRepository<ConnectionLog, St
   Optional<ConnectionLog> findFirstByCommonNameAndDisconnectedAtIsNullOrderByConnectedAtDesc(
       String commonName);
 
+  List<ConnectionLog> findAllByDisconnectedAtIsNull();
+
   List<ConnectionLog> findTop20ByOrderByConnectedAtDesc();
 
   @Modifying

@@ -12,6 +12,7 @@ import com.opnl.vpn.monitor.MgmtStatus.MgmtClientStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
@@ -95,8 +96,7 @@ class ConnectionLogServiceTest {
             .bytesOut(200)
             .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
             .build();
-    when(repository.findAll(any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of(log)));
+    when(repository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(log)));
 
     List<ConnectionLogDto> recent = service.recent(25);
 
@@ -112,5 +112,90 @@ class ConnectionLogServiceTest {
     when(repository.deleteOlderThan(any())).thenReturn(3);
     service.purgeOld();
     verify(repository).deleteOlderThan(any(Instant.class));
+  }
+
+  @Test
+  void reconcileClosesOpenRowsMissingFromLiveView() {
+    ConnectionLog open =
+        ConnectionLog.builder()
+            .id("log1")
+            .username("alice")
+            .commonName("alice")
+            .connectedAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .build();
+    when(repository.findAllByDisconnectedAtIsNull()).thenReturn(List.of(open));
+    when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service.reconcileOpenSessions(Set.of("bob", "carol"));
+
+    assertThat(open.getDisconnectedAt()).isNotNull();
+    verify(repository).save(open);
+  }
+
+  @Test
+  void reconcileKeepsRowsPresentInLiveView() {
+    ConnectionLog live =
+        ConnectionLog.builder()
+            .id("log1")
+            .username("alice")
+            .commonName("alice")
+            .connectedAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .build();
+    when(repository.findAllByDisconnectedAtIsNull()).thenReturn(List.of(live));
+
+    service.reconcileOpenSessions(Set.of("alice"));
+
+    assertThat(live.getDisconnectedAt()).isNull();
+    verify(repository, never()).save(any());
+  }
+
+  @Test
+  void reconcileWithEmptyLiveViewClosesEverything() {
+    // Empty live view is valid (no clients connected): all open rows are stale.
+    ConnectionLog open =
+        ConnectionLog.builder()
+            .id("log1")
+            .username("alice")
+            .commonName("alice")
+            .connectedAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .build();
+    when(repository.findAllByDisconnectedAtIsNull()).thenReturn(List.of(open));
+    when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service.reconcileOpenSessions(Set.of());
+
+    assertThat(open.getDisconnectedAt()).isNotNull();
+  }
+
+  @Test
+  void reconcileAttachesLastKnownBytesFromAggregator() {
+    ConnectionLog open =
+        ConnectionLog.builder()
+            .id("log1")
+            .username("alice")
+            .commonName("alice")
+            .connectedAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .build();
+    when(repository.findAllByDisconnectedAtIsNull()).thenReturn(List.of(open));
+    when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    Instant t0 = Instant.parse("2026-01-01T00:05:00Z");
+    aggregator.update(
+        List.of(new MgmtClientStatus("alice", "203.0.113.5", "10.8.0.2", 4096, 8192, t0, 1)), t0);
+
+    service.reconcileOpenSessions(Set.of("bob"));
+
+    assertThat(open.getBytesIn()).isEqualTo(4096);
+    assertThat(open.getBytesOut()).isEqualTo(8192);
+  }
+
+  @Test
+  void reconcileWithNullLiveViewIsNoop() {
+    service.reconcileOpenSessions(null);
+    verify(repository, never()).findAllByDisconnectedAtIsNull();
+    verify(repository, never()).save(any());
   }
 }

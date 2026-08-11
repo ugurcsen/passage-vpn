@@ -147,6 +147,23 @@ Legend: `[x]` released, `[~]` partial.
   `/api/admin/connection-logs` → `[]`; `/ws/status` handshake returns 101 with
   an admin token and 401 with a bad token; backend suite green (181 tests,
   spotless clean).
+- Live E2E round-2 minor sweep (SSH ops on `65.21.108.250`, `docs/test-findings.md`
+  2.8–2.12): legacy `not-a-cidr:443` access rule purged via admin API (grid clean);
+  one stale "Active" session row (`disconnected_at IS NULL`, client gone from live
+  `status 3`) found and closed — confirming finding 2.8; `jq` installed on the host;
+  stale test artifacts in `/root` (12 log/diff files) removed; deploy scripts
+  (`opnl-vpn-pull.sh`/`push.sh`) preserved.
+- Finding 2.8 backend fix (session reconciliation): `ConnectionLogService` now
+  reconciles open session rows against the live `status 3` view every monitor poll —
+  rows whose session is gone from every daemon (restart, crash, missed
+  `client-disconnect`) are closed with last-known byte counters via a shared
+  `closeRow`; `ConnectionRegistry.retainOnly` drops matching stale live sessions so
+  the UI view and history stay consistent. Reconciliation runs only while all enabled
+  daemons are visible and at least one daemon reports (an empty client set is valid).
+  Covered by 9 new unit tests (reconcile open/keep/close-empty/null cases, aggregator
+  byte attach, poll guards, registry retain/delete); backend suite green
+  (42 monitor+registry tests, full suite BUILD SUCCESSFUL), spotless clean on all
+  touched files.
 
 ### Not yet released
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group

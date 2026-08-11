@@ -25,6 +25,11 @@ case with wrong status code / masking, `[LOW]` polish / hardening.
 | 5 | MED | Unknown `/api/**` path returns 500 instead of 404 | error handling |
 | 6 | LOW | MFA pre-auth token is replayable | authentication |
 | 7 | LOW | Access rule `dstCidr` accepts malformed CIDR | access rules |
+| 8 | MED | Session rows stay "Active" after daemon restart (stale connection logs) | connection logs |
+| 9 | LOW | 401 console noise from background polls before silent token refresh | frontend auth |
+| 10 | LOW | Empty `#root` flash when loading `/login` after a hard reload | frontend router |
+| 11 | LOW | A11y: form field without id/name attribute | frontend |
+| 12 | LOW | Pre-fix invalid access rule remains in production data | data hygiene |
 
 ---
 
@@ -267,6 +272,118 @@ matches or fail at connect time, affecting real traffic.
 
 ---
 
+### 2.8 MED — Session rows stay "Active" after daemon restart (stale connection logs)
+
+**Location**
+- `backend/src/main/java/com/opnl/vpn/monitor/ConnectionLogService.java` `sessionEnded(...)`
+  (and the `client-disconnect.sh` → `/internal/disconnect` callback path).
+- `frontend/src/pages/StatusPage.tsx` "Recent sessions" table rendering.
+
+**Evidence** The status page "Recent sessions" list showed an entry still marked
+"Active" with 0s duration while no client was connected at that moment.
+
+**Root cause** A session is only closed when the `client-disconnect` callback fires
+(`/internal/disconnect`). When a daemon restarts (SIGUSR1 from the config watcher, crash,
+or container restart) or the backend is briefly unreachable at disconnect time, the
+callback is never delivered, so the `connection_logs` row keeps `disconnected_at = NULL`
+and the UI renders it as "Active" forever.
+
+**Impact** Misleading status page (an operator may believe a client is connected);
+session-history statistics are wrong after any daemon restart.
+
+**Fix**
+1. Reconciliation: on each management-interface status poll (or on daemon startup), close
+   any open `connection_logs` rows for sessions no longer present in the live `status 3`
+   client list — treat "gone from the daemon view" as ended.
+2. Alternatively/also: close open rows for a daemon when its config is (re)written or its
+   process restarts (findings 2.2/2.3 touch this lifecycle).
+3. Add a unit test: open session row + stale snapshot → row closed; and an integration
+   test for disconnect-callback-vs-restart ordering.
+
+---
+
+### 2.9 LOW — 401 console noise from background polls before silent token refresh
+
+**Location**
+- `frontend/src/lib/api.ts` (axios instance / auth interceptors, refresh logic).
+- `frontend/src/hooks/useLiveStatus.ts` (polling every 10s).
+
+**Evidence** 13× `401` responses (console `Failed to load resource: the server responded
+with a status of 401`) clustered right after the 10-minute access-token expiry, each
+paired with a status poll; the subsequent refresh-token call then succeeded and the UI
+recovered. Functional impact nil — the refresh flow works — but the console is noisy and
+real auth failures can get drowned out.
+
+**Root cause** Background polls continue to use the expired access token; the refresh
+only happens reactively on the first 401 (or when a page explicitly re-authenticates),
+so every in-flight poll in the expiry window returns 401.
+
+**Fix**
+1. Proactive refresh: refresh the access token shortly before expiry (e.g. at 80% of the
+   TTL) instead of waiting for a 401, or
+2. Retry-once-with-fresh-token in the interceptor: on 401 (and not the refresh endpoint
+   itself), wait for the in-flight refresh, then retry the original request once.
+3. Frontend test: fake timers + mocked refresh — polls crossing the expiry boundary must
+   not emit 401s.
+
+---
+
+### 2.10 LOW — Empty `#root` flash when loading `/login` after a hard reload
+
+**Location** `frontend/src/App.tsx` / router setup / entry (`main.tsx`).
+
+**Evidence** After signing out and hard-reloading `/login`, the page rendered an empty
+`#root` once (blank screen); a second manual reload rendered the login page correctly.
+No console error accompanied it.
+
+**Root cause** Suspected race in the router/lazy-route hydration on the first mount after
+logout state change (likely a route chunk or query-client hydration ordering issue).
+
+**Fix**
+1. Reproduce deterministically (logout → reload `/login` several times), then inspect the
+   router setup for a missing `Suspense`/splash fallback while lazy chunks load.
+2. Ensure the query client / auth-state provider is mounted before routes render.
+3. Add a test if reproducible in jsdom; otherwise a manual regression step in section 4.
+
+---
+
+### 2.11 LOW — A11y: form field without id/name attribute
+
+**Location** Frontend — one form control in the login flow flagged by an automated a11y
+snapshot ("A form field element should have an id or name attribute").
+
+**Evidence** Chrome DevTools a11y snapshot of the login page reported exactly one form
+field missing `id`/`name`; no functional impact.
+
+**Fix**
+1. Add `id`/`name` (or `aria-label`) to the flagged control, and verify with a fresh a11y
+   snapshot that the count drops to zero.
+2. Frontend test: login form renders with all controls labelled.
+
+---
+
+### 2.12 LOW — Pre-fix invalid access rule remains in production data
+
+**Location** `access_rules` table (production DB) / Access Rules grid (frontend).
+
+**Evidence** The Access Rules grid still shows a rule with destination
+`not-a-cidr:443`, created before finding 2.7's validation landed. Finding 2.7's DTO
+validation now blocks *new* malformed CIDRs, but the legacy row persists, so the grid
+surface is not clean.
+
+**Root cause** Data created while finding 2.7 was open was never cleaned up.
+
+**Impact** None functional (RuleEngine tolerates it), but it pollutes demo/screenshot
+surfaces and keeps the invalid value visible to admins.
+
+**Fix**
+1. Delete the legacy rule via the admin API (`DELETE /api/admin/rules/{id}`) or a one-off
+   SQL cleanup on the staging DB.
+2. Add a regression step (section 4): re-create `not-a-cidr` → must be rejected 400
+   (confirms finding 2.7 holds); the only way a bad CIDR exists is via pre-validation data.
+
+---
+
 ## 3. Verified non-issues and API notes
 
 Recorded during testing so they are not re-reported as bugs:
@@ -317,3 +434,13 @@ Suggested regression run after fixes:
 5. `GET /api/admin/nonexistent` → 404, not 500 (finding 2.5).
 6. Redeem an MFA preAuthToken twice → second call rejected (finding 2.6).
 7. Create a rule with `dstCidr=not-a-cidr` → 400 (finding 2.7).
+8. Kill a client's daemon connection mid-session (or restart a daemon) → the open
+   session row must close / disappear from "Active" on the next poll (finding 2.8).
+9. Cross the access-token expiry boundary while a status poll is running → no 401
+   bursts in the console (finding 2.9).
+10. Logout → hard reload `/login` repeatedly → always renders the login page, never an
+    empty `#root` (finding 2.10).
+11. Run an a11y snapshot on the login page → zero "form field without id/name" issues
+    (finding 2.11).
+12. `GET /api/admin/rules` → no `not-a-cidr` rows remain; `POST` with `not-a-cidr` → 400
+    (finding 2.12 / 2.7).

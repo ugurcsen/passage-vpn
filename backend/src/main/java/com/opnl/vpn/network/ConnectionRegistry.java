@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Component;
 
@@ -76,6 +77,23 @@ public class ConnectionRegistry {
     if (removed != null && removed.virtualIp() != null) {
       byVirtualIp.remove(removed.virtualIp(), removed);
     }
+  }
+
+  /**
+   * Drops every session whose common name is not in the given live set. Mirrors the {@code
+   * client-disconnect} path for sessions that died with a daemon restart before the disconnect
+   * callback fired; the live {@code status 3} view is the source of truth. The caller must only
+   * call with a trustworthy (all-daemons-visible) view; an empty set removes everything, which is
+   * correct when no client is connected.
+   */
+  public void retainOnly(Set<String> liveCommonNames) {
+    if (liveCommonNames == null) {
+      return;
+    }
+    byCommonName.entrySet().removeIf(entry -> !liveCommonNames.contains(entry.getKey()));
+    byVirtualIp
+        .entrySet()
+        .removeIf(entry -> !liveCommonNames.contains(entry.getValue().commonName()));
   }
 
   /** Snapshot of all active sessions, ordered by connection time ascending. */
