@@ -41,11 +41,14 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 > fixed and verified above).
 - [x] 2.8 MED — reconcile stale "Active" session rows when a daemon restarts (close rows
       whose session is gone from the live `status 3` view; unit + integration test)
-- [ ] 2.9 LOW — eliminate 401 bursts from background polls at token expiry (proactive
-      refresh at ~80% TTL or retry-once-with-fresh-token; frontend test)
-- [ ] 2.10 LOW — fix empty `#root` flash on `/login` after hard reload (router/Suspense
-      hydration race; regression step)
-- [ ] 2.11 LOW — a11y: give the flagged login form control an `id`/`name`/`aria-label`
+- [x] 2.9 LOW — eliminate 401 bursts from background polls at token expiry (proactive
+      refresh at ~80% TTL, silent JWT-exp scheduling in `api.ts`; frontend tests with
+      fake timers)
+- [x] 2.10 LOW — fix empty `#root` flash on `/login` after hard reload (inline splash in
+      `index.html` so the root renders immediately while the bundle loads; manual
+      regression step)
+- [x] 2.11 LOW — a11y: give the flagged login form control an `id`/`name`/`aria-label`
+      (all login-flow fields now carry `id`+`name`; frontend tests)
 - [x] 2.12 LOW — purge legacy `not-a-cidr:443` access rule from the staging DB; regression:
       re-create → 400 (finding 2.7 holds)
 

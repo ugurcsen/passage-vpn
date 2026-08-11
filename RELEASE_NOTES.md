@@ -176,6 +176,15 @@ Legend: `[x]` released, `[~]` partial.
   the touched monitor/API/controller files. Covered by new tab-separated parser
   tests in `MgmtStatusTest` and `MgmtClientTest`; backend + frontend suites
   green, lint clean.
+- Frontend robustness sweep (`docs/test-findings.md` 2.9–2.11): background polls
+  no longer burst 401s across the access-token expiry boundary — `api.ts` decodes
+  the JWT `exp` claim and schedules a silent refresh at 80% TTL (re-arming after
+  each rotation; the 401 retry stays as a shared-in-flight safety net), verified
+  with fake-timer tests; `index.html` embeds a static dark splash inside `#root`
+  so a hard reload never paints an empty root while the bundle loads; login-flow
+  form controls (`username`, `password`, MFA `code`) now carry explicit
+  `id`/`name` attributes with labelled-controls regression tests. Frontend suite
+  61/61 green, lint clean, `vite build` passes (verified on staging host).
 
 ### Not yet released
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group

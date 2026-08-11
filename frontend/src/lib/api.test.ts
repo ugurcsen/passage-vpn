@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, tokenStore } from "@/lib/api";
 
+/** Builds a JWT-shaped token carrying the given `exp` claim (seconds). */
+function makeJwt(exp: number): string {
+  const enc = (obj: unknown) =>
+    btoa(JSON.stringify(obj)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${enc({ alg: "none" })}.${enc({ exp })}.${enc({})}`;
+}
+
 describe("api token refresh", () => {
   const access = "access-1";
   const refresh = "refresh-1";
@@ -13,6 +20,8 @@ describe("api token refresh", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    vi.useRealTimers();
+    tokenStore.clear();
   });
 
   it("returns data on success", async () => {
@@ -163,5 +172,79 @@ describe("api token refresh", () => {
 
     await expect(api("/auth/me")).rejects.toBeInstanceOf(ApiError);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("proactively refreshes the access token before it expires", async () => {
+    vi.useFakeTimers();
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const firstAccess = makeJwt(nowSeconds + 120);
+    const secondAccess = makeJwt(nowSeconds + 240);
+    localStorage.clear();
+
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/auth/refresh") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ accessToken: secondAccess, refreshToken: "refresh-2" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ v: 1 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    tokenStore.set(firstAccess, "refresh-1");
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(96_000 + 1_000);
+
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) => url === "/api/auth/refresh");
+    expect(refreshCalls).toHaveLength(1);
+    expect(tokenStore.access).toBe(secondAccess);
+    expect(tokenStore.refresh).toBe("refresh-2");
+  });
+
+  it("uses the proactively refreshed token for requests crossing the expiry boundary", async () => {
+    vi.useFakeTimers();
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const firstAccess = makeJwt(nowSeconds + 120);
+    const secondAccess = makeJwt(nowSeconds + 240);
+    localStorage.clear();
+
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/auth/refresh") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ accessToken: secondAccess, refreshToken: "refresh-2" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    tokenStore.set(firstAccess, "refresh-1");
+    await vi.advanceTimersByTimeAsync(97_000);
+
+    await api("/admin/status");
+
+    const pollCall = fetchMock.mock.calls.find(([url]) => url === "/api/admin/status");
+    const headers = pollCall?.[1] as RequestInit | undefined;
+    const auth = (headers?.headers as Record<string, string> | undefined)?.Authorization;
+    expect(auth).toBe(`Bearer ${secondAccess}`);
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) => url === "/api/auth/refresh");
+    expect(refreshCalls).toHaveLength(1);
   });
 });

@@ -61,6 +61,8 @@ export function LoginPage() {
         </Typography>
         <form onSubmit={onSubmit}>
           <TextField
+            id="username"
+            name="username"
             label="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -71,6 +73,8 @@ export function LoginPage() {
             autoComplete="username"
           />
           <TextField
+            id="password"
+            name="password"
             label="Password"
             type="password"
             value={password}

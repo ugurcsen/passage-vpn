@@ -73,4 +73,28 @@ describe("LoginPage", () => {
     renderLogin();
     expect(await screen.findByText("wizard page")).toBeInTheDocument();
   });
+
+  it("labels all login form controls with id/name (a11y)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ state: "COMPLETE" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      ),
+    );
+
+    renderLogin();
+
+    const username = screen.getByLabelText(/username/i);
+    expect(username).toHaveAttribute("id", "username");
+    expect(username).toHaveAttribute("name", "username");
+
+    const password = screen.getByLabelText(/password/i);
+    expect(password).toHaveAttribute("id", "password");
+    expect(password).toHaveAttribute("name", "password");
+  });
 });

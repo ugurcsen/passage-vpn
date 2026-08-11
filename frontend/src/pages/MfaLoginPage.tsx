@@ -45,6 +45,8 @@ export function MfaLoginPage() {
         </Alert>
         <form onSubmit={onSubmit}>
           <TextField
+            id="code"
+            name="code"
             label="Verification code"
             value={code}
             onChange={(e) => setCode(e.target.value)}

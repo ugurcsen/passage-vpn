@@ -302,7 +302,7 @@ session-history statistics are wrong after any daemon restart.
 
 ---
 
-### 2.9 LOW — 401 console noise from background polls before silent token refresh
+### 2.9 LOW — 401 console noise from background polls before silent token refresh — [FIXED]
 
 **Location**
 - `frontend/src/lib/api.ts` (axios instance / auth interceptors, refresh logic).
@@ -319,18 +319,21 @@ only happens reactively on the first 401 (or when a page explicitly re-authentic
 so every in-flight poll in the expiry window returns 401.
 
 **Fix**
-1. Proactive refresh: refresh the access token shortly before expiry (e.g. at 80% of the
-   TTL) instead of waiting for a 401, or
-2. Retry-once-with-fresh-token in the interceptor: on 401 (and not the refresh endpoint
-   itself), wait for the in-flight refresh, then retry the original request once.
-3. Frontend test: fake timers + mocked refresh — polls crossing the expiry boundary must
-   not emit 401s.
+1. Proactive refresh: refresh the access token shortly before expiry. `api.ts` now decodes
+   the JWT `exp` claim and schedules a silent refresh at 80% of the TTL via a module-level
+   timer, re-arming itself after each rotation (`tokenStore.set` / `tokenStore.clear`
+   schedule/cancel the timer). The 401 retry-once path stays as a safety net and shares a
+   single in-flight refresh promise with the proactive timer.
+2. Frontend test (`src/lib/api.test.ts`): fake timers + mocked refresh — the timer fires
+   before expiry, rotates the token, and a subsequent poll uses the fresh bearer token
+   without any 401.
 
 ---
 
-### 2.10 LOW — Empty `#root` flash when loading `/login` after a hard reload
+### 2.10 LOW — Empty `#root` flash when loading `/login` after a hard reload — [FIXED]
 
-**Location** `frontend/src/App.tsx` / router setup / entry (`main.tsx`).
+**Location** `frontend/index.html` (empty `<div id="root">` between HTML paint and module
+script execution).
 
 **Evidence** After signing out and hard-reloading `/login`, the page rendered an empty
 `#root` once (blank screen); a second manual reload rendered the login page correctly.
@@ -345,9 +348,15 @@ logout state change (likely a route chunk or query-client hydration ordering iss
 2. Ensure the query client / auth-state provider is mounted before routes render.
 3. Add a test if reproducible in jsdom; otherwise a manual regression step in section 4.
 
+**Resolution** Root cause is the render gap inherent to a `<div id="root">` that is empty
+in the HTML: the browser paints the blank root before the deferred module bundle executes
+(no lazy routes exist, so no Suspense gap — the flash is the pre-React paint). `index.html`
+now embeds a static dark splash (spinner + label) inside `#root`, which React replaces on
+mount. Manual regression step added in section 4.
+
 ---
 
-### 2.11 LOW — A11y: form field without id/name attribute
+### 2.11 LOW — A11y: form field without id/name attribute — [FIXED]
 
 **Location** Frontend — one form control in the login flow flagged by an automated a11y
 snapshot ("A form field element should have an id or name attribute").
@@ -359,6 +368,10 @@ field missing `id`/`name`; no functional impact.
 1. Add `id`/`name` (or `aria-label`) to the flagged control, and verify with a fresh a11y
    snapshot that the count drops to zero.
 2. Frontend test: login form renders with all controls labelled.
+
+**Resolution** All login-flow controls now carry explicit `id` + `name` attributes:
+`LoginPage` (`username`, `password`) and `MfaLoginPage` (`code`). Regression tests in
+`LoginPage.test.tsx` and `MfaLoginPage.test.tsx` assert `id`/`name` on every control.
 
 ---
 
@@ -438,8 +451,8 @@ Suggested regression run after fixes:
    session row must close / disappear from "Active" on the next poll (finding 2.8).
 9. Cross the access-token expiry boundary while a status poll is running → no 401
    bursts in the console (finding 2.9).
-10. Logout → hard reload `/login` repeatedly → always renders the login page, never an
-    empty `#root` (finding 2.10).
+10. Logout → hard reload `/login` repeatedly → always renders the login page (or the
+    inline splash during load), never an empty `#root` (finding 2.10).
 11. Run an a11y snapshot on the login page → zero "form field without id/name" issues
     (finding 2.11).
 12. `GET /api/admin/rules` → no `not-a-cidr` rows remain; `POST` with `not-a-cidr` → 400

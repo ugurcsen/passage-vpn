@@ -11,14 +11,20 @@ export const tokenStore = {
     return localStorage.getItem(REFRESH_KEY);
   },
   set: (access: string | null, refresh: string | null) => {
-    if (access) localStorage.setItem(TOKEN_KEY, access);
-    else localStorage.removeItem(TOKEN_KEY);
+    if (access) {
+      localStorage.setItem(TOKEN_KEY, access);
+      scheduleProactiveRefresh();
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+      cancelProactiveRefresh();
+    }
     if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
     else localStorage.removeItem(REFRESH_KEY);
   },
   clear: () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
+    cancelProactiveRefresh();
   },
 };
 
@@ -33,6 +39,51 @@ export class ApiError extends Error {
 }
 
 let refreshing: Promise<string | null> | null = null;
+let proactiveTimer: number | null = null;
+
+/** Fraction of the access-token TTL at which a silent refresh is scheduled. */
+const PROACTIVE_REFRESH_FRACTION = 0.8;
+
+/** Decodes the JWT `exp` claim (seconds since epoch) to schedule proactive refreshes.
+ *  The signature is not verified here; malformed/non-JWT tokens simply disable the schedule. */
+function accessTokenExpiry(token: string | null): number | null {
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const payload = JSON.parse(atob(padded)) as { exp?: unknown };
+    return typeof payload.exp === "number" ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Refreshes the access token shortly before it expires so background polls never fire with a
+ *  known-expired token (avoids the 401 burst around the expiry boundary). */
+function scheduleProactiveRefresh(): void {
+  if (proactiveTimer !== null) {
+    window.clearTimeout(proactiveTimer);
+    proactiveTimer = null;
+  }
+  const exp = accessTokenExpiry(tokenStore.access);
+  if (exp === null) return;
+  const ttlMs = exp * 1000 - Date.now();
+  const delayMs = ttlMs * PROACTIVE_REFRESH_FRACTION;
+  if (delayMs <= 0) return;
+  proactiveTimer = window.setTimeout(() => {
+    proactiveTimer = null;
+    void refreshNow();
+  }, delayMs);
+}
+
+function cancelProactiveRefresh(): void {
+  if (proactiveTimer !== null) {
+    window.clearTimeout(proactiveTimer);
+    proactiveTimer = null;
+  }
+}
 
 async function refreshAccessToken(): Promise<string | null> {
   const refresh = tokenStore.refresh;
@@ -49,6 +100,14 @@ async function refreshAccessToken(): Promise<string | null> {
   const data = await res.json();
   tokenStore.set(data.accessToken, data.refreshToken ?? refresh);
   return data.accessToken;
+}
+
+/** Refreshes the token exactly once across concurrent callers (401 retries + proactive timer). */
+function refreshNow(): Promise<string | null> {
+  refreshing ??= refreshAccessToken().finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
 }
 
 /** Authenticated fetch wrapper: bearer token, automatic refresh on 401. */
@@ -69,10 +128,7 @@ export async function api<T = unknown>(
 
   let res = await doFetch(tokenStore.access);
   if (res.status === 401 && !path.startsWith("/auth/")) {
-    refreshing ??= refreshAccessToken().finally(() => {
-      refreshing = null;
-    });
-    const fresh = await refreshing;
+    const fresh = await refreshNow();
     if (fresh) res = await doFetch(fresh);
   }
   if (!res.ok) {
