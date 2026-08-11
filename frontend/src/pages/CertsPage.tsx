@@ -94,28 +94,28 @@ export function CertsPage() {
     {
       field: "status",
       headerName: "Status",
-      width: 110,
+      width: 90,
       renderCell: (params) => (
         <Chip label={params.value as string} size="small" color={STATUS_COLOR[params.value as CertificateRow["status"]]} />
       ),
     },
-    { field: "serial", headerName: "Serial", width: 130 },
+    { field: "serial", headerName: "Serial", width: 120 },
     {
       field: "issuedAt",
       headerName: "Issued",
-      width: 170,
+      width: 150,
       valueGetter: (_, row) => (row as CertificateRow).issuedAt ? new Date((row as CertificateRow).issuedAt!).toLocaleString() : "—",
     },
     {
       field: "expiresAt",
       headerName: "Expires",
-      width: 170,
+      width: 150,
       valueGetter: (_, row) => (row as CertificateRow).expiresAt ? new Date((row as CertificateRow).expiresAt!).toLocaleString() : "—",
     },
     {
       field: "actions",
       headerName: "Actions",
-      width: 110,
+      width: 100,
       sortable: false,
       filterable: false,
       renderCell: (params) => {

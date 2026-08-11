@@ -171,7 +171,7 @@ export function DaemonsPage() {
       field: "name",
       headerName: "Daemon",
       flex: 1.2,
-      minWidth: 180,
+      minWidth: 160,
       renderCell: (params) => {
         const row = params.row as Daemon;
         return <Typography variant="body2">{row.name ?? `Daemon ${row.daemonIndex}`}</Typography>;
@@ -180,19 +180,19 @@ export function DaemonsPage() {
     {
       field: "endpoint",
       headerName: "Endpoint",
-      width: 130,
+      width: 120,
       valueGetter: (_, row) => `${(row as Daemon).proto.toUpperCase()}:${(row as Daemon).port}`,
     },
     {
       field: "subnet",
       headerName: "Subnet",
-      width: 150,
+      width: 140,
       valueGetter: (_, row) => `${(row as Daemon).subnet}/${(row as Daemon).subnetMask}`,
     },
     {
       field: "role",
       headerName: "Serves profiles",
-      width: 190,
+      width: 170,
       renderCell: (params) => {
         const row = params.row as Daemon;
         const role = daemonRole(row);
@@ -204,13 +204,13 @@ export function DaemonsPage() {
     {
       field: "fullTunnel",
       headerName: "Routing",
-      width: 110,
+      width: 100,
       valueGetter: (_, row) => ((row as Daemon).fullTunnel ? "Full tunnel" : "Split tunnel"),
     },
     {
       field: "enabled",
       headerName: "Enabled",
-      width: 100,
+      width: 90,
       renderCell: (params) => {
         const row = params.row as Daemon;
         return (
@@ -221,7 +221,7 @@ export function DaemonsPage() {
     {
       field: "actions",
       headerName: "Actions",
-      width: 100,
+      width: 90,
       sortable: false,
       filterable: false,
       renderCell: (params) => {

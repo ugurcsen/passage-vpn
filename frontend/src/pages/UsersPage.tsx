@@ -224,11 +224,11 @@ export function UsersPage() {
 
   const columns: GridColDef[] = [
     { field: "username", headerName: "Username", flex: 1.2, minWidth: 140 },
-    { field: "fullName", headerName: "Full name", flex: 1 },
+    { field: "fullName", headerName: "Full name", flex: 1, minWidth: 100 },
     {
       field: "groups",
       headerName: "Groups",
-      width: 200,
+      width: 160,
       valueGetter: (_, row) => (row as UserRow).groups.join(", "),
       renderCell: (params) => (
         <Stack direction="row" spacing={0.5} sx={{ py: 0.5, flexWrap: "wrap" }}>
@@ -241,7 +241,7 @@ export function UsersPage() {
     {
       field: "role",
       headerName: "Role",
-      width: 110,
+      width: 100,
       renderCell: (params) => (
         <Chip
           label={params.value as string}
@@ -253,28 +253,28 @@ export function UsersPage() {
     {
       field: "mfaEnabled",
       headerName: "MFA",
-      width: 80,
+      width: 70,
       renderCell: (params) =>
         params.value ? <Chip label="On" size="small" color="success" /> : <Chip label="Off" size="small" />,
     },
     {
       field: "banned",
       headerName: "Status",
-      width: 110,
+      width: 100,
       renderCell: (params) =>
         params.value ? <Chip label="Disabled" size="small" color="error" /> : <Chip label="Active" size="small" color="success" />,
     },
     {
       field: "lastLoginAt",
       headerName: "Last login",
-      width: 170,
+      width: 150,
       valueGetter: (_, row) => (row as UserRow).lastLoginAt ?? "",
       renderCell: (params) => <Typography variant="body2">{formatDateTime(params.value as string)}</Typography>,
     },
     {
       field: "actions",
       headerName: "Actions",
-      width: 180,
+      width: 160,
       sortable: false,
       filterable: false,
       renderCell: (params) => {

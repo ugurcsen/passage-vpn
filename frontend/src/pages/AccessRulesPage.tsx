@@ -171,7 +171,7 @@ export function AccessRulesPage() {
       field: "target",
       headerName: "Applies to",
       flex: 1.2,
-      minWidth: 150,
+      minWidth: 130,
       valueGetter: (_, row) => {
         const r = row as RuleRow;
         return r.targetType === "GLOBAL" ? "All users" : `${r.targetType === "USER" ? "User" : "Group"}: ${r.targetName ?? ""}`;
@@ -185,7 +185,7 @@ export function AccessRulesPage() {
     {
       field: "action",
       headerName: "Action",
-      width: 100,
+      width: 90,
       renderCell: (params) => (
         <Chip label={params.value as string} size="small" color={(params.value as Action) === "ALLOW" ? "success" : "error"} />
       ),
@@ -193,25 +193,25 @@ export function AccessRulesPage() {
     {
       field: "protocol",
       headerName: "Protocol",
-      width: 110,
+      width: 100,
       valueGetter: (_, row) => (row as RuleRow).protocol ?? "any",
     },
     {
       field: "destination",
       headerName: "Destination",
       flex: 1.2,
-      minWidth: 160,
+      minWidth: 140,
       valueGetter: (_, row) => {
         const r = row as RuleRow;
         const cidr = r.dstCidr ?? "any";
         return r.dstPort ? `${cidr}:${r.dstPort}` : cidr;
       },
     },
-    { field: "priority", headerName: "Priority", width: 90 },
+    { field: "priority", headerName: "Priority", width: 80 },
     {
       field: "enabled",
       headerName: "Enabled",
-      width: 100,
+      width: 90,
       renderCell: (params) => {
         const row = params.row as RuleRow;
         return (
@@ -226,7 +226,7 @@ export function AccessRulesPage() {
     {
       field: "actions",
       headerName: "Actions",
-      width: 100,
+      width: 90,
       sortable: false,
       filterable: false,
       renderCell: (params) => {
