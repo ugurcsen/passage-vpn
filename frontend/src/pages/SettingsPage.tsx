@@ -113,27 +113,29 @@ export function SettingsPage() {
         </Stack>
       </Paper>
 
-      <Paper sx={{ p: 3 }}>
+      <Paper sx={{ p: 3, overflowX: "auto" }}>
         <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
           Server settings ({entries.length})
         </Typography>
         {isLoading ? (
           <Skeleton height={120} />
         ) : (
-          <Table size="small">
+          <Table size="small" sx={{ tableLayout: "fixed", width: "100%" }}>
             <TableHead>
               <TableRow>
-                <TableCell>Key</TableCell>
-                <TableCell>Value</TableCell>
-                <TableCell align="right">Actions</TableCell>
+                <TableCell sx={{ width: "30%" }}>Key</TableCell>
+                <TableCell sx={{ width: "60%" }}>Value</TableCell>
+                <TableCell align="right" sx={{ width: "10%" }}>
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {entries.map(([k, v]) => (
                 <TableRow key={k}>
-                  <TableCell sx={{ fontWeight: 600 }}>{k}</TableCell>
-                  <TableCell sx={{ maxWidth: 420, overflowWrap: "anywhere" }}>
-                    <Typography variant="body2" component="pre" sx={{ m: 0, fontFamily: "monospace" }}>
+                  <TableCell sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>{k}</TableCell>
+                  <TableCell sx={{ overflowWrap: "anywhere" }}>
+                    <Typography variant="body2" component="pre" sx={{ m: 0, fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
                       {JSON.stringify(v)}
                     </Typography>
                   </TableCell>

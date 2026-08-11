@@ -174,19 +174,14 @@ export function DaemonsPage() {
       minWidth: 180,
       renderCell: (params) => {
         const row = params.row as Daemon;
-        return (
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Typography variant="body2">{row.name ?? `Daemon ${row.daemonIndex}`}</Typography>
-            {row.primary && <Chip label="Primary" size="small" color="primary" variant="outlined" />}
-          </Stack>
-        );
+        return <Typography variant="body2">{row.name ?? `Daemon ${row.daemonIndex}`}</Typography>;
       },
     },
     {
       field: "endpoint",
       headerName: "Endpoint",
       width: 130,
-      valueGetter: (_, row) => `${(row as Daemon).proto.toUpperCase()} :${(row as Daemon).port}`,
+      valueGetter: (_, row) => `${(row as Daemon).proto.toUpperCase()}:${(row as Daemon).port}`,
     },
     {
       field: "subnet",

@@ -299,7 +299,7 @@ function DaemonChip({ daemon }: { daemon: DaemonHealth }) {
               {label}
             </Box>
             <Box component="span" sx={{ fontSize: "0.7rem", opacity: 0.9 }}>
-              {daemon.proto.toUpperCase()} :{daemon.port}
+              {daemon.proto.toUpperCase()}:{daemon.port}
             </Box>
             {daemon.dco ? (
               <Box

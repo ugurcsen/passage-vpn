@@ -84,8 +84,8 @@ describe("DaemonsPage", () => {
 
     expect((await screen.findAllByText("Primary")).length).toBeGreaterThan(0);
     expect(screen.getByText("Generic gateway")).toBeInTheDocument();
-    expect(screen.getByText("UDP :1194")).toBeInTheDocument();
-    expect(screen.getByText("TCP :1195")).toBeInTheDocument();
+    expect(screen.getByText("UDP:1194")).toBeInTheDocument();
+    expect(screen.getByText("TCP:1195")).toBeInTheDocument();
     expect(screen.getByText("Generic")).toBeInTheDocument();
   });
 

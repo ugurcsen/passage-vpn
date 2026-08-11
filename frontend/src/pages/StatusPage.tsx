@@ -130,7 +130,7 @@ export function StatusPage() {
         />
       </Stack>
 
-      <Paper sx={{ p: 3, mb: 3 }}>
+      <Paper sx={{ p: 3, mb: 3, overflowX: "auto" }}>
         <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
           VPN daemons
         </Typography>
@@ -155,7 +155,7 @@ export function StatusPage() {
                   <TableCell>{d.index}</TableCell>
                   <TableCell>{d.name ?? "—"}</TableCell>
                   <TableCell>
-                    {d.proto.toUpperCase()} :{d.port}
+                    {d.proto.toUpperCase()}:{d.port}
                   </TableCell>
                   <TableCell>
                     <StatusChip ok={d.dco === true} label={d.dco ? "DCO" : "Userspace"} />
@@ -183,7 +183,7 @@ export function StatusPage() {
         )}
       </Paper>
 
-      <Paper sx={{ p: 3, mb: 3 }}>
+      <Paper sx={{ p: 3, mb: 3, overflowX: "auto" }}>
         <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
           Active connections
         </Typography>
@@ -223,7 +223,7 @@ export function StatusPage() {
         )}
       </Paper>
 
-      <Paper sx={{ p: 3 }}>
+      <Paper sx={{ p: 3, overflowX: "auto" }}>
         <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
           Recent sessions
         </Typography>
@@ -250,7 +250,7 @@ export function StatusPage() {
                   <TableCell>{log.username || "—"}</TableCell>
                   <TableCell>{log.commonName}</TableCell>
                   <TableCell>{log.virtualIp ?? "—"}</TableCell>
-                  <TableCell>{log.daemonName ?? "—"}</TableCell>
+                  <TableCell>{log.daemonName?.trim() || "—"}</TableCell>
                   <TableCell>{formatDateTime(log.connectedAt)}</TableCell>
                   <TableCell>{log.disconnectedAt ? formatDateTime(log.disconnectedAt) : "Active"}</TableCell>
                   <TableCell>{formatDuration(log.durationSeconds)}</TableCell>

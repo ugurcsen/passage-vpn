@@ -22,8 +22,32 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { PortalPage } from "@/pages/PortalPage";
 import { SharePage } from "@/pages/SharePage";
 
+const THEME_KEY = "opnl.theme";
+
+/** Dark mode is the default; the choice persists across reloads. */
+function loadDarkMode(): boolean {
+  try {
+    return localStorage.getItem(THEME_KEY) !== "light";
+  } catch {
+    return true;
+  }
+}
+
 export default function App() {
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState<boolean>(loadDarkMode);
+
+  const toggleDarkMode = () => {
+    setDarkMode((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem(THEME_KEY, next ? "dark" : "light");
+      } catch {
+        // Persistence is best-effort (e.g. private browsing).
+      }
+      return next;
+    });
+  };
+
   const theme = darkMode ? darkTheme : lightTheme;
 
   return (
@@ -38,7 +62,7 @@ export default function App() {
                   <Route path="/login/mfa" element={<MfaLoginPage />} />
                   <Route path="/setup" element={<SetupWizardPage />} />
                   <Route path="/share/:token" element={<SharePage />} />
-                  <Route element={<AppLayout darkMode={darkMode} onToggleDarkMode={() => setDarkMode((d) => !d)} />}>
+                  <Route element={<AppLayout darkMode={darkMode} onToggleDarkMode={toggleDarkMode} />}>
                     <Route path="/" element={<DashboardPage />} />
                     <Route path="/users" element={<UsersPage />} />
                     <Route path="/groups" element={<GroupsPage />} />

@@ -148,7 +148,16 @@ export function AppLayout({ darkMode, onToggleDarkMode }: AppLayoutProps) {
           {drawer}
         </Drawer>
       </Box>
-      <Box component="main" sx={{ flexGrow: 1, p: 3, width: { md: `calc(100% - ${DRAWER_WIDTH}px)` } }}>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          minWidth: 0,
+          overflowX: "hidden",
+          p: 3,
+          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+        }}
+      >
         <Toolbar />
         <PageOutlet />
       </Box>

@@ -70,6 +70,11 @@ const EMPTY_FORM: UserForm = {
   groupIds: [],
 };
 
+function formatDateTime(iso?: string) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString();
+}
+
 export function UsersPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -263,7 +268,8 @@ export function UsersPage() {
       field: "lastLoginAt",
       headerName: "Last login",
       width: 170,
-      valueGetter: (_, row) => (row as UserRow).lastLoginAt ?? "—",
+      valueGetter: (_, row) => (row as UserRow).lastLoginAt ?? "",
+      renderCell: (params) => <Typography variant="body2">{formatDateTime(params.value as string)}</Typography>,
     },
     {
       field: "actions",

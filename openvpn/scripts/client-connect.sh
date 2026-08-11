@@ -9,11 +9,18 @@ set -euo pipefail
 
 OPNL_INTERNAL_BASE_URL="${OPNL_INTERNAL_BASE_URL:-http://backend:8080}"
 
+# OpenVPN does not export a daemon identity to scripts; derive it from the
+# --config path (e.g. /etc/opnl/config/daemon-0.conf -> daemon-0).
+daemon_name="${daemon_name:-}"
+if [[ -z "$daemon_name" && -n "${config:-}" ]]; then
+    daemon_name="$(basename "${config}" .conf)"
+fi
+
 resp="$(curl -sS --max-time 8 \
     -X POST "$OPNL_INTERNAL_BASE_URL/internal/connect" \
     -H 'Content-Type: application/json' \
     -H 'X-Internal-Token: __INTERNAL_TOKEN__' \
-    -d "{\"commonName\":$(jq -Rn --arg v "${common_name:-}" '$v'),\"username\":$(jq -Rn --arg v "${username:-}" '$v'),\"daemonName\":$(jq -Rn --arg v "${daemon_name:-}" '$v'),\"remoteIp\":$(jq -Rn --arg v "${trusted_ip:-}" '$v'),\"virtualIp\":$(jq -Rn --arg v "${ifconfig_pool_remote_ip:-}" '$v')}" \
+    -d "{\"commonName\":$(jq -Rn --arg v "${common_name:-}" '$v'),\"username\":$(jq -Rn --arg v "${username:-}" '$v'),\"daemonName\":$(jq -Rn --arg v "$daemon_name" '$v'),\"remoteIp\":$(jq -Rn --arg v "${trusted_ip:-}" '$v'),\"virtualIp\":$(jq -Rn --arg v "${ifconfig_pool_remote_ip:-}" '$v')}" \
     || true)" || true
 
 if [[ -z "$resp" ]]; then
