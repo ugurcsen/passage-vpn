@@ -2,6 +2,7 @@ package com.opnl.vpn.api.admin;
 
 import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.group.GroupRepository;
+import com.opnl.vpn.monitor.TrafficAggregator;
 import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.network.ConnectionRegistry.VpnSession;
 import com.opnl.vpn.network.Daemon;
@@ -26,6 +27,7 @@ public class DashboardAdminService {
   private final CertificateRepository certificateRepository;
   private final ConnectionRegistry connectionRegistry;
   private final DaemonService daemonService;
+  private final TrafficAggregator trafficAggregator;
   private final OpnlProperties properties;
 
   public DashboardAdminService(
@@ -34,12 +36,14 @@ public class DashboardAdminService {
       CertificateRepository certificateRepository,
       ConnectionRegistry connectionRegistry,
       DaemonService daemonService,
+      TrafficAggregator trafficAggregator,
       OpnlProperties properties) {
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
     this.certificateRepository = certificateRepository;
     this.connectionRegistry = connectionRegistry;
     this.daemonService = daemonService;
+    this.trafficAggregator = trafficAggregator;
     this.properties = properties;
   }
 
@@ -56,7 +60,7 @@ public class DashboardAdminService {
         sessions.stream()
             .sorted(Comparator.comparing(VpnSession::connectedAt).reversed())
             .limit(RECENT_CONNECTIONS_LIMIT)
-            .map(ConnectionDto::from)
+            .map(this::withTraffic)
             .toList();
     return new DashboardDto(
         userRepository.count(),
@@ -66,5 +70,20 @@ public class DashboardAdminService {
         running,
         daemons.size(),
         recent);
+  }
+
+  /** Merges the session with its last known management-interface traffic counters. */
+  private ConnectionDto withTraffic(VpnSession session) {
+    TrafficAggregator.SessionTraffic traffic =
+        trafficAggregator.trafficFor(session.commonName()).orElse(null);
+    if (traffic == null) {
+      return ConnectionDto.from(session);
+    }
+    return ConnectionDto.from(
+        session,
+        traffic.bytesIn(),
+        traffic.bytesOut(),
+        traffic.bytesInPerSec(),
+        traffic.bytesOutPerSec());
   }
 }
