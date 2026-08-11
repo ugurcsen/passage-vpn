@@ -82,8 +82,34 @@ Legend: `[x]` released, `[~]` partial.
 - [~] Server settings store — generic JSON key/value admin CRUD (list, upsert
       with key validation, delete) with settings management UI
 
+### Phase 4b — Real-time monitoring (management interface + WebSocket)
+- [x] `MgmtClient` — persistent TCP client to the OpenVPN management interface
+      (auth via `OPNL_OPENVPN_MGMT_PASSWORD`), async `>INFO/` + event parsing,
+      reconnecting with backoff; per-daemon clients multiplexed by daemon index
+- [x] `MgmtStatusMonitor` — periodic `status` polling per daemon into
+      `VirtualAddress/ROUTING_TABLE` snapshots (client IPs, byte counters,
+      connect times); `kill <cn>` support with `KILL` confirmation
+- [x] `TrafficAggregator` — in-memory ring buffer (max 64 samples) of aggregate
+      bytes-in/out per second and active connection counts; baseline reset on
+      daemon reconnect; RATE samples over 3s
+- [x] `ConnectionLogService` — records connect/disconnect events (duration,
+      byte counters, daemon) into `connection_logs` (Flyway V6, BIGINT counters);
+      exposed via `GET /api/admin/connection-logs?limit=`
+- [x] `MonitorSnapshotService` — combined snapshot (connections with live bytes,
+      daemon health incl. DCO, rates, history ring, host system info via
+      `oshi-core`); `GET /api/admin/monitor` and `GET /api/admin/system`
+- [x] `/ws/status` WebSocket — `WsAuthHandshakeInterceptor` (token in query
+      param, ADMIN-only, MFA challenge tokens rejected, 401 on failure) +
+      `MonitorSnapshotWebSocketHandler` broadcasting snapshots every 2s
+- [x] DCO detection from management `TITLE` (DCO data channel vs userspace)
+- [x] Frontend: `useLiveStatus` hook (WebSocket with 5s reconnect + REST
+      fallback polling), Dashboard traffic chart (`@mui/x-charts` LineChart,
+      15-min history) + host System card (CPU/RAM/disk) + daemon chips with DCO
+      badge + Live/Offline indicator, Status page byte counters, rates chip,
+      DCO column and Recent sessions table
+
 ### Verified end-to-end
-- Backend: 150 unit tests green; frontend: 56 component tests; `make test`,
+- Backend: 181 unit tests green; frontend: 63 component tests; `make test`,
   `make lint` and spotless pass.
 - Live E2E (production `65.21.108.250`, docker compose): setup wizard → PKI
   provisioned → OpenVPN daemon boots from the generated config → management
@@ -114,6 +140,13 @@ Legend: `[x]` released, `[~]` partial.
   → 400 (was 500); unknown `/api/**` path → 404 `not_found` (was 500); MFA
   challenge tokens are single-use; access rule `dstCidr` is validated as CIDR
   (malformed values rejected with 400 `validation_failed`).
+- Live E2E (Phase 4b monitoring): redeployed on production `65.21.108.250`
+  with the management-interface monitor; Flyway V6 applied; `/api/admin/monitor`
+  returns connections + daemon health (all 3 daemons `mgmtReachable`,
+  `dco: false`) + history ring (growing over time) + host system stats;
+  `/api/admin/connection-logs` → `[]`; `/ws/status` handshake returns 101 with
+  an admin token and 401 with a bad token; backend suite green (181 tests,
+  spotless clean).
 
 ### Not yet released
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group

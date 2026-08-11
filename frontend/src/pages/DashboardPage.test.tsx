@@ -45,7 +45,12 @@ function renderPage() {
 describe("DashboardPage", () => {
   beforeEach(() => {
     localStorage.clear();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json(dashboard)));
+    // jsdom has no WebSocket: the live hook falls back to REST polling, so fetch
+    // stays the single source of truth in tests.
+    vi.stubGlobal("WebSocket", undefined);
+    // A fresh Response per call: bodies are one-shot streams and the monitor poll
+    // performs a second fetch that would fail on an already-consumed body.
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(json(dashboard))));
   });
 
   afterEach(() => {
@@ -75,15 +80,60 @@ describe("DashboardPage", () => {
   it("renders an error alert when the fetch fails", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ message: "boom" }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }),
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ message: "boom" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
       ),
     );
     renderPage();
 
     expect(await screen.findByText("boom")).toBeInTheDocument();
+  });
+
+  it("renders the live traffic chart and host system card from the monitor feed", async () => {
+    const monitor = {
+      at: new Date().toISOString(),
+      connections: [],
+      daemons: [
+        {
+          index: 0,
+          name: "Primary",
+          port: 1194,
+          proto: "udp",
+          enabled: true,
+          configPresent: true,
+          mgmtReachable: true,
+          dco: false,
+        },
+      ],
+      bytesInPerSec: 1024,
+      bytesOutPerSec: 512,
+      activeConnections: 0,
+      history: [
+        { at: new Date(Date.now() - 60_000).toISOString(), bytesInPerSec: 100, bytesOutPerSec: 50, activeConnections: 0 },
+        { at: new Date().toISOString(), bytesInPerSec: 200, bytesOutPerSec: 80, activeConnections: 0 },
+      ],
+      system: {
+        cpuLoadPercent: 12,
+        totalMemory: 8 * 1024 ** 3,
+        freeMemory: 3 * 1024 ** 3,
+        diskTotal: 50 * 1024 ** 3,
+        diskFree: 20 * 1024 ** 3,
+        availableProcessors: 4,
+      },
+    };
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(json(monitor))));
+    const { container } = renderPage();
+
+    // Wait for the REST fallback poll to deliver a snapshot (slow CI boxes may
+    // take a moment), then assert the live widgets rendered from it.
+    expect(await screen.findByText("Polling", {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText("CPU")).toBeInTheDocument();
+    expect(screen.getByText("12%")).toBeInTheDocument();
+    expect(container.querySelector('[data-testid="traffic-chart"]')).not.toBeNull();
   });
 });

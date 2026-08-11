@@ -35,28 +35,33 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] 2.6 LOW — MFA challenge tokens are single-use (redeemed `jti` set, TTL-pruned)
 - [x] 2.7 LOW — access rule `dstCidr` validated as CIDR (was storing `not-a-cidr`)
 
-**P1.5 — Status / Settings / Dashboard phase (live E2E finding 2.5)**
+**P1.5 — Status / Settings / Dashboard phase (live E2E finding 2.5)** — DONE
 > Scoped from live E2E testing (`docs/test-findings.md` §2.5): the frontend defined
 > `/admin/status`, `/admin/settings`, `/admin/dashboard` but no backend controller existed.
 > Instead of removing the dead endpoints, implement them as a dedicated phase.
-- [ ] `GET /api/admin/status` — `ServerStatusDto`: brand/version, per-daemon
+- [x] `GET /api/admin/status` — `ServerStatusDto`: brand/version, per-daemon
       `{index,name,port,proto,enabled,configPresent,mgmtReachable}` (TCP probe to
       `openvpn:7505+index`), active connections from `ConnectionRegistry`, backend uptime
-- [ ] `GET/PUT/DELETE /api/admin/settings` — `SettingsAdminController` over the
+- [x] `GET/PUT/DELETE /api/admin/settings` — `SettingsAdminController` over the
       `SettingsService` server-level store (generic JSON key-value, same shape as per-user)
-- [ ] `GET /api/admin/dashboard` — `DashboardDto`: user/group/cert/connection counts,
+- [x] `GET /api/admin/dashboard` — `DashboardDto`: user/group/cert/connection counts,
       running-daemon count, recent connections
-- [ ] Frontend: `DashboardPage` consumes `/admin/dashboard` (live stat cards + daemon status
+- [x] Frontend: `DashboardPage` consumes `/admin/dashboard` (live stat cards + daemon status
       + recent connections); new `StatusPage` (daemon table + active connections) and
       `SettingsPage` (server settings editor) replace the placeholders
-- [ ] Unit/component tests for the three endpoints and pages
-- [ ] Live E2E verification against staging (local Vite dev proxy → remote backend)
+- [x] Unit/component tests for the three endpoints and pages
+- [x] Live E2E verification against production (login → dashboard/status/settings flows)
 
-**P2 — Phase 4: monitoring & dashboard (advanced)**
-- [ ] `MgmtClient` (persistent TCP to `openvpn:7505`) + async event handling
-- [ ] `TrafficAggregator` + WebSocket push (bytes in/out per session)
-- [ ] Online users list, session duration, connection history persisted
-- [ ] Dashboard: MUI X Charts traffic, system info (actuator), DCO badge
+**P2 — Phase 4: real-time monitoring & advanced dashboard**
+> Operational dashboard (stat cards, daemon health, settings) shipped in P1.5.
+> This batch adds live traffic + session history on top.
+- [x] `MgmtClient` (persistent TCP to `openvpn:7505+index`) + async event handling,
+      per-daemon clients, reconnect with backoff
+- [x] `TrafficAggregator` + WebSocket push (`/ws/status`, 2s snapshots) with REST
+      fallback polling (bytes in/out per session)
+- [x] Online users list, session duration, connection history persisted
+      (`connection_logs`, Flyway V6, `/api/admin/connection-logs`)
+- [x] Dashboard: MUI X Charts traffic, system info (oshi), DCO badge
 - [ ] Audit log entity + UI; syslog integration; `connection_logs` retention
 
 **P3 — Phase 4: API, ops, deployment**
@@ -187,17 +192,21 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 ## Phase 4 — Monitoring, Admin & Deployment
 
 ### 4.1 Real-time monitoring
-- [ ] Management interface TCP client (`MgmtClient`) — async events + `status 3` poll
-- [ ] Event handling: `>CLIENT:ESTABLISHED`, `>CLIENT:DISCONNECT`, `>BYTECOUNT:`
-- [~] In-memory `ConnectionRegistry` (fed by `client-connect`/`learn-address`, read via `/api/admin/connections`); `TrafficAggregator` pending
-- [ ] WebSocket push to frontend (native WS, tiny JSON protocol)
-- [ ] Online users list (live), session duration, bytes in/out
-- [ ] Connection history (session logs) persisted
+- [x] Management interface TCP client (`MgmtClient`) — async events + `status 3` poll,
+      per-daemon clients (`openvpn:7505+index`), reconnect with backoff
+- [x] Event handling: `>CLIENT:ESTABLISHED`, `>CLIENT:DISCONNECT`, `>BYTECOUNT:` plus
+      `kill <cn>` with confirmation
+- [x] In-memory `ConnectionRegistry` (fed by `client-connect`/`learn-address`, read via
+      `/api/admin/connections` + dashboard); `TrafficAggregator` shipped
+- [x] WebSocket push to frontend (`/ws/status`, ADMIN-only handshake, 2s snapshots,
+      REST fallback polling)
+- [x] Online users list (live), session duration, bytes in/out
+- [x] Connection history (session logs) persisted (`connection_logs`, Flyway V6)
 
 ### 4.2 Dashboard
-- [ ] Live: active connections, total users, traffic rate
-- [ ] Charts (MUI X Charts): connections + traffic over time
-- [ ] System info: CPU/mem/disk (backend actuator), OpenVPN version, DCO
+- [~] Live stat cards (connections/users/groups/certs) + recent connections — shipped (P1.5)
+- [x] Traffic rate + charts (MUI X Charts — dependency already present)
+- [x] System info: CPU/mem/disk (oshi), OpenVPN version, DCO
 
 ### 4.3 Logging & audit
 - [ ] Audit log entity (admin actions) + UI

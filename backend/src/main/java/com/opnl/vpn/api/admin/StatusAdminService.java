@@ -1,6 +1,8 @@
 package com.opnl.vpn.api.admin;
 
 import com.opnl.vpn.config.OpnlProperties;
+import com.opnl.vpn.monitor.MgmtClientManager;
+import com.opnl.vpn.monitor.MgmtStatus;
 import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.network.Daemon;
 import com.opnl.vpn.network.DaemonService;
@@ -25,14 +27,17 @@ public class StatusAdminService {
 
   private final DaemonService daemonService;
   private final ConnectionRegistry connectionRegistry;
+  private final MgmtClientManager mgmtClientManager;
   private final OpnlProperties properties;
 
   public StatusAdminService(
       DaemonService daemonService,
       ConnectionRegistry connectionRegistry,
+      MgmtClientManager mgmtClientManager,
       OpnlProperties properties) {
     this.daemonService = daemonService;
     this.connectionRegistry = connectionRegistry;
+    this.mgmtClientManager = mgmtClientManager;
     this.properties = properties;
   }
 
@@ -49,6 +54,8 @@ public class StatusAdminService {
   }
 
   private ServerStatusDto.DaemonStatus toDaemonStatus(Daemon daemon, Path configDir) {
+    MgmtStatus cached = mgmtClientManager.cachedStatus(daemon.getDaemonIndex());
+    Boolean dco = cached != null ? cached.dco() : null;
     return new ServerStatusDto.DaemonStatus(
         daemon.getDaemonIndex(),
         daemon.getName(),
@@ -56,7 +63,8 @@ public class StatusAdminService {
         daemon.getProto().name().toLowerCase(),
         daemon.isEnabled(),
         Files.exists(configDir.resolve("daemon-" + daemon.getDaemonIndex() + ".conf")),
-        mgmtReachable(daemon.getDaemonIndex()));
+        mgmtReachable(daemon.getDaemonIndex()),
+        dco);
   }
 
   /** Opens a short-lived TCP connection to the daemon's management socket. */

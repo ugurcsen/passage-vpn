@@ -5,6 +5,7 @@ import com.opnl.vpn.access.AccessRuleService;
 import com.opnl.vpn.access.RuleEngine.IptablesResult;
 import com.opnl.vpn.auth.AuthService;
 import com.opnl.vpn.common.ApiException;
+import com.opnl.vpn.monitor.ConnectionLogService;
 import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
@@ -38,6 +39,7 @@ public class InternalController {
   private final AccessRuleService ruleService;
   private final ConnectionRegistry connectionRegistry;
   private final SettingsService settingsService;
+  private final ConnectionLogService connectionLogService;
 
   public InternalController(
       UserRepository userRepository,
@@ -46,7 +48,8 @@ public class InternalController {
       AuthService authService,
       AccessRuleService ruleService,
       ConnectionRegistry connectionRegistry,
-      SettingsService settingsService) {
+      SettingsService settingsService,
+      ConnectionLogService connectionLogService) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.setupService = setupService;
@@ -54,6 +57,7 @@ public class InternalController {
     this.ruleService = ruleService;
     this.connectionRegistry = connectionRegistry;
     this.settingsService = settingsService;
+    this.connectionLogService = connectionLogService;
   }
 
   /**
@@ -124,6 +128,8 @@ public class InternalController {
         request.virtualIp(),
         request.remoteIp(),
         request.daemonName());
+    connectionLogService.sessionStarted(
+        user.getUsername(), user.getUsername(), request.virtualIp(), request.remoteIp(), request.daemonName());
     IptablesResult result =
         ruleService.iptablesFor(user.getUsername(), request.virtualIp(), user.getId());
     return new ConnectResult(true, null, List.of(), result.apply(), result.remove());
@@ -139,6 +145,7 @@ public class InternalController {
       return new DisconnectResult(List.of());
     }
     connectionRegistry.unregister(user.getUsername());
+    connectionLogService.sessionEnded(user.getUsername());
     IptablesResult result =
         ruleService.iptablesFor(user.getUsername(), request.virtualIp(), user.getId());
     return new DisconnectResult(result.remove());

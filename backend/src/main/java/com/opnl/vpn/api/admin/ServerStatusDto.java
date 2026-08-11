@@ -10,7 +10,10 @@ public record ServerStatusDto(
     int activeConnections,
     List<DaemonStatus> daemons) {
 
-  /** Health view of a single daemon. */
+  /**
+   * Health view of a single daemon. {@code dco} is {@code null} until a management-interface poll
+   * reported the daemon's capabilities.
+   */
   public record DaemonStatus(
       int index,
       String name,
@@ -18,5 +21,6 @@ public record ServerStatusDto(
       String proto,
       boolean enabled,
       boolean configPresent,
-      boolean mgmtReachable) {}
+      boolean mgmtReachable,
+      Boolean dco) {}
 }

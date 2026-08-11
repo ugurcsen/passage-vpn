@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.config.OpnlProperties;
+import com.opnl.vpn.monitor.MgmtClientManager;
 import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.network.Daemon;
 import com.opnl.vpn.network.DaemonService;
@@ -53,7 +54,7 @@ class StatusAdminServiceTest {
                 "http://backend:8080",
                 "easyrsa",
                 tempDir.resolve("logs").toString()));
-    return new StatusAdminService(daemonService, connectionRegistry, properties);
+    return new StatusAdminService(daemonService, connectionRegistry, new MgmtClientManager(properties), properties);
   }
 
   private Daemon daemon(int index, boolean enabled) {

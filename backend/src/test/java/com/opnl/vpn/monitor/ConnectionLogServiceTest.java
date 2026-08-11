@@ -1,0 +1,116 @@
+package com.opnl.vpn.monitor;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.opnl.vpn.api.admin.ConnectionLogDto;
+import com.opnl.vpn.monitor.MgmtStatus.MgmtClientStatus;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+
+class ConnectionLogServiceTest {
+
+  private ConnectionLogRepository repository;
+  private TrafficAggregator aggregator;
+  private ConnectionLogService service;
+
+  @BeforeEach
+  void setUp() {
+    repository = mock(ConnectionLogRepository.class);
+    aggregator = new TrafficAggregator();
+    service = new ConnectionLogService(repository, aggregator);
+  }
+
+  @Test
+  void sessionStartedPersistsOpenRow() {
+    when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service.sessionStarted("alice", "alice", "10.8.0.2", "203.0.113.5", "daemon-0");
+
+    verify(repository).save(any(ConnectionLog.class));
+  }
+
+  @Test
+  void sessionStartedIgnoresBlankCommonName() {
+    service.sessionStarted("alice", "", null, null, null);
+    verify(repository, never()).save(any());
+  }
+
+  @Test
+  void sessionEndedFinalizesOpenRowWithAggregatorBytes() {
+    ConnectionLog open =
+        ConnectionLog.builder()
+            .id("log1")
+            .username("alice")
+            .commonName("alice")
+            .connectedAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .build();
+    when(repository.findFirstByCommonNameAndDisconnectedAtIsNullOrderByConnectedAtDesc("alice"))
+        .thenReturn(Optional.of(open));
+    when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    Instant t0 = Instant.parse("2026-01-01T00:05:00Z");
+    aggregator.update(
+        List.of(new MgmtClientStatus("alice", "203.0.113.5", "10.8.0.2", 4096, 8192, t0, 1)), t0);
+
+    service.sessionEnded("alice");
+
+    assertThat(open.getDisconnectedAt()).isNotNull();
+    assertThat(open.getBytesIn()).isEqualTo(4096);
+    assertThat(open.getBytesOut()).isEqualTo(8192);
+    verify(repository).save(open);
+  }
+
+  @Test
+  void sessionEndedWithoutOpenRowIsNoop() {
+    when(repository.findFirstByCommonNameAndDisconnectedAtIsNullOrderByConnectedAtDesc("alice"))
+        .thenReturn(Optional.empty());
+
+    service.sessionEnded("alice");
+
+    verify(repository, never()).save(any());
+  }
+
+  @Test
+  void recentMapsEntitiesToDtos() {
+    ConnectionLog log =
+        ConnectionLog.builder()
+            .id("log1")
+            .username("alice")
+            .commonName("alice")
+            .virtualIp("10.8.0.2")
+            .connectedAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .disconnectedAt(Instant.parse("2026-01-01T00:02:00Z"))
+            .bytesIn(100)
+            .bytesOut(200)
+            .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .build();
+    when(repository.findAll(any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(log)));
+
+    List<ConnectionLogDto> recent = service.recent(25);
+
+    assertThat(recent).hasSize(1);
+    ConnectionLogDto dto = recent.get(0);
+    assertThat(dto.username()).isEqualTo("alice");
+    assertThat(dto.bytesIn()).isEqualTo(100);
+    assertThat(dto.durationSeconds()).isEqualTo(120);
+  }
+
+  @Test
+  void purgeOldDeletesBeforeCutoff() {
+    when(repository.deleteOlderThan(any())).thenReturn(3);
+    service.purgeOld();
+    verify(repository).deleteOlderThan(any(Instant.class));
+  }
+}

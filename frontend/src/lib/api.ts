@@ -168,6 +168,9 @@ export const endpoints = {
   status: "/admin/status",
   settings: "/admin/settings",
   dashboard: "/admin/dashboard",
+  connectionLogs: "/admin/connection-logs",
+  system: "/admin/system",
+  monitor: "/admin/monitor",
 };
 
 export type ProfileType = "USER_LOCKED" | "AUTO_LOGIN" | "SERVER_LOCKED" | "GENERIC";
@@ -206,6 +209,8 @@ export interface DaemonHealth {
   enabled: boolean;
   configPresent: boolean;
   mgmtReachable: boolean;
+  /** True when the daemon reports a DCO-capable data channel in its management TITLE. */
+  dco?: boolean | null;
 }
 
 /** Snapshot returned by the live status endpoint. */
@@ -225,6 +230,11 @@ export interface VpnConnection {
   remoteIp: string | null;
   daemonName: string | null;
   connectedAt: string;
+  /** Cumulative byte counters from the management interface (present when live). */
+  bytesIn?: number | null;
+  bytesOut?: number | null;
+  bytesInPerSec?: number | null;
+  bytesOutPerSec?: number | null;
 }
 
 /** Aggregate counts and recent activity for the dashboard. */
@@ -236,6 +246,50 @@ export interface DashboardStats {
   runningDaemons: number;
   totalDaemons: number;
   recentConnections: VpnConnection[];
+}
+
+/** One sample of the rolling traffic history ring. */
+export interface TrafficPoint {
+  at: string;
+  bytesInPerSec: number;
+  bytesOutPerSec: number;
+  activeConnections: number;
+}
+
+/** Host resource usage reported by the backend system endpoint. */
+export interface SystemInfo {
+  cpuLoadPercent: number;
+  totalMemory: number;
+  freeMemory: number;
+  diskTotal: number;
+  diskFree: number;
+  availableProcessors: number;
+}
+
+/** Full monitor payload pushed over /ws/status and served by /admin/monitor. */
+export interface MonitorSnapshot {
+  at: string;
+  connections: VpnConnection[];
+  daemons: DaemonHealth[];
+  bytesInPerSec: number;
+  bytesOutPerSec: number;
+  activeConnections: number;
+  history: TrafficPoint[];
+  system: SystemInfo;
+}
+
+/** A finished (or still active) VPN session from the connection log. */
+export interface ConnectionLog {
+  username: string;
+  commonName: string;
+  virtualIp: string | null;
+  remoteIp: string | null;
+  daemonName: string | null;
+  connectedAt: string;
+  disconnectedAt: string | null;
+  bytesIn: number;
+  bytesOut: number;
+  durationSeconds: number;
 }
 
 /** Server-level settings store: arbitrary JSON values keyed by string. */

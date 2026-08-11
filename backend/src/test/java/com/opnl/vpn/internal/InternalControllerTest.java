@@ -16,6 +16,7 @@ import com.opnl.vpn.access.RuleEngine.IptablesResult;
 import com.opnl.vpn.auth.AuthService;
 import com.opnl.vpn.auth.AuthService.VpnVerification;
 import com.opnl.vpn.common.GlobalExceptionHandler;
+import com.opnl.vpn.monitor.ConnectionLogService;
 import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.setup.SetupService;
@@ -42,6 +43,7 @@ class InternalControllerTest {
   private AccessRuleService ruleService;
   private ConnectionRegistry connectionRegistry;
   private SettingsService settingsService;
+  private ConnectionLogService connectionLogService;
   private MockMvc mvc;
 
   private User user(boolean banned, boolean locked) {
@@ -64,6 +66,7 @@ class InternalControllerTest {
     ruleService = mock(AccessRuleService.class);
     connectionRegistry = new ConnectionRegistry();
     settingsService = mock(SettingsService.class);
+    connectionLogService = mock(ConnectionLogService.class);
     when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user(false, false)));
     when(settingsService.effectiveForUser("u1")).thenReturn(Map.of());
     when(ruleService.iptablesFor(anyString(), anyString(), anyString()))
@@ -79,7 +82,8 @@ class InternalControllerTest {
                     authService,
                     ruleService,
                     connectionRegistry,
-                    settingsService))
+                    settingsService,
+                    connectionLogService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -241,7 +245,8 @@ class InternalControllerTest {
                     authService,
                     ruleService,
                     connectionRegistry,
-                    settingsService))
+                    settingsService,
+                    connectionLogService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .addFilters(filter)
             .build();
@@ -295,6 +300,28 @@ class InternalControllerTest {
               assertThat(s.remoteIp()).isEqualTo("1.2.3.4");
               assertThat(s.daemonName()).isEqualTo("daemon-0");
             });
+  }
+
+  @Test
+  void connectRecordsSessionHistoryStart() throws Exception {
+    mvc.perform(
+            post("/internal/connect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\",\"remoteIp\":\"1.2.3.4\",\"daemonName\":\"daemon-0\"}"))
+        .andExpect(status().isOk());
+    verify(connectionLogService)
+        .sessionStarted("alice", "alice", "10.8.0.9", "1.2.3.4", "daemon-0");
+  }
+
+  @Test
+  void disconnectFinalizesSessionHistory() throws Exception {
+    mvc.perform(
+            post("/internal/disconnect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
+        .andExpect(status().isOk());
+    verify(connectionLogService).sessionEnded("alice");
   }
 
   @Test
