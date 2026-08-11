@@ -7,9 +7,10 @@ import java.util.List;
 /**
  * Parsed result of a {@code status 3} query against the OpenVPN management interface.
  *
- * <p>The management protocol is plain text: {@code status 3} returns a block of comma-separated
- * lines terminated by {@code END}. The {@code TITLE} line announces the OpenVPN version and
- * whether data channel offload ({@code [DCO]}) is active.
+ * <p>The management protocol is plain text: {@code status 3} returns a block of lines terminated by
+ * {@code END}, in {@code --status-version 3} format (tab-separated; older versions use commas).
+ * Both separators are accepted. The {@code TITLE} line announces the OpenVPN version and whether
+ * data channel offload ({@code [DCO]}) is active.
  */
 public record MgmtStatus(
     Instant at, String title, int numClients, List<MgmtClientStatus> clients, boolean dco) {
@@ -31,11 +32,11 @@ public record MgmtStatus(
     boolean dco = false;
     List<MgmtClientStatus> clients = new ArrayList<>();
     for (String line : lines) {
-      if (line.startsWith("TITLE,")) {
-        title = line.substring("TITLE,".length());
-        dco = title.contains("[DCO]");
-      } else if (line.startsWith("TIME,")) {
-        String[] parts = line.split(",", -1);
+      if (line.startsWith("TITLE")) {
+        title = valueAfter(line, "TITLE");
+        dco = title != null && title.contains("[DCO]");
+      } else if (line.startsWith("TIME")) {
+        String[] parts = line.split("[,\\t]", -1);
         if (parts.length >= 4) {
           try {
             numClients = Integer.parseInt(parts[3]);
@@ -43,7 +44,7 @@ public record MgmtStatus(
             // keep default
           }
         }
-      } else if (line.startsWith("CLIENT_LIST,")) {
+      } else if (line.startsWith("CLIENT_LIST")) {
         MgmtClientStatus client = parseClient(line);
         if (client != null) {
           clients.add(client);
@@ -53,9 +54,19 @@ public record MgmtStatus(
     return new MgmtStatus(at, title, numClients, List.copyOf(clients), dco);
   }
 
+  /** Content of a key line minus the leading separator (comma or tab). */
+  private static String valueAfter(String line, String prefix) {
+    String value = line.substring(prefix.length());
+    if (value.startsWith("\t") || value.startsWith(",")) {
+      return value.substring(1);
+    }
+    return value;
+  }
+
   private static MgmtClientStatus parseClient(String line) {
     // CLIENT_LIST,cn,real,vaddr,v6addr,brecv,bsent,since,sincetime,username,cid,peerid,cipher
-    String[] parts = line.split(",", -1);
+    // (tab-separated in status-version 3 output)
+    String[] parts = line.split("[,\\t]", -1);
     if (parts.length < 7) {
       return null;
     }

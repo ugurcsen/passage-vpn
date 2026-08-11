@@ -164,6 +164,18 @@ Legend: `[x]` released, `[~]` partial.
   byte attach, poll guards, registry retain/delete); backend suite green
   (42 monitor+registry tests, full suite BUILD SUCCESSFUL), spotless clean on all
   touched files.
+- Post-deploy monitoring fixups: `MgmtStatus` now parses OpenVPN 2.6's
+  `--status-version 3` output, which is tab-separated (the legacy comma format is
+  still accepted), so the live `status 3` view and per-session byte counters work
+  on 2.6 daemons where the previous comma-only parser produced no client rows;
+  a display-string `Connected Since` column no longer aborts row parsing.
+  Frontend Download/Upload semantics corrected everywhere: Download =
+  server→client (`bytesOut` / `bytesOutPerSec`), Upload = client→server
+  (`bytesIn` / `bytesInPerSec`) across the Dashboard traffic chart, the rate
+  chips and both connection tables. A spotless formatting sweep was applied to
+  the touched monitor/API/controller files. Covered by new tab-separated parser
+  tests in `MgmtStatusTest` and `MgmtClientTest`; backend + frontend suites
+  green, lint clean.
 
 ### Not yet released
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group

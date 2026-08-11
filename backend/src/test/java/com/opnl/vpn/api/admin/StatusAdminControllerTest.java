@@ -36,7 +36,9 @@ class StatusAdminControllerTest {
             "0.1.0-SNAPSHOT",
             123,
             2,
-            List.of(new ServerStatusDto.DaemonStatus(0, "Primary", 1194, "udp", true, true, true, null)));
+            List.of(
+                new ServerStatusDto.DaemonStatus(
+                    0, "Primary", 1194, "udp", true, true, true, null)));
     when(statusAdminService.status()).thenReturn(dto);
 
     mvc.perform(get("/api/admin/status"))

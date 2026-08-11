@@ -54,7 +54,8 @@ class StatusAdminServiceTest {
                 "http://backend:8080",
                 "easyrsa",
                 tempDir.resolve("logs").toString()));
-    return new StatusAdminService(daemonService, connectionRegistry, new MgmtClientManager(properties), properties);
+    return new StatusAdminService(
+        daemonService, connectionRegistry, new MgmtClientManager(properties), properties);
   }
 
   private Daemon daemon(int index, boolean enabled) {

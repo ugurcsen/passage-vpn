@@ -57,6 +57,49 @@ class MgmtClientTest {
   }
 
   @Test
+  void statusParsesTabSeparatedVersion3Response() throws Exception {
+    try (ServerSocket listener = new ServerSocket(0)) {
+      int port = listener.getLocalPort();
+      Thread daemon =
+          new Thread(
+              () -> {
+                try (Socket s = listener.accept()) {
+                  BufferedReader r =
+                      new BufferedReader(
+                          new InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8));
+                  r.readLine(); // expect "status 3"
+                  BufferedWriter w =
+                      new BufferedWriter(
+                          new OutputStreamWriter(s.getOutputStream(), StandardCharsets.UTF_8));
+                  w.write(
+                      "TITLE\tOpenVPN 2.6.20 x86_64-alpine-linux-musl [SSL (OpenSSL)] built on ...\n");
+                  w.write(
+                      "CLIENT_LIST\tadmin\t31.223.13.8:27961\t10.8.0.2\t\t148702\t179132\t2026-08-11 08:28:23\t1786436903\tadmin\t0\t0\tAES-256-GCM\n");
+                  w.write("END\n");
+                  w.flush();
+                } catch (IOException ignored) {
+                  // test teardown
+                }
+              });
+      daemon.start();
+
+      MgmtClient client = new MgmtClient("127.0.0.1", port, 0);
+      MgmtStatus status = client.status();
+      daemon.join(3_000);
+
+      assertThat(status).isNotNull();
+      assertThat(status.title()).contains("OpenVPN 2.6.20");
+      assertThat(status.dco()).isFalse();
+      assertThat(status.clients()).hasSize(1);
+      MgmtStatus.MgmtClientStatus admin = status.clients().get(0);
+      assertThat(admin.commonName()).isEqualTo("admin");
+      assertThat(admin.bytesIn()).isEqualTo(148702);
+      assertThat(admin.bytesOut()).isEqualTo(179132);
+      client.close();
+    }
+  }
+
+  @Test
   void killAcknowledgesSuccess() throws Exception {
     try (ServerSocket listener = new ServerSocket(0)) {
       int port = listener.getLocalPort();

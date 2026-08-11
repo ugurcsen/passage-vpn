@@ -125,7 +125,7 @@ export function StatusPage() {
         <Chip
           size="small"
           color={snapshot ? "success" : "default"}
-          label={`↓ ${formatRate(snapshot?.bytesInPerSec)}  ↑ ${formatRate(snapshot?.bytesOutPerSec)}`}
+          label={`↓ ${formatRate(snapshot?.bytesOutPerSec)}  ↑ ${formatRate(snapshot?.bytesInPerSec)}`}
           variant="outlined"
         />
       </Stack>
@@ -210,8 +210,8 @@ export function StatusPage() {
                   <TableCell>{c.virtualIp ?? "—"}</TableCell>
                   <TableCell>{c.remoteIp ?? "—"}</TableCell>
                   <TableCell>{c.daemonName ?? "—"}</TableCell>
-                  <TableCell>{formatBytes(c.bytesIn)}</TableCell>
                   <TableCell>{formatBytes(c.bytesOut)}</TableCell>
+                  <TableCell>{formatBytes(c.bytesIn)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

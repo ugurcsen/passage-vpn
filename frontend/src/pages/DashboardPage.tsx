@@ -82,8 +82,8 @@ function TrafficChart({ history }: { history: { at: string; bytesInPerSec: numbe
           },
         ]}
         series={[
-          { data: history.map((p) => p.bytesInPerSec), label: "Download", color: "#66bb6a" },
-          { data: history.map((p) => p.bytesOutPerSec), label: "Upload", color: "#42a5f5" },
+          { data: history.map((p) => p.bytesOutPerSec), label: "Download", color: "#66bb6a" },
+          { data: history.map((p) => p.bytesInPerSec), label: "Upload", color: "#42a5f5" },
         ]}
       />
     </Box>
@@ -240,8 +240,8 @@ export function DashboardPage() {
                 Traffic (last 15 min)
               </Typography>
               <Stack direction="row" spacing={1}>
-                <Chip size="small" variant="outlined" label={`↓ ${formatRate(snapshot?.bytesInPerSec ?? 0)}`} />
-                <Chip size="small" variant="outlined" label={`↑ ${formatRate(snapshot?.bytesOutPerSec ?? 0)}`} />
+                <Chip size="small" variant="outlined" label={`↓ ${formatRate(snapshot?.bytesOutPerSec ?? 0)}`} />
+                <Chip size="small" variant="outlined" label={`↑ ${formatRate(snapshot?.bytesInPerSec ?? 0)}`} />
               </Stack>
             </Box>
             <TrafficChart history={history} />
@@ -309,8 +309,8 @@ export function DashboardPage() {
                       <TableCell>{c.virtualIp ?? "—"}</TableCell>
                       <TableCell>{c.remoteIp ?? "—"}</TableCell>
                       <TableCell>{c.daemonName ?? "—"}</TableCell>
-                      <TableCell>{formatBytes(c.bytesIn ?? 0)}</TableCell>
                       <TableCell>{formatBytes(c.bytesOut ?? 0)}</TableCell>
+                      <TableCell>{formatBytes(c.bytesIn ?? 0)}</TableCell>
                       <TableCell>{formatSince(c.connectedAt)}</TableCell>
                     </TableRow>
                   ))}

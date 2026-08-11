@@ -34,8 +34,7 @@ class TrafficAggregatorTest {
     Instant t0 = Instant.parse("2026-01-01T00:00:00Z");
     aggregator.update(List.of(client("alice", 1000, 500, t0)), t0);
 
-    aggregator.update(
-        List.of(client("alice", 5000, 2500, t0.plusSeconds(5))), t0.plusSeconds(5));
+    aggregator.update(List.of(client("alice", 5000, 2500, t0.plusSeconds(5))), t0.plusSeconds(5));
 
     TrafficAggregator.SessionTraffic traffic = aggregator.trafficFor("alice").orElseThrow();
     assertThat(traffic.bytesIn()).isEqualTo(5000);

@@ -59,12 +59,14 @@ public class MgmtClient implements Closeable {
       this.reader =
           new BufferedReader(new InputStreamReader(fresh.getInputStream(), StandardCharsets.UTF_8));
       this.writer =
-          new BufferedWriter(new OutputStreamWriter(fresh.getOutputStream(), StandardCharsets.UTF_8));
+          new BufferedWriter(
+              new OutputStreamWriter(fresh.getOutputStream(), StandardCharsets.UTF_8));
       this.socket = fresh;
       log.info("Connected to management interface {}:{} (daemon {})", host, port, daemonIndex);
       return true;
     } catch (IOException e) {
-      log.debug("Management {}:{} unreachable (daemon {}): {}", host, port, daemonIndex, e.getMessage());
+      log.debug(
+          "Management {}:{} unreachable (daemon {}): {}", host, port, daemonIndex, e.getMessage());
       return false;
     }
   }

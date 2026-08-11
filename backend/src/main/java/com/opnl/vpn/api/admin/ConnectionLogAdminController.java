@@ -21,8 +21,7 @@ public class ConnectionLogAdminController {
   }
 
   @GetMapping
-  public List<ConnectionLogDto> list(
-      @RequestParam(defaultValue = "25") int limit) {
+  public List<ConnectionLogDto> list(@RequestParam(defaultValue = "25") int limit) {
     return connectionLogService.recent(limit);
   }
 }

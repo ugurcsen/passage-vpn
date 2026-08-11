@@ -11,8 +11,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.http.server.ServletServerHttpResponse;
-import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.socket.WebSocketHandler;
 
 /** Auth contract for the /ws/status handshake. */
@@ -32,8 +32,17 @@ class WsAuthHandshakeInterceptorTest {
             new OpnlProperties.Jwt("j".repeat(64), 900, 14),
             new OpnlProperties.Auth("local", 5, 300, 300, 20, 60),
             new OpnlProperties.OpenVpn(
-                "openvpn", 7505, "vpn.example.com", "pki", "ccd", "config", "scripts",
-                "openvpn/scripts", "http://backend:8080", "easyrsa", "logs"));
+                "openvpn",
+                7505,
+                "vpn.example.com",
+                "pki",
+                "ccd",
+                "config",
+                "scripts",
+                "openvpn/scripts",
+                "http://backend:8080",
+                "easyrsa",
+                "logs"));
     jwtService = new JwtService(properties);
     interceptor = new WsAuthHandshakeInterceptor(jwtService);
     handler = mock(WebSocketHandler.class);

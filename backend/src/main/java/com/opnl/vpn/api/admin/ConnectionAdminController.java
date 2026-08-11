@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Admin monitoring: live VPN connections tracked from internal script callbacks, plus
- * session termination through the management interface.
+ * Admin monitoring: live VPN connections tracked from internal script callbacks, plus session
+ * termination through the management interface.
  */
 @RestController
 @RequestMapping("/api/admin/connections")

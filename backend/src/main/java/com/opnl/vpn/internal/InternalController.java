@@ -129,7 +129,11 @@ public class InternalController {
         request.remoteIp(),
         request.daemonName());
     connectionLogService.sessionStarted(
-        user.getUsername(), user.getUsername(), request.virtualIp(), request.remoteIp(), request.daemonName());
+        user.getUsername(),
+        user.getUsername(),
+        request.virtualIp(),
+        request.remoteIp(),
+        request.daemonName());
     IptablesResult result =
         ruleService.iptablesFor(user.getUsername(), request.virtualIp(), user.getId());
     return new ConnectResult(true, null, List.of(), result.apply(), result.remove());

@@ -24,11 +24,7 @@ public class TrafficAggregator {
 
   /** Current counters and computed rates for one session. */
   public record SessionTraffic(
-      long bytesIn,
-      long bytesOut,
-      long bytesInPerSec,
-      long bytesOutPerSec,
-      Instant lastSeen) {}
+      long bytesIn, long bytesOut, long bytesInPerSec, long bytesOutPerSec, Instant lastSeen) {}
 
   /** One aggregate sample for the traffic chart. */
   public record TrafficPoint(
@@ -55,8 +51,7 @@ public class TrafficAggregator {
       long inPerSec = 0;
       long outPerSec = 0;
       if (previous != null) {
-        double seconds =
-            (now.toEpochMilli() - previous.lastSeen().toEpochMilli()) / 1000.0;
+        double seconds = (now.toEpochMilli() - previous.lastSeen().toEpochMilli()) / 1000.0;
         if (seconds > 0) {
           inPerSec = Math.max(0, (long) ((bytesIn - previous.bytesIn()) / seconds));
           outPerSec = Math.max(0, (long) ((bytesOut - previous.bytesOut()) / seconds));

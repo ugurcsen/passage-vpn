@@ -45,7 +45,11 @@ public class SystemInfoService {
     }
 
     return new SystemInfoDto(
-        cpuLoadPercent, totalMemory, freeMemory, diskTotal, diskFree,
+        cpuLoadPercent,
+        totalMemory,
+        freeMemory,
+        diskTotal,
+        diskFree,
         Runtime.getRuntime().availableProcessors());
   }
 

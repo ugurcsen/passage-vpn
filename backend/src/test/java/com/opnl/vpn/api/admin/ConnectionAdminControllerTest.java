@@ -34,8 +34,7 @@ class ConnectionAdminControllerTest {
   void disconnectDelegatesToManagementKill() throws Exception {
     when(mgmtClientManager.kill("alice")).thenReturn(true);
 
-    mvc.perform(post("/api/admin/connections/alice/disconnect"))
-        .andExpect(status().isOk());
+    mvc.perform(post("/api/admin/connections/alice/disconnect")).andExpect(status().isOk());
   }
 
   @Test

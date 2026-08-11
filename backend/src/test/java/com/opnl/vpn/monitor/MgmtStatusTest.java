@@ -40,11 +40,44 @@ class MgmtStatusTest {
   }
 
   @Test
+  void parsesTabSeparatedStatusVersion3Lines() {
+    // OpenVPN 2.6's `status 3` management command returns --status-version 3
+    // (tab-separated) output; mirrors real daemon-0.status content.
+    List<String> lines =
+        List.of(
+            "TITLE\tOpenVPN 2.6.20 x86_64-alpine-linux-musl [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [MH/PKTINFO] [AEAD]",
+            "TIME\t2026-08-11 08:26:25\t1786436785",
+            "HEADER\tCLIENT_LIST\tCommon Name\tReal Address\tVirtual Address\tVirtual IPv6 Address\t"
+                + "Bytes Received\tBytes Sent\tConnected Since\tConnected Since (time_t)\tUsername\tClient ID\tPeer ID\tData Channel Cipher",
+            "CLIENT_LIST\tadmin\t31.223.13.8:27961\t10.8.0.2\t\t148702\t179132\t2026-08-11 08:28:23\t1786436903\tadmin\t0\t0\tAES-256-GCM",
+            "HEADER\tROUTING_TABLE\tVirtual Address\tCommon Name\tReal Address\tLast Ref\tLast Ref (time_t)",
+            "ROUTING_TABLE\t10.8.0.2\tadmin\t31.223.13.8:27961\t2026-08-11 08:28:37\t1786436917",
+            "GLOBAL_STATS\tMax bcast/mcast queue length\t0",
+            "GLOBAL_STATS\tdco_enabled\t0",
+            "END");
+
+    MgmtStatus status = MgmtStatus.parse(lines, Instant.parse("2026-01-01T00:00:00Z"));
+
+    assertThat(status.title()).contains("OpenVPN 2.6.20");
+    assertThat(status.dco()).isFalse();
+    assertThat(status.clients()).hasSize(1);
+
+    MgmtStatus.MgmtClientStatus admin = status.clients().get(0);
+    assertThat(admin.commonName()).isEqualTo("admin");
+    assertThat(admin.realAddress()).isEqualTo("31.223.13.8:27961");
+    assertThat(admin.virtualAddress()).isEqualTo("10.8.0.2");
+    assertThat(admin.bytesIn()).isEqualTo(148702);
+    assertThat(admin.bytesOut()).isEqualTo(179132);
+    // The `since` column is a display string, not an epoch; it must not crash parsing.
+    assertThat(admin.connectedSince()).isNull();
+    assertThat(admin.clientId()).isZero();
+  }
+
+  @Test
   void titleWithoutDcoReportsDcoFalse() {
     MgmtStatus status =
         MgmtStatus.parse(
-            List.of("TITLE,OpenVPN 2.6.12 x86_64-pc-linux-gnu built on ...", "END"),
-            Instant.now());
+            List.of("TITLE,OpenVPN 2.6.12 x86_64-pc-linux-gnu built on ...", "END"), Instant.now());
     assertThat(status.dco()).isFalse();
   }
 
