@@ -35,7 +35,12 @@ export const darkTheme = createTheme({
     MuiDataGrid: {
       styleOverrides: {
         root: { border: "1px solid #223049" },
-        columnHeader: { backgroundColor: "#141d2e" },
+        columnHeader: {
+          backgroundColor: "#141d2e",
+          // Hidden sort/column-menu icons otherwise inflate the grid's scroll
+          // width and show a useless horizontal scrollbar on every data grid.
+          overflow: "hidden",
+        },
       },
     },
   },
@@ -53,7 +58,14 @@ export const lightTheme = createTheme({
   shape: { borderRadius: 8 },
   components: {
     MuiDataGrid: {
-      styleOverrides: { root: { border: "1px solid #e0e6ef" } },
+      styleOverrides: {
+        root: { border: "1px solid #e0e6ef" },
+        columnHeader: {
+          // Hidden sort/column-menu icons otherwise inflate the grid's scroll
+          // width and show a useless horizontal scrollbar on every data grid.
+          overflow: "hidden",
+        },
+      },
     },
   },
 });
