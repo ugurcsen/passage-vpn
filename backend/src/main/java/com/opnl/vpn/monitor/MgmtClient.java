@@ -88,6 +88,14 @@ public class MgmtClient implements Closeable {
         }
         lines.add(line);
       }
+      if (line == null) {
+        // EOF: the daemon closed the connection (e.g. it restarted). Drop the
+        // dead socket so the next poll transparently reconnects; a stale
+        // "connected" socket would otherwise serve incomplete status forever.
+        log.debug("Management connection closed by daemon {} (EOF)", daemonIndex);
+        closeQuietly();
+        return null;
+      }
       return MgmtStatus.parse(lines, Instant.now());
     } catch (IOException e) {
       log.debug("Management read failed on daemon {}: {}", daemonIndex, e.getMessage());
@@ -108,7 +116,12 @@ public class MgmtClient implements Closeable {
       writer.write("kill " + commonName + "\n");
       writer.flush();
       String response = reader.readLine();
-      return response != null && response.startsWith("SUCCESS:");
+      if (response == null) {
+        // EOF: daemon went away mid-command; drop the dead socket.
+        closeQuietly();
+        return false;
+      }
+      return response.startsWith("SUCCESS:");
     } catch (IOException e) {
       log.debug("Management kill failed on daemon {}: {}", daemonIndex, e.getMessage());
       closeQuietly();

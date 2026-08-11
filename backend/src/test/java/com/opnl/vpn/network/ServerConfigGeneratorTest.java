@@ -24,6 +24,9 @@ class ServerConfigGeneratorTest {
     assertThat(conf).contains("proto udp");
     assertThat(conf).contains("server 10.8.0.0 255.255.255.0");
     assertThat(conf).contains("management 0.0.0.0 7505");
+    // management-signal must never be rendered: it would SIGUSR1-restart the
+    // daemon (dropping all sessions) whenever the management client disconnects.
+    assertThat(conf).doesNotContain("management-signal");
     assertThat(conf).contains("auth-user-pass-verify /scripts/verify-user-pass.sh via-env");
   }
 

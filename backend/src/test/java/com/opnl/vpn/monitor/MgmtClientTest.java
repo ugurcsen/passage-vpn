@@ -134,4 +134,59 @@ class MgmtClientTest {
     assertThat(client.isConnected()).isFalse();
     client.close();
   }
+
+  @Test
+  void statusDropsStaleConnectionWhenDaemonCloses() throws Exception {
+    try (ServerSocket listener = new ServerSocket(0)) {
+      int port = listener.getLocalPort();
+      Thread daemon =
+          new Thread(
+              () -> {
+                try (Socket s = listener.accept()) {
+                  BufferedReader r =
+                      new BufferedReader(
+                          new InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8));
+                  r.readLine(); // expect "status 3"
+                  // Simulate a daemon restart: close the connection without a reply.
+                } catch (IOException ignored) {
+                  // test teardown
+                }
+              });
+      daemon.start();
+
+      MgmtClient client = new MgmtClient("127.0.0.1", port, 0);
+      assertThat(client.status()).isNull();
+      // The stale socket must be dropped so the next poll can reconnect.
+      assertThat(client.isConnected()).isFalse();
+      daemon.join(3_000);
+      client.close();
+    }
+  }
+
+  @Test
+  void killReportsFailureWhenDaemonClosesWithoutReply() throws Exception {
+    try (ServerSocket listener = new ServerSocket(0)) {
+      int port = listener.getLocalPort();
+      Thread daemon =
+          new Thread(
+              () -> {
+                try (Socket s = listener.accept()) {
+                  BufferedReader r =
+                      new BufferedReader(
+                          new InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8));
+                  r.readLine(); // expect "kill ..."
+                  // Daemon restarts without replying.
+                } catch (IOException ignored) {
+                  // test teardown
+                }
+              });
+      daemon.start();
+
+      MgmtClient client = new MgmtClient("127.0.0.1", port, 0);
+      assertThat(client.kill("alice")).isFalse();
+      assertThat(client.isConnected()).isFalse();
+      daemon.join(3_000);
+      client.close();
+    }
+  }
 }
