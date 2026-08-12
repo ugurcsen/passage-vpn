@@ -131,6 +131,10 @@ npm run test
 
 - Follow existing commit message style (imperative, English, concise).
 - Only commit when explicitly asked.
+- Release tagging convention: whenever `RELEASE_NOTES.md` is updated for a
+  released milestone, give the milestone a SemVer version (e.g. `v0.1.0-alpha.1`),
+  set it as the release-notes heading, and record it as an annotated git tag
+  pushed to `origin` (`git tag -a <version> -m "<version>" && git push origin <version>`).
 
 ## Environment Variables
 

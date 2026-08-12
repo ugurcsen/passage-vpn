@@ -8,7 +8,10 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
-## Unreleased — Pre-release (0.1.0-SNAPSHOT)
+## v0.1.0-alpha.1 — 2026-08-12
+
+First tagged milestone (SemVer pre-release). Every `[x]` item under this
+heading is included in this release. Tag: `v0.1.0-alpha.1`.
 
 ### Phase 0 — Project scaffolding
 - [x] Repo layout, `TODO.md`, `AGENTS.md`, `.gitignore`, `.env.example`
@@ -232,4 +235,4 @@ Legend: `[x]` released, `[~]` partial.
 
 ## Previous releases
 
-None yet — this is the first release notes entry.
+None yet — `v0.1.0-alpha.1` is the first tagged release.
