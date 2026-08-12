@@ -32,12 +32,16 @@ import { api, endpoints, type ServerSettings } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
+  type ServerConfigForm,
   type SettingValueType,
   displaySetting,
+  emptyServerConfigForm,
+  formToServerConfig,
   KNOWN_SETTINGS,
   knownSetting,
   normalizeSetting,
   serializeSetting,
+  serverConfigToForm,
 } from "@/features/settings/knownSettings";
 
 const ADVANCED_KEY_PATTERN = /^[a-zA-Z0-9_.-]{1,64}$/;
@@ -47,6 +51,8 @@ interface DefaultDialog {
   key: string;
   value: string;
   isNew: boolean;
+  /** Structured form state for `serverConfig`-typed settings (e.g. `network`). */
+  config?: ServerConfigForm;
 }
 
 /** Dialog state for the raw JSON advanced editor. */
@@ -100,12 +106,18 @@ export function SettingsPage() {
   const entries = Object.entries(data ?? {});
   const knownEntries = entries.filter(([k]) => knownSetting(k));
   const customEntries = entries.filter(([k]) => !knownSetting(k));
-  const availableDefaults = KNOWN_SETTINGS.filter((s) => !knownEntries.some(([k]) => k === s.key));
+  const availableDefaults = KNOWN_SETTINGS.filter(
+    (s) => s.type !== "serverConfig" && !knownEntries.some(([k]) => k === s.key),
+  );
 
   const openAddDefault = () =>
     setDialog({ key: availableDefaults[0]?.key ?? "", value: "", isNew: true });
   const openEditDefault = (key: string, value: unknown) => {
     const type = knownSetting(key)?.type ?? "json";
+    if (type === "serverConfig") {
+      setDialog({ key, value: "", isNew: false, config: serverConfigToForm(value) });
+      return;
+    }
     setDialog({ key, value: normalizeSetting(type, value), isNew: false });
   };
 
@@ -114,11 +126,31 @@ export function SettingsPage() {
   const numberInvalid =
     dialogType === "number" && dialog !== null && dialog.value.trim() !== "" &&
     !(Number.isInteger(Number(dialog.value)) && Number(dialog.value) >= 0);
-  const dialogValid = dialog !== null && dialog.key.trim() !== "" && !numberInvalid;
+  const configInvalid = (() => {
+    if (dialogType !== "serverConfig" || !dialog?.config) return false;
+    const c = dialog.config;
+    const port = Number(c.port);
+    return (
+      !Number.isInteger(port) ||
+      port < 1 ||
+      port > 65535 ||
+      c.subnet.trim() === "" ||
+      c.subnetMask.trim() === "" ||
+      c.adminHost.trim() === ""
+    );
+  })();
+  const dialogValid = dialog !== null && dialog.key.trim() !== "" && !numberInvalid && !configInvalid;
+
+  const updateConfig = (patch: Partial<ServerConfigForm>) =>
+    setDialog((d) => (d ? { ...d, config: { ...d.config!, ...patch } } : d));
 
   const submitDialog = () => {
     if (!dialog || !dialogValid) return;
-    save.mutate({ key: dialog.key, value: serializeSetting(dialogType, dialog.value) });
+    const value =
+      dialogType === "serverConfig"
+        ? formToServerConfig(dialog.config ?? emptyServerConfigForm())
+        : serializeSetting(dialogType, dialog.value);
+    save.mutate({ key: dialog.key, value });
   };
 
   const submitAdvanced = () => {
@@ -372,7 +404,100 @@ export function SettingsPage() {
                 disabled
               />
             ) : null}
-            {dialogType === "boolean" ? (
+            {dialogType === "serverConfig" ? (
+              <Stack spacing={2}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                  <TextField
+                    label="Port"
+                    type="number"
+                    value={dialog?.config?.port ?? ""}
+                    onChange={(e) => updateConfig({ port: e.target.value })}
+                    error={configInvalid}
+                    helperText={configInvalid ? "Port must be 1-65535" : "UDP/TCP listen port"}
+                    sx={{ flex: 1 }}
+                  />
+                  <TextField
+                    select
+                    label="Protocol"
+                    value={dialog?.config?.proto ?? "udp"}
+                    onChange={(e) => updateConfig({ proto: e.target.value as "udp" | "tcp" })}
+                    sx={{ flex: 1 }}
+                  >
+                    <MenuItem value="udp">UDP</MenuItem>
+                    <MenuItem value="tcp">TCP</MenuItem>
+                  </TextField>
+                </Stack>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                  <TextField
+                    label="Subnet"
+                    value={dialog?.config?.subnet ?? ""}
+                    onChange={(e) => updateConfig({ subnet: e.target.value })}
+                    error={configInvalid && !(dialog?.config?.subnet.trim())}
+                    helperText="VPN client subnet"
+                    sx={{ flex: 1 }}
+                  />
+                  <TextField
+                    label="Subnet mask"
+                    value={dialog?.config?.subnetMask ?? ""}
+                    onChange={(e) => updateConfig({ subnetMask: e.target.value })}
+                    error={configInvalid && !(dialog?.config?.subnetMask.trim())}
+                    sx={{ flex: 1 }}
+                  />
+                </Stack>
+                <TextField
+                  label="DNS servers"
+                  value={dialog?.config?.dnsServers ?? ""}
+                  onChange={(e) => updateConfig({ dnsServers: e.target.value })}
+                  helperText="Comma separated DNS servers pushed to clients"
+                />
+                <TextField
+                  label="Domain"
+                  value={dialog?.config?.domain ?? ""}
+                  onChange={(e) => updateConfig({ domain: e.target.value })}
+                  helperText="DNS search domain pushed to clients (optional)"
+                />
+                <TextField
+                  label="Extra routes"
+                  value={dialog?.config?.extraRoutes ?? ""}
+                  onChange={(e) => updateConfig({ extraRoutes: e.target.value })}
+                  helperText="Comma separated CIDR networks to route (optional)"
+                />
+                <TextField
+                  label="Admin host"
+                  value={dialog?.config?.adminHost ?? ""}
+                  onChange={(e) => updateConfig({ adminHost: e.target.value })}
+                  error={configInvalid && !(dialog?.config?.adminHost.trim())}
+                  helperText="VPN server hostname/IP pushed to clients"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={dialog?.config?.fullTunnel ?? true}
+                      onChange={(e) => updateConfig({ fullTunnel: e.target.checked })}
+                    />
+                  }
+                  label="Full tunnel"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={dialog?.config?.clientCertNotRequired ?? false}
+                      onChange={(e) => updateConfig({ clientCertNotRequired: e.target.checked })}
+                    />
+                  }
+                  label="Client certificate not required"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={dialog?.config?.authUserPass ?? true}
+                      onChange={(e) => updateConfig({ authUserPass: e.target.checked })}
+                    />
+                  }
+                  label="Username + password auth"
+                />
+              </Stack>
+            ) : dialogType === "boolean" ? (
               <FormControlLabel
                 control={
                   <Switch

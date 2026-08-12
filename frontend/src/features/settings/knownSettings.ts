@@ -1,5 +1,5 @@
 /** Editor type used for a known setting value. */
-export type SettingValueType = "string" | "number" | "boolean" | "list" | "json";
+export type SettingValueType = "string" | "number" | "boolean" | "list" | "serverConfig" | "json";
 
 /** Metadata describing a well-known server setting so it can be edited with a friendly control. */
 export interface KnownSetting {
@@ -20,6 +20,12 @@ export interface KnownSetting {
  * defaults for every account; group and per-user settings override them.
  */
 export const KNOWN_SETTINGS: KnownSetting[] = [
+  {
+    key: "network",
+    label: "VPN server network",
+    description: "Port, protocol and addressing for the primary daemon (bootstrap default config).",
+    type: "serverConfig",
+  },
   {
     key: "default_group",
     label: "Default group",
@@ -87,6 +93,90 @@ export function knownSetting(key: string): KnownSetting | undefined {
   return KNOWN_SETTINGS.find((s) => s.key === key);
 }
 
+/** Editable form state for the `network` (ServerConfig) setting. */
+export interface ServerConfigForm {
+  port: string;
+  proto: "udp" | "tcp";
+  subnet: string;
+  subnetMask: string;
+  dnsServers: string;
+  domain: string;
+  extraRoutes: string;
+  fullTunnel: boolean;
+  clientCertNotRequired: boolean;
+  authUserPass: boolean;
+  adminHost: string;
+}
+
+/** Defaults matching the backend `ServerConfig.defaults()` (daemon 0, UDP 1194, 10.8.0.0/24). */
+export function emptyServerConfigForm(): ServerConfigForm {
+  return {
+    port: "1194",
+    proto: "udp",
+    subnet: "10.8.0.0",
+    subnetMask: "255.255.255.0",
+    dnsServers: "1.1.1.1, 8.8.8.8",
+    domain: "",
+    extraRoutes: "",
+    fullTunnel: true,
+    clientCertNotRequired: false,
+    authUserPass: true,
+    adminHost: "vpn.example.com",
+  };
+}
+
+/** Maps a stored `network` value into the editable form, tolerating missing/unknown fields. */
+export function serverConfigToForm(value: unknown): ServerConfigForm {
+  const cfg = (value ?? {}) as Record<string, unknown>;
+  const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+  const list = (v: unknown): string =>
+    Array.isArray(v) ? v.map(String).join(", ") : typeof v === "string" ? v : "";
+  return {
+    port: typeof cfg.port === "number" ? String(cfg.port) : "1194",
+    proto: cfg.proto === "tcp" ? "tcp" : "udp",
+    subnet: str(cfg.subnet, "10.8.0.0"),
+    subnetMask: str(cfg.subnetMask, "255.255.255.0"),
+    dnsServers: list(cfg.dnsServers),
+    domain: str(cfg.domain),
+    extraRoutes: list(cfg.extraRoutes),
+    fullTunnel: cfg.fullTunnel === true,
+    clientCertNotRequired: cfg.clientCertNotRequired === true,
+    authUserPass: cfg.authUserPass !== false,
+    adminHost: str(cfg.adminHost, "vpn.example.com"),
+  };
+}
+
+/** Maps the editable form back into the wire shape of the backend `ServerConfig` record. */
+export function formToServerConfig(form: ServerConfigForm): Record<string, unknown> {
+  const split = (s: string) =>
+    s
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+  return {
+    daemonIndex: 0,
+    port: Number(form.port),
+    proto: form.proto,
+    subnet: form.subnet.trim(),
+    subnetMask: form.subnetMask.trim(),
+    dnsServers: split(form.dnsServers),
+    domain: form.domain.trim() || null,
+    extraRoutes: split(form.extraRoutes),
+    fullTunnel: form.fullTunnel,
+    clientCertNotRequired: form.clientCertNotRequired,
+    authUserPass: form.authUserPass,
+    adminHost: form.adminHost.trim(),
+  };
+}
+
+/** One-line summary of the network config used in the read-only row display. */
+export function serverConfigSummary(value: unknown): string {
+  const form = serverConfigToForm(value);
+  const proto = form.proto.toUpperCase();
+  const dns = form.dnsServers.trim() ? form.dnsServers : "default";
+  return `${proto} ${form.port} · ${form.subnet}/${form.subnetMask} · DNS ${dns}`;
+}
+
 /**
  * Serializes a value for storage via the generic settings API. Lists are joined into the
  * comma-separated string the backend expects; strings are sent as-is.
@@ -106,6 +196,7 @@ export function serializeSetting(type: SettingValueType, value: string): unknown
         .filter((item) => item.length > 0)
         .join(", ");
     case "json":
+    case "serverConfig":
       try {
         return JSON.parse(value);
       } catch {
@@ -131,6 +222,8 @@ export function normalizeSetting(type: SettingValueType, value: unknown): string
       return Array.isArray(value) ? value.join(", ") : String(value);
     case "json":
       return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    case "serverConfig":
+      return typeof value === "string" ? value : JSON.stringify(value, null, 2);
     default:
       return String(value);
   }
@@ -142,6 +235,8 @@ export function displaySetting(type: SettingValueType, value: unknown): string {
   switch (type) {
     case "boolean":
       return value === true || value === "true" ? "On" : "Off";
+    case "serverConfig":
+      return serverConfigSummary(value);
     case "json":
       return JSON.stringify(value);
     default:

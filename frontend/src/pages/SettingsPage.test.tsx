@@ -155,6 +155,50 @@ describe("SettingsPage", () => {
     });
   });
 
+  it("shows the network config as a known setting and edits it via the structured form", async () => {
+    const fetchMock = makeFetch({
+      network: {
+        daemonIndex: 0,
+        port: 1194,
+        proto: "udp",
+        subnet: "10.8.0.0",
+        subnetMask: "255.255.255.0",
+        dnsServers: ["1.1.1.1", "8.8.8.8"],
+        extraRoutes: [],
+        fullTunnel: true,
+        clientCertNotRequired: false,
+        authUserPass: true,
+        adminHost: "vpn.example.com",
+      },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+
+    expect(await screen.findByText("VPN server network")).toBeInTheDocument();
+    expect(screen.getByText(/UDP 1194 · 10\.8\.0\.0\/255\.255\.255\.0/)).toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByLabelText("Edit VPN server network"));
+    const portInput = await screen.findByLabelText("Port");
+    expect(portInput).toHaveValue(1194);
+    fireEvent.change(portInput, { target: { value: "1195" } });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      const put = vi
+        .mocked(fetchMock)
+        .mock.calls.find(([url]) => url === "/api/admin/settings/network");
+      expect(put).toBeDefined();
+    });
+    const put = vi
+      .mocked(fetchMock)
+      .mock.calls.find(([url]) => url === "/api/admin/settings/network")!;
+    const body = JSON.parse(String(put[1]!.body)) as { value: { port: number; proto: string; dnsServers: string[]; subnet: string } };
+    expect(body.value.port).toBe(1195);
+    expect(body.value.proto).toBe("udp");
+    expect(body.value.subnet).toBe("10.8.0.0");
+    expect(body.value.dnsServers).toEqual(["1.1.1.1", "8.8.8.8"]);
+  });
+
   it("keeps custom settings out of the defaults section and shows them in the advanced section", async () => {
     vi.stubGlobal("fetch", makeFetch({ brand: "OpenVPN Panel", max_conn: 5 }));
     renderPage();

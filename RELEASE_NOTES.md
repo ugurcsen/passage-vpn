@@ -84,7 +84,9 @@ Legend: `[x]` released, `[~]` partial.
 - [x] Settings page redesign — friendly typed editors for well-known server
       defaults (boolean switches, validated numbers, comma-separated lists,
       strings) with human labels and descriptions, add/edit dialog, empty state
-      and a collapsible raw-JSON "Advanced" section for custom keys
+      and a collapsible raw-JSON "Advanced" section for custom keys. The `network`
+      config is surfaced as a structured form (port, protocol, subnet, DNS,
+      routes, tunnel toggles, admin host) instead of raw JSON.
 
 ### Phase 4b — Real-time monitoring (management interface + WebSocket)
 - [x] `MgmtClient` — persistent TCP client to the OpenVPN management interface
@@ -189,12 +191,13 @@ Legend: `[x]` released, `[~]` partial.
   form controls (`username`, `password`, MFA `code`) now carry explicit
   `id`/`name` attributes with labelled-controls regression tests. Frontend suite
   61/61 green, lint clean, `vite build` passes (verified on staging host).
-- Settings page typed-editor redesign: frontend suite green (69 tests across
+- Settings page typed-editor redesign: frontend suite green (70 tests across
   17 files, SettingsPage coverage for typed rendering, boolean toggle PUT,
-  list/number serialization + validation, add-default flow, advanced add/delete
-  and confirmation deletes), `npm run lint` clean (0 errors), `tsc -b` and
-  `vite build` pass; backend suite unaffected and green. SSH-verified on
-  production `65.21.108.250` (tests run on the deployed checkout).
+  list/number serialization + validation, structured `network` config form,
+  add-default flow, advanced add/delete and confirmation deletes), `npm run
+  lint` clean (0 errors), `tsc -b` and `vite build` pass; backend suite
+  unaffected and green. SSH-verified on production `65.21.108.250` (tests run
+  on the deployed checkout).
 
 ### Not yet released
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group
