@@ -135,7 +135,9 @@ describe("AccountPage", () => {
     await waitFor(() => {
       expect(screen.getByText(/two-factor authentication is enabled/i)).toBeInTheDocument();
     });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
   });
 
   it("disables MFA after re-authentication", async () => {
