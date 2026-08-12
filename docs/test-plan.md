@@ -46,7 +46,7 @@ cd frontend && npm run lint && npm run test
 
 ## 4. Test inventory (current state)
 
-### 4.1 Backend — 14 classes, 104 tests, all green
+### 4.1 Backend — 15 classes, 213 tests, all green
 
 | Class | Area | Status |
 |---|---|---|
@@ -66,15 +66,16 @@ cd frontend && npm run lint && npm run test
 | `api/portal/PortalAccountServiceTest` | Self-service MFA setup/enable/disable + password change | [x] |
 | `internal/InternalControllerTest` | `/internal/connect|disconnect|auth/verify|seed-admin` contract + filter | [x] |
 
-### 4.2 Frontend — 13 test files, 40 tests
+### 4.2 Frontend — 18 test files, 76 tests
 
 | File | Area | Status |
 |---|---|---|
 | `lib/api.test.ts` | Token-refresh wrapper, ApiError mapping, 204 | [x] |
 | `hooks/useAuth.test.tsx` | Session restore, login/MFA/logout, token store | [x] |
 | `pages/LoginPage.test.tsx` | Sign-in form renders | [x] |
+| `pages/MfaLoginPage.test.tsx` | Verification code control id/name (a11y) | [x] |
 | `pages/DashboardPage.test.tsx` | Stat cards + phase placeholders render | [x] |
-| `pages/UsersPage.test.tsx` | Grid render, create dialog, status filter, create POST | [x] |
+| `pages/UsersPage.test.tsx` | Grid render, create dialog, status filter, create POST, MFA manage dialog | [x] |
 | `pages/CertsPage.test.tsx` | Grid render, issue dialog payload, revoke disabled | [x] |
 | `pages/AccessRulesPage.test.tsx` | Rule render, global/user create payload, enable toggle | [x] |
 | `pages/GroupsPage.test.tsx` | Grid render, create POST payload, members dialog PUT | [x] |
@@ -83,6 +84,9 @@ cd frontend && npm run lint && npm run test
 | `pages/SetupWizardPage.test.tsx` | Full flow: admin POST, server config POST, PKI provision gate, finish | [x] |
 | `components/ProfileCard.test.tsx` | Download blob, QR render | [x] |
 | `pages/PortalPage.test.tsx` | Profile list render, download endpoint | [x] |
+| `pages/SettingsPage.test.tsx` | Typed editors, boolean toggle, list/number save, structured network form | [x] |
+| `pages/DaemonsPage.test.tsx` | Daemon rows, create payload, enable toggle, primary delete guard | [x] |
+| `pages/StatusPage.test.tsx` | Panel info, daemon health, active connections, sessions | [x] |
 | `pages/AccountPage.test.tsx` | Self-service MFA setup/disable flow + password change | [x] |
 
 ## 5. Backend test plan by feature area

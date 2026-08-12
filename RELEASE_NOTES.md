@@ -217,7 +217,9 @@ Legend: `[x]` released, `[~]` partial.
   under `/api/portal/account`, surfaced in a new My Account page
   (`/portal/account`). Covered by `PortalAccountServiceTest`,
   `ProfileServiceTest` static-challenge cases and frontend UsersPage/AccountPage
-  tests; suites green via SSH on the production checkout.
+  tests. Verified via SSH on the production checkout: backend 213 tests green
+  (spotlessCheck clean), frontend 76 tests across 18 files green, lint 0
+  errors, `tsc -b` clean.
 
 ### Not yet released
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group
