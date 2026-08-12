@@ -63,9 +63,10 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Portal self-service account page (`/api/portal/account`): MFA
       setup/enable/disable (current-password verified) + password change (revoke
       all refresh tokens, clear `must_change_password`)
-- [ ] Tests: backend (PortalAccountService, OvpnGenerator/ProfileService) +
-      frontend (UsersPage MFA dialog, AccountPage) — run via SSH on production checkout
-- [ ] Docs: RELEASE_NOTES.md entry, docs/test-plan.md MFA E2E item
+- [x] Tests: backend (PortalAccountService, OvpnGenerator/ProfileService) +
+      frontend (UsersPage MFA dialog, AccountPage) — run via SSH on production
+      checkout: backend 213 green (spotlessCheck clean), frontend 76 green
+- [x] Docs: RELEASE_NOTES.md entry, docs/test-plan.md MFA E2E item
 
 **P1.5 — Status / Settings / Dashboard phase (live E2E finding 2.5)** — DONE
 > Scoped from live E2E testing (`docs/test-findings.md` §2.5): the frontend defined
