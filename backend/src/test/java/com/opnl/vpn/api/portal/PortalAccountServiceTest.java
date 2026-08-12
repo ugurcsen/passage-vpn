@@ -74,9 +74,13 @@ class PortalAccountServiceTest {
   private static String validCode(User user) {
     // Recompute a fresh 6-digit code from the stored secret (SameWindow accepted).
     String secret = user.getMfaSecret();
-    return new dev.samstevens.totp.code.DefaultCodeGenerator(
-            dev.samstevens.totp.code.HashingAlgorithm.SHA1, 6)
-        .generate(secret, (System.currentTimeMillis() / 1000) / 30L);
+    try {
+      return new dev.samstevens.totp.code.DefaultCodeGenerator(
+              dev.samstevens.totp.code.HashingAlgorithm.SHA1, 6)
+          .generate(secret, new dev.samstevens.totp.time.SystemTimeProvider().getTime() / 30);
+    } catch (dev.samstevens.totp.exceptions.CodeGenerationException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   @Test
