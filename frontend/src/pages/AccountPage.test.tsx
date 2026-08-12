@@ -93,7 +93,9 @@ describe("AccountPage", () => {
 
     expect(await screen.findByText(/two-factor authentication is disabled/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /set up mfa/i })).toBeInTheDocument();
-    expect(screen.getByText(/change password/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /change password/i }),
+    ).toBeInTheDocument();
   });
 
   it("sets up MFA end-to-end (password -> QR -> code)", async () => {

@@ -185,7 +185,9 @@ describe("UsersPage", () => {
 
     await waitFor(() => {
       dialog = screen.getByRole("dialog");
-      expect(within(dialog).getByLabelText(/secret/i)).toHaveValue("JBSWY3DPEHPK3PXP");
+      expect(within(dialog).getByLabelText("Secret", { exact: true })).toHaveValue(
+        "JBSWY3DPEHPK3PXP",
+      );
     });
     expect(within(dialog).getByAltText(/totp qr code/i)).toBeInTheDocument();
 
