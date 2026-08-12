@@ -26,6 +26,7 @@ const daemons = [
     enabled: true,
     primary: true,
     createdAt: "2026-08-01T00:00:00Z",
+    dco: true,
   },
   {
     id: "d1",
@@ -45,6 +46,7 @@ const daemons = [
     enabled: true,
     primary: false,
     createdAt: "2026-08-02T00:00:00Z",
+    dco: false,
   },
 ];
 
@@ -87,6 +89,14 @@ describe("DaemonsPage", () => {
     expect(screen.getByText("UDP:1194")).toBeInTheDocument();
     expect(screen.getByText("TCP:1195")).toBeInTheDocument();
     expect(screen.getByText("Generic")).toBeInTheDocument();
+  });
+
+  it("shows the data-channel (DCO) badge per daemon", async () => {
+    renderPage();
+    await screen.findAllByText("Primary");
+
+    expect(screen.getByText("DCO")).toBeInTheDocument();
+    expect(screen.getByText("Userspace")).toBeInTheDocument();
   });
 
   it("creates a daemon with the submitted payload", async () => {

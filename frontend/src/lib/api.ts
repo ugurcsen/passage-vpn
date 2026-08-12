@@ -258,6 +258,8 @@ export interface Daemon {
   enabled: boolean;
   primary: boolean;
   createdAt: string;
+  /** True when the daemon reports a DCO-capable data channel; null until polled. */
+  dco?: boolean | null;
 }
 
 /** Health view of a single OpenVPN daemon (live status). */

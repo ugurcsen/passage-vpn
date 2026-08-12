@@ -158,7 +158,10 @@ export function StatusPage() {
                     {d.proto.toUpperCase()}:{d.port}
                   </TableCell>
                   <TableCell>
-                    <StatusChip ok={d.dco === true} label={d.dco ? "DCO" : "Userspace"} />
+                    <StatusChip
+                      ok={d.dco === true}
+                      label={d.dco === true ? "DCO" : d.dco === false ? "Userspace" : "—"}
+                    />
                   </TableCell>
                   <TableCell>
                     <StatusChip ok={d.enabled} label={d.enabled ? "Enabled" : "Disabled"} />

@@ -85,6 +85,27 @@ describe("StatusPage", () => {
     expect(screen.getByText("10.8.0.2")).toBeInTheDocument();
   });
 
+  it("shows the DCO data-channel state per daemon", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          json({
+            ...status,
+            daemons: [
+              { ...status.daemons[0], dco: true },
+              { ...status.daemons[1], dco: false },
+            ],
+          }),
+        ),
+      ),
+    );
+    renderPage();
+
+    expect(await screen.findByText("DCO")).toBeInTheDocument();
+    expect(screen.getByText("Userspace")).toBeInTheDocument();
+  });
+
   it("renders recent sessions and falls back when the daemon name is empty", async () => {
     const logs = [
       {

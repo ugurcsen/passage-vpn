@@ -67,6 +67,12 @@ function daemonRole(d: Daemon): string {
   return "User-locked / Server-locked";
 }
 
+function dcoLabel(d: Daemon): string {
+  if (d.dco === true) return "DCO";
+  if (d.dco === false) return "Userspace";
+  return "—";
+}
+
 function splitList(value: string): string[] {
   return value
     .split(",")
@@ -215,6 +221,30 @@ export function DaemonsPage() {
         const row = params.row as Daemon;
         return (
           <Switch size="small" checked={row.enabled} onChange={() => toggleEnabled.mutate(row)} />
+        );
+      },
+    },
+    {
+      field: "dco",
+      headerName: "Data channel",
+      width: 110,
+      renderCell: (params) => {
+        const row = params.row as Daemon;
+        const dco = row.dco;
+        return (
+          <Chip
+            size="small"
+            color={dco === true ? "success" : dco === false ? "default" : "default"}
+            variant="outlined"
+            label={dcoLabel(row)}
+            title={
+              dco === true
+                ? "Data Channel Offload (kernel)"
+                : dco === false
+                  ? "Userspace data channel"
+                  : "Unknown until the daemon is polled"
+            }
+          />
         );
       },
     },

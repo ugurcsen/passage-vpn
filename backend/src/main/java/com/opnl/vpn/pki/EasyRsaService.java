@@ -113,6 +113,55 @@ public class EasyRsaService {
     genCrl();
   }
 
+  /**
+   * Restores a previously revoked certificate by flipping its index.txt entry back to valid
+   * (Easy-RSA 3.1 has no unrevoke command) and regenerating the CRL so the cert is accepted again.
+   *
+   * @throws ApiException {@code certificate_not_found} when no revoked entry carries the serial,
+   *     {@code not_revoked} when the entry exists but is not in the revoked state
+   */
+  public synchronized void unrevokeCert(String serial) {
+    requirePki();
+    Path indexFile = pkiDir.resolve("index.txt");
+    List<String> lines;
+    try {
+      lines = Files.readAllLines(indexFile, StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      throw ApiException.internal("pki_index", "Cannot read index.txt: " + e.getMessage());
+    }
+    java.util.ArrayList<String> updated = new java.util.ArrayList<>(lines.size());
+    boolean restored = false;
+    boolean found = false;
+    for (String line : lines) {
+      String[] parts = line.split("\\t", -1);
+      if (parts.length >= 6 && "R".equals(parts[0]) && serial.equals(parts[3])) {
+        found = true;
+        // index.txt row: status, expiry, revocation date, serial, filename, CN
+        updated.add("V\t" + parts[1] + "\t\t" + parts[3] + "\t" + parts[4] + "\t" + parts[5]);
+        restored = true;
+        continue;
+      }
+      if (parts.length >= 4 && !"R".equals(parts[0]) && serial.equals(parts[3])) {
+        found = true;
+      }
+      updated.add(line);
+    }
+    if (!found) {
+      throw ApiException.notFound(
+          "certificate_not_found", "No certificate with serial " + serial + " in the PKI index");
+    }
+    if (!restored) {
+      throw ApiException.conflict(
+          "not_revoked", "Certificate with serial " + serial + " is not revoked");
+    }
+    try {
+      Files.write(indexFile, updated, StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      throw ApiException.internal("pki_index", "Cannot write index.txt: " + e.getMessage());
+    }
+    genCrl();
+  }
+
   /** Regenerates the CRL from the current index.txt. */
   public synchronized void genCrl() {
     requirePki();

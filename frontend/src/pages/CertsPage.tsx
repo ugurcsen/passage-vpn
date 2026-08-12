@@ -18,9 +18,13 @@ import {
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/Add";
 import BlockIcon from "@mui/icons-material/Block";
+import CachedIcon from "@mui/icons-material/Cached";
+import RestoreIcon from "@mui/icons-material/Restore";
 import { api, endpoints } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+
+const EXPIRY_WARNING_MS = 30 * 24 * 60 * 60 * 1000;
 
 interface CertificateRow {
   id: string;
@@ -45,6 +49,12 @@ const STATUS_COLOR: Record<CertificateRow["status"], "success" | "error" | "warn
   EXPIRED: "warning",
 };
 
+function isExpiringSoon(expiresAt: string | undefined): boolean {
+  if (!expiresAt) return false;
+  const left = new Date(expiresAt).getTime() - Date.now();
+  return left > 0 && left <= EXPIRY_WARNING_MS;
+}
+
 export function CertsPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -53,6 +63,9 @@ export function CertsPage() {
   const [confirm, setConfirm] = useState<{
     title: string;
     text: string;
+    label: string;
+    danger?: boolean;
+    loading?: boolean;
     action: () => void;
   } | null>(null);
 
@@ -88,6 +101,24 @@ export function CertsPage() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Revoke failed"),
   });
 
+  const restore = useMutation({
+    mutationFn: (id: string) => api(`${endpoints.certs}/${id}/restore`, { method: "POST" }),
+    onSuccess: () => {
+      toast.success("Certificate restored");
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Restore failed"),
+  });
+
+  const rotate = useMutation({
+    mutationFn: (id: string) => api(`${endpoints.certs}/${id}/rotate`, { method: "POST" }),
+    onSuccess: () => {
+      toast.success("Certificate rotated");
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Rotate failed"),
+  });
+
   const columns: GridColDef[] = [
     { field: "commonName", headerName: "Common name", flex: 1, minWidth: 140 },
     { field: "username", headerName: "User", flex: 1 },
@@ -110,34 +141,91 @@ export function CertsPage() {
       field: "expiresAt",
       headerName: "Expires",
       width: 150,
-      valueGetter: (_, row) => (row as CertificateRow).expiresAt ? new Date((row as CertificateRow).expiresAt!).toLocaleString() : "—",
+      renderCell: (params) => {
+        const row = params.row as CertificateRow;
+        return (
+          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
+            {row.expiresAt ? new Date(row.expiresAt).toLocaleString() : "—"}
+            {isExpiringSoon(row.expiresAt) && (
+              <Tooltip title={`Expires within ${Math.ceil((new Date(row.expiresAt!).getTime() - Date.now()) / 86_400_000)} days`}>
+                <Chip label="Expiring" size="small" color="warning" />
+              </Tooltip>
+            )}
+          </Box>
+        );
+      },
     },
     {
       field: "actions",
       headerName: "Actions",
-      width: 100,
+      width: 140,
       sortable: false,
       filterable: false,
       renderCell: (params) => {
         const row = params.row as CertificateRow;
         return (
-          <Tooltip title={row.status === "VALID" ? "Revoke" : "Revoked"}>
-            <span>
-              <IconButton
-                size="small"
-                disabled={row.status !== "VALID"}
-                onClick={() =>
-                  setConfirm({
-                    title: "Revoke certificate",
-                    text: `Revoke ${row.commonName}'s certificate? Clients using it will be rejected.`,
-                    action: () => revoke.mutate(row.id),
-                  })
-                }
-              >
-                <BlockIcon fontSize="small" color={row.status === "VALID" ? "error" : "disabled"} />
-              </IconButton>
-            </span>
-          </Tooltip>
+          <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+            {row.status === "VALID" && (
+              <>
+                <Tooltip title="Rotate">
+                  <IconButton
+                    aria-label="Rotate certificate"
+                    size="small"
+                    onClick={() =>
+                      setConfirm({
+                        title: "Rotate certificate",
+                        text: `Rotate ${row.commonName}'s certificate? A new one is issued and the current one is revoked.`,
+                        label: "Rotate",
+                        danger: false,
+                        loading: rotate.isPending,
+                        action: () => rotate.mutate(row.id),
+                      })
+                    }
+                  >
+                    <CachedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Revoke">
+                  <IconButton
+                    aria-label="Revoke certificate"
+                    size="small"
+                    onClick={() =>
+                      setConfirm({
+                        title: "Revoke certificate",
+                        text: `Revoke ${row.commonName}'s certificate? Clients using it will be rejected.`,
+                        label: "Revoke",
+                        danger: true,
+                        loading: revoke.isPending,
+                        action: () => revoke.mutate(row.id),
+                      })
+                    }
+                  >
+                    <BlockIcon fontSize="small" color="error" />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
+            {row.status === "REVOKED" && (
+              <Tooltip title="Restore">
+                <IconButton
+                  aria-label="Restore certificate"
+                  size="small"
+                  onClick={() =>
+                      setConfirm({
+                        title: "Restore certificate",
+                        text: `Re-verify ${row.commonName}'s revoked certificate? It will be accepted by the VPN server again.`,
+                        label: "Restore",
+                        danger: false,
+                        loading: restore.isPending,
+                        action: () => restore.mutate(row.id),
+                      })
+                  }
+                >
+                  <RestoreIcon fontSize="small" color="primary" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
         );
       },
     },
@@ -196,9 +284,9 @@ export function CertsPage() {
         open={!!confirm}
         title={confirm?.title ?? ""}
         message={confirm?.text}
-        danger
-        confirmLabel="Revoke"
-        loading={revoke.isPending}
+        danger={confirm?.danger}
+        confirmLabel={confirm?.label ?? "Confirm"}
+        loading={confirm?.loading}
         onCancel={() => setConfirm(null)}
         onConfirm={() => {
           confirm?.action();

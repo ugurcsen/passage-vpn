@@ -3,6 +3,7 @@ package com.opnl.vpn.pki;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -114,5 +115,114 @@ class CertServiceTest {
   void ensureUserCertThrowsWhenUserMissing() {
     when(userRepository.findById("missing")).thenReturn(Optional.empty());
     assertThatThrownBy(() -> service.ensureUserCert("missing")).isInstanceOf(ApiException.class);
+  }
+
+  @Test
+  void restoreReactivatesRevokedCertificate() {
+    Certificate cert =
+        Certificate.builder()
+            .id("c1")
+            .commonName("alice")
+            .userId("u1")
+            .serial("AB")
+            .status(Status.REVOKED)
+            .revokedAt(Instant.now())
+            .build();
+    when(certificateRepository.findById("c1")).thenReturn(Optional.of(cert));
+    when(certificateRepository.save(cert)).thenReturn(cert);
+
+    Certificate restored = service.restore("c1");
+
+    assertThat(restored.getStatus()).isEqualTo(Status.VALID);
+    assertThat(restored.getRevokedAt()).isNull();
+    verify(easyRsa).unrevokeCert("AB");
+  }
+
+  @Test
+  void restoreThrowsWhenCertificateNotRevoked() {
+    Certificate cert =
+        Certificate.builder().id("c1").commonName("alice").status(Status.VALID).build();
+    when(certificateRepository.findById("c1")).thenReturn(Optional.of(cert));
+
+    assertThatThrownBy(() -> service.restore("c1"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "not_revoked");
+    verify(easyRsa, never()).unrevokeCert(any());
+  }
+
+  @Test
+  void restoreThrowsWhenCertificateMissing() {
+    when(certificateRepository.findById("missing")).thenReturn(Optional.empty());
+    assertThatThrownBy(() -> service.restore("missing"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "certificate_not_found");
+  }
+
+  @Test
+  void rotateRevokesOldAndIssuesNewCertificate() {
+    Certificate valid =
+        Certificate.builder()
+            .id("c1")
+            .commonName("alice")
+            .userId("u1")
+            .serial("OLD")
+            .status(Status.VALID)
+            .build();
+    when(userRepository.findById("u1")).thenReturn(Optional.of(user()));
+    when(certificateRepository.findByUserIdAndStatus("u1", Status.VALID))
+        .thenReturn(List.of(valid));
+    when(certificateRepository.findById("c1")).thenReturn(Optional.of(valid));
+    when(certificateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(easyRsa.index())
+        .thenReturn(
+            List.of(
+                new CertIndexEntry(
+                    CertIndexEntry.Status.VALID,
+                    Instant.now().plusSeconds(86400),
+                    "NEW",
+                    "alice.crt",
+                    "alice")));
+
+    Certificate rotated = service.rotate("u1");
+
+    assertThat(rotated.getStatus()).isEqualTo(Status.VALID);
+    assertThat(rotated.getSerial()).isEqualTo("NEW");
+    assertThat(rotated.getIssuedAt()).isNotNull();
+    verify(easyRsa).revokeCert("alice");
+    verify(easyRsa).deleteClientCert("alice");
+    verify(easyRsa).issueClientCert("alice");
+  }
+
+  @Test
+  void rotateThrowsWhenNoValidCertificate() {
+    when(certificateRepository.findByUserIdAndStatus("u1", Status.VALID)).thenReturn(List.of());
+
+    assertThatThrownBy(() -> service.rotate("u1"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "no_valid_certificate");
+    verify(easyRsa, never()).revokeCert(any());
+  }
+
+  @Test
+  void markExpiredCertificatesFlagsPastExpiry() {
+    Certificate expired =
+        Certificate.builder().id("c1").commonName("alice").status(Status.VALID).build();
+    when(certificateRepository.findByStatusAndExpiresAtBefore(eq(Status.VALID), any()))
+        .thenReturn(List.of(expired));
+
+    service.markExpiredCertificates();
+
+    assertThat(expired.getStatus()).isEqualTo(Status.EXPIRED);
+    verify(certificateRepository).saveAll(List.of(expired));
+  }
+
+  @Test
+  void expiringSoonReturnsCertificatesWithinWindow() {
+    Certificate soon =
+        Certificate.builder().id("c1").commonName("alice").status(Status.VALID).build();
+    when(certificateRepository.findByStatusAndExpiresAtBetween(eq(Status.VALID), any(), any()))
+        .thenReturn(List.of(soon));
+
+    assertThat(service.expiringSoon()).containsExactly(soon);
   }
 }

@@ -1,5 +1,7 @@
 package com.opnl.vpn.api.admin;
 
+import com.opnl.vpn.monitor.MgmtClientManager;
+import com.opnl.vpn.network.Daemon;
 import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.network.DaemonService.DaemonRequest;
 import com.opnl.vpn.profile.ProfileType;
@@ -23,30 +25,35 @@ import org.springframework.web.bind.annotation.RestController;
 public class DaemonAdminController {
 
   private final DaemonService daemonService;
+  private final MgmtClientManager mgmtClientManager;
 
-  public DaemonAdminController(DaemonService daemonService) {
+  public DaemonAdminController(DaemonService daemonService, MgmtClientManager mgmtClientManager) {
     this.daemonService = daemonService;
+    this.mgmtClientManager = mgmtClientManager;
   }
 
   @GetMapping
   public List<DaemonDto> list() {
-    return daemonService.list().stream().map(DaemonDto::from).toList();
+    return daemonService.list().stream().map(d -> withDco(d.getDaemonIndex(), d)).toList();
   }
 
   /** Preview: which daemon currently serves the given profile type. */
   @GetMapping("/resolve/{profileType}")
   public DaemonDto resolve(@PathVariable ProfileType profileType) {
-    return DaemonDto.from(daemonService.entityForProfile(profileType));
+    var daemon = daemonService.entityForProfile(profileType);
+    return withDco(daemon.getDaemonIndex(), daemon);
   }
 
   @PostMapping
   public DaemonDto create(@Valid @RequestBody DaemonRequest request) {
-    return DaemonDto.from(daemonService.create(request));
+    var daemon = daemonService.create(request);
+    return withDco(daemon.getDaemonIndex(), daemon);
   }
 
   @PutMapping("/{id}")
   public DaemonDto update(@PathVariable String id, @Valid @RequestBody DaemonRequest request) {
-    return DaemonDto.from(daemonService.update(id, request));
+    var daemon = daemonService.update(id, request);
+    return withDco(daemon.getDaemonIndex(), daemon);
   }
 
   @DeleteMapping("/{id}")
@@ -56,6 +63,12 @@ public class DaemonAdminController {
 
   @PostMapping("/{id}/enabled")
   public DaemonDto setEnabled(@PathVariable String id, @RequestParam boolean enabled) {
-    return DaemonDto.from(daemonService.setEnabled(id, enabled));
+    var daemon = daemonService.setEnabled(id, enabled);
+    return withDco(daemon.getDaemonIndex(), daemon);
+  }
+
+  private DaemonDto withDco(int daemonIndex, Daemon daemon) {
+    var cached = mgmtClientManager.cachedStatus(daemonIndex);
+    return DaemonDto.from(daemon, cached != null ? cached.dco() : null);
   }
 }

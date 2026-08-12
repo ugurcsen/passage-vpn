@@ -23,9 +23,18 @@ public record DaemonDto(
     String adminHost,
     boolean enabled,
     boolean primary,
-    Instant createdAt) {
+    Instant createdAt,
+    Boolean dco) {
 
   public static DaemonDto from(Daemon daemon) {
+    return from(daemon, null);
+  }
+
+  /**
+   * @param dco data-channel offload capability as last reported by the management interface, or
+   *     {@code null} when the daemon has not been polled yet
+   */
+  public static DaemonDto from(Daemon daemon, Boolean dco) {
     return new DaemonDto(
         daemon.getId(),
         daemon.getDaemonIndex(),
@@ -43,6 +52,7 @@ public record DaemonDto(
         daemon.getAdminHost(),
         daemon.isEnabled(),
         daemon.getDaemonIndex() == 0,
-        daemon.getCreatedAt());
+        daemon.getCreatedAt(),
+        dco);
   }
 }

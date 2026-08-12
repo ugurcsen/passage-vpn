@@ -1,5 +1,6 @@
 package com.opnl.vpn.api.admin;
 
+import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.pki.CertService;
 import com.opnl.vpn.pki.Certificate;
 import com.opnl.vpn.pki.CertificateRepository;
@@ -16,9 +17,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Admin certificate management: list, issue, revoke. */
+/** Admin certificate management: list, issue, revoke, restore, rotate. */
 @RestController
 @RequestMapping("/api/admin/certs")
 @PreAuthorize("hasRole('ADMIN')")
@@ -38,11 +40,13 @@ public class CertAdminController {
   }
 
   @GetMapping
-  public List<CertificateDto> list() {
+  public List<CertificateDto> list(@RequestParam(defaultValue = "false") boolean expiring) {
     Map<String, String> usernames =
         userRepository.findAll().stream()
             .collect(Collectors.toMap(User::getId, User::getUsername, (a, b) -> a));
-    return certificateRepository.findAll().stream()
+    List<Certificate> source =
+        expiring ? certService.expiringSoon() : certificateRepository.findAll();
+    return source.stream()
         .sorted(java.util.Comparator.comparing(Certificate::getIssuedAt).reversed())
         .map(c -> CertificateDto.from(c, usernames.get(c.getUserId())))
         .toList();
@@ -64,6 +68,27 @@ public class CertAdminController {
   public CertificateDto revoke(@PathVariable String id) {
     Certificate certificate = certService.revoke(id);
     return CertificateDto.from(certificate, usernameFor(certificate.getUserId()));
+  }
+
+  @PostMapping("/{id}/restore")
+  public CertificateDto restore(@PathVariable String id) {
+    Certificate certificate = certService.restore(id);
+    return CertificateDto.from(certificate, usernameFor(certificate.getUserId()));
+  }
+
+  @PostMapping("/{id}/rotate")
+  public CertificateDto rotate(@PathVariable String id) {
+    Certificate certificate = certService.rotate(requireUser(id));
+    return CertificateDto.from(certificate, usernameFor(certificate.getUserId()));
+  }
+
+  private String requireUser(String certificateId) {
+    Certificate certificate = certService.get(certificateId);
+    if (certificate.getUserId() == null) {
+      throw ApiException.conflict(
+          "no_user", "Certificate is not bound to a user and cannot be rotated");
+    }
+    return certificate.getUserId();
   }
 
   private String usernameFor(String userId) {
