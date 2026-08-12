@@ -70,7 +70,7 @@ class EasyRsaServiceTest {
   void unrevokeCertFlipsEntryToValidAndClearsRevocationDate() throws Exception {
     Files.writeString(indexFile, indexWithRevoked("02", "260801000000Z"));
 
-    service.unrevokeCert("02");
+    service.unrevokeCert("02", "bob");
 
     String content = Files.readString(indexFile);
     assertThat(content)
@@ -84,7 +84,7 @@ class EasyRsaServiceTest {
   void unrevokeCertKeepsOtherRowsUntouched() throws Exception {
     Files.writeString(indexFile, indexWithRevoked("02", "260801000000Z"));
 
-    service.unrevokeCert("02");
+    service.unrevokeCert("02", "bob");
 
     String content = Files.readString(indexFile);
     assertThat(content).contains("V\t270101000000Z\t\t01\tissued/alice.crt\t/CN=alice\n");
@@ -94,7 +94,7 @@ class EasyRsaServiceTest {
   void unrevokeCertThrowsWhenSerialUnknown() throws Exception {
     Files.writeString(indexFile, indexWithRevoked("02", "260801000000Z"));
 
-    assertThatThrownBy(() -> service.unrevokeCert("99"))
+    assertThatThrownBy(() -> service.unrevokeCert("99", "bob"))
         .isInstanceOf(ApiException.class)
         .hasFieldOrPropertyWithValue("code", "certificate_not_found");
     assertThat(Files.readString(indexFile)).isEqualTo(indexWithRevoked("02", "260801000000Z"));
@@ -109,8 +109,30 @@ class EasyRsaServiceTest {
         "V\t270101000000Z\t\t01\tissued/alice.crt\t/CN=alice\n"
             + "V\t260101000000Z\t\t02\tissued/bob.crt\t/CN=bob\n");
 
-    assertThatThrownBy(() -> service.unrevokeCert("02"))
+    assertThatThrownBy(() -> service.unrevokeCert("02", "bob"))
         .isInstanceOf(ApiException.class)
         .hasFieldOrPropertyWithValue("code", "not_revoked");
+  }
+
+  @Test
+  void unrevokeCertMatchesByCommonNameWhenSerialMissing() throws Exception {
+    Files.writeString(indexFile, indexWithRevoked("02", "260801000000Z"));
+
+    service.unrevokeCert(null, "bob");
+
+    String content = Files.readString(indexFile);
+    assertThat(content)
+        .contains("V\t260101000000Z\t\t02\tissued/bob.crt\t/CN=bob\n")
+        .doesNotContain("R\t260101000000Z\t260801000000Z\t02");
+  }
+
+  @Test
+  void unrevokeCertThrowsWhenSerialAndCommonNameBothMissing() throws Exception {
+    Files.writeString(indexFile, indexWithRevoked("02", "260801000000Z"));
+
+    assertThatThrownBy(() -> service.unrevokeCert(null, null))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_index");
+    assertThat(Files.readString(indexFile)).isEqualTo(indexWithRevoked("02", "260801000000Z"));
   }
 }

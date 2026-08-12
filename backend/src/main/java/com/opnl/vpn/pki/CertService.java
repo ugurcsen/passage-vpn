@@ -106,7 +106,7 @@ public class CertService {
     if (certificate.getStatus() != Certificate.Status.REVOKED) {
       throw ApiException.conflict("not_revoked", "Only revoked certificates can be restored");
     }
-    easyRsaService.unrevokeCert(certificate.getSerial());
+    easyRsaService.unrevokeCert(certificate.getSerial(), certificate.getCommonName());
     certificate.setStatus(Certificate.Status.VALID);
     certificate.setRevokedAt(null);
     return certificateRepository.save(certificate);

@@ -135,7 +135,27 @@ class CertServiceTest {
 
     assertThat(restored.getStatus()).isEqualTo(Status.VALID);
     assertThat(restored.getRevokedAt()).isNull();
-    verify(easyRsa).unrevokeCert("AB");
+    verify(easyRsa).unrevokeCert("AB", "alice");
+  }
+
+  @Test
+  void restoreFallsBackToCommonNameWhenSerialMissing() {
+    Certificate cert =
+        Certificate.builder()
+            .id("c1")
+            .commonName("bob")
+            .userId("u1")
+            .status(Status.REVOKED)
+            .revokedAt(Instant.now())
+            .build();
+    when(certificateRepository.findById("c1")).thenReturn(Optional.of(cert));
+    when(certificateRepository.save(cert)).thenReturn(cert);
+
+    Certificate restored = service.restore("c1");
+
+    assertThat(restored.getStatus()).isEqualTo(Status.VALID);
+    assertThat(restored.getRevokedAt()).isNull();
+    verify(easyRsa).unrevokeCert(null, "bob");
   }
 
   @Test
@@ -147,7 +167,7 @@ class CertServiceTest {
     assertThatThrownBy(() -> service.restore("c1"))
         .isInstanceOf(ApiException.class)
         .hasFieldOrPropertyWithValue("code", "not_revoked");
-    verify(easyRsa, never()).unrevokeCert(any());
+    verify(easyRsa, never()).unrevokeCert(any(), any());
   }
 
   @Test

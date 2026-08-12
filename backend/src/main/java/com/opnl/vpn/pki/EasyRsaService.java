@@ -117,10 +117,13 @@ public class EasyRsaService {
    * Restores a previously revoked certificate by flipping its index.txt entry back to valid
    * (Easy-RSA 3.1 has no unrevoke command) and regenerating the CRL so the cert is accepted again.
    *
+   * <p>Matching is by serial when one is available, falling back to the common name for legacy
+   * certificates whose serial was never recorded in the database.
+   *
    * @throws ApiException {@code certificate_not_found} when no revoked entry carries the serial,
    *     {@code not_revoked} when the entry exists but is not in the revoked state
    */
-  public synchronized void unrevokeCert(String serial) {
+  public synchronized void unrevokeCert(String serial, String commonName) {
     requirePki();
     Path indexFile = pkiDir.resolve("index.txt");
     List<String> lines;
@@ -129,30 +132,41 @@ public class EasyRsaService {
     } catch (IOException e) {
       throw ApiException.internal("pki_index", "Cannot read index.txt: " + e.getMessage());
     }
+    boolean matchBySerial = serial != null && !serial.isBlank();
+    boolean matchByCommonName = commonName != null && !commonName.isBlank();
+    if (!matchBySerial && !matchByCommonName) {
+      throw ApiException.internal(
+          "pki_index", "Cannot locate the certificate: no serial or common name to match");
+    }
     java.util.ArrayList<String> updated = new java.util.ArrayList<>(lines.size());
     boolean restored = false;
     boolean found = false;
     for (String line : lines) {
       String[] parts = line.split("\\t", -1);
-      if (parts.length >= 6 && "R".equals(parts[0]) && serial.equals(parts[3])) {
-        found = true;
-        // index.txt row: status, expiry, revocation date, serial, filename, CN
-        updated.add("V\t" + parts[1] + "\t\t" + parts[3] + "\t" + parts[4] + "\t" + parts[5]);
-        restored = true;
+      // index.txt row: status, expiry, revocation date, serial, filename, CN
+      boolean matches =
+          matchBySerial
+              ? parts.length >= 6 && serial.equals(parts[3])
+              : parts.length >= 6 && ("/CN=" + commonName).equals(parts[5]);
+      if (!matches) {
+        updated.add(line);
         continue;
       }
-      if (parts.length >= 4 && !"R".equals(parts[0]) && serial.equals(parts[3])) {
-        found = true;
+      found = true;
+      if ("R".equals(parts[0])) {
+        updated.add("V\t" + parts[1] + "\t\t" + parts[3] + "\t" + parts[4] + "\t" + parts[5]);
+        restored = true;
+      } else {
+        updated.add(line);
       }
-      updated.add(line);
     }
+    String target = matchBySerial ? "serial " + serial : "common name " + commonName;
     if (!found) {
       throw ApiException.notFound(
-          "certificate_not_found", "No certificate with serial " + serial + " in the PKI index");
+          "certificate_not_found", "No certificate with " + target + " in the PKI index");
     }
     if (!restored) {
-      throw ApiException.conflict(
-          "not_revoked", "Certificate with serial " + serial + " is not revoked");
+      throw ApiException.conflict("not_revoked", "Certificate with " + target + " is not revoked");
     }
     try {
       Files.write(indexFile, updated, StandardCharsets.UTF_8);

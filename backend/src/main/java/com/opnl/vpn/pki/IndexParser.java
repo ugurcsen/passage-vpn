@@ -29,11 +29,37 @@ public class IndexParser {
       if (parts.length < 5) {
         continue;
       }
-      entries.add(
-          new CertIndexEntry(
-              mapStatus(parts[0]), parseExpiry(parts[1]), parts[2], parts[3], parts[4]));
+      if (parts.length >= 6) {
+        // Easy-RSA 3 index.txt: status, expiry, revocation date, serial, filename, subject.
+        entries.add(
+            new CertIndexEntry(
+                mapStatus(parts[0]),
+                parseExpiry(parts[1]),
+                parts[3],
+                parts[4],
+                commonNameOf(parts[5])));
+      } else {
+        // Legacy 5-column rows: status, expiry, serial, filename, common name.
+        entries.add(
+            new CertIndexEntry(
+                mapStatus(parts[0]), parseExpiry(parts[1]), parts[2], parts[3], parts[4]));
+      }
     }
     return entries;
+  }
+
+  /** Extracts the common name from an X.500 subject (e.g. {@code /CN=alice}). */
+  private String commonNameOf(String subject) {
+    if (subject == null) {
+      return null;
+    }
+    int idx = subject.indexOf("/CN=");
+    if (idx < 0) {
+      return null;
+    }
+    String cn = subject.substring(idx + "/CN=".length());
+    int slash = cn.indexOf('/');
+    return slash < 0 ? cn : cn.substring(0, slash);
   }
 
   private CertIndexEntry.Status mapStatus(String s) {

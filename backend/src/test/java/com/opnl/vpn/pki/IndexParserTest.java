@@ -12,9 +12,9 @@ class IndexParserTest {
 
   private static final String SAMPLE =
       """
-            V	270101000000Z	2A01	ca.crt	Easy-RSA CA
-            V	280601000000Z	2A02	01_CN	C5E6E1
-            R	270101000000Z	2A03	02_CN	revoked-user
+            V	270101000000Z		2A01	unknown	/CN=user-one
+            V	280601000000Z		2A02	unknown	/CN=C5E6E1
+            R	270101000000Z	271201000000Z	2A03	unknown	/CN=revoked-user
             """;
 
   @Test
@@ -26,6 +26,17 @@ class IndexParserTest {
     assertThat(entries.get(0).expiry()).isEqualTo(Instant.parse("2027-01-01T00:00:00Z"));
     assertThat(entries.get(1).commonName()).isEqualTo("C5E6E1");
     assertThat(entries.get(2).status()).isEqualTo(CertIndexEntry.Status.REVOKED);
+    assertThat(entries.get(2).serial()).isEqualTo("2A03");
+    assertThat(entries.get(2).commonName()).isEqualTo("revoked-user");
+  }
+
+  @Test
+  void parsesLegacyFiveColumnRows() {
+    List<CertIndexEntry> entries =
+        parser.parse("V\t280601000000Z\t2A04\tlegacy.crt\tlegacy-user\n");
+    assertThat(entries).hasSize(1);
+    assertThat(entries.get(0).serial()).isEqualTo("2A04");
+    assertThat(entries.get(0).commonName()).isEqualTo("legacy-user");
   }
 
   @Test
