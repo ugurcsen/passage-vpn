@@ -52,6 +52,21 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] 2.12 LOW — purge legacy `not-a-cidr:443` access rule from the staging DB; regression:
       re-create → 400 (finding 2.7 holds)
 
+**P4 — MFA integration completion (approved plan)**
+- [x] Client `static-challenge` directive in password-auth .ovpn profiles
+      (USER_LOCKED/SERVER_LOCKED/GENERIC) when MFA is in force (user `mfaEnabled`
+      or server `require_mfa_on_connect`; AUTO_LOGIN excluded) — makes
+      MFA-on-connect actually prompt for OTP
+- [x] Admin MFA management UI on Users page (setup → QR + secret copy → verify
+      code → enable; disable with confirm) — backend endpoints exist
+      (`/api/admin/users/{id}/mfa/setup|enable|disable`)
+- [x] Portal self-service account page (`/api/portal/account`): MFA
+      setup/enable/disable (current-password verified) + password change (revoke
+      all refresh tokens, clear `must_change_password`)
+- [ ] Tests: backend (PortalAccountService, OvpnGenerator/ProfileService) +
+      frontend (UsersPage MFA dialog, AccountPage) — run via SSH on production checkout
+- [ ] Docs: RELEASE_NOTES.md entry, docs/test-plan.md MFA E2E item
+
 **P1.5 — Status / Settings / Dashboard phase (live E2E finding 2.5)** — DONE
 > Scoped from live E2E testing (`docs/test-findings.md` §2.5): the frontend defined
 > `/admin/status`, `/admin/settings`, `/admin/dashboard` but no backend controller existed.
@@ -88,7 +103,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [ ] `install.sh` full installer, first-run wizard UI, demo/seed mode
 - [ ] PostgreSQL docker profile validation, Makefile polish
 - [ ] E2E test pass, README/docs finalization, CI workflow
-- [ ] Profile settings page (portal: password + MFA setup)
+- [x] Profile settings page (portal: password + MFA setup)
 - [ ] Post-auth Python script hook support
 
 ---
@@ -173,7 +188,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] User management page (MUI DataGrid: search, filter, bulk, confirm dialogs)
 - [x] Group management page
 - [x] Toasts, loading states, dialogs (data-grid loading, pending buttons)
-- [ ] Profile settings page (password, MFA setup) (portal, Phase 3)
+- [x] Profile settings page (password, MFA setup) (portal, Phase 3)
 
 ## Phase 3 — Access Control & Connection Profiles
 

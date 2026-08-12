@@ -44,6 +44,7 @@ const NAV_ITEMS = [
   { label: "Connection Profiles", path: "/profiles", icon: <DownloadIcon /> },
   { label: "VPN Daemons", path: "/daemons", icon: <DnsIcon /> },
   { label: "My Profiles", path: "/portal", icon: <PersonIcon /> },
+  { label: "My Account", path: "/portal/account", icon: <SecurityIcon /> },
   { label: "Live Status", path: "/status", icon: <MonitorHeartIcon /> },
   { label: "Settings", path: "/settings", icon: <SettingsIcon /> },
 ];

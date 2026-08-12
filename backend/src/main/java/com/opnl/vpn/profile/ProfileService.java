@@ -6,6 +6,8 @@ import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.network.ServerConfig;
 import com.opnl.vpn.pki.CertService;
 import com.opnl.vpn.pki.EasyRsaService;
+import com.opnl.vpn.setting.SettingKeys;
+import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Duration;
@@ -31,6 +33,7 @@ public class ProfileService {
   private final DaemonService daemonService;
   private final UserRepository userRepository;
   private final ProfileTokenRepository tokenRepository;
+  private final SettingsService settingsService;
   private final OpnlProperties properties;
 
   public ProfileService(
@@ -40,6 +43,7 @@ public class ProfileService {
       DaemonService daemonService,
       UserRepository userRepository,
       ProfileTokenRepository tokenRepository,
+      SettingsService settingsService,
       OpnlProperties properties) {
     this.generator = generator;
     this.certService = certService;
@@ -47,6 +51,7 @@ public class ProfileService {
     this.daemonService = daemonService;
     this.userRepository = userRepository;
     this.tokenRepository = tokenRepository;
+    this.settingsService = settingsService;
     this.properties = properties;
   }
 
@@ -168,7 +173,8 @@ public class ProfileService {
             easyRsa.caCert(),
             easyRsa.taKey(),
             certMaterial == null ? null : certMaterial[0],
-            certMaterial == null ? null : certMaterial[1]);
+            certMaterial == null ? null : certMaterial[1],
+            requiresMfaChallenge(user, type));
     String daemonSuffix = type == ProfileType.GENERIC ? "-generic" : "";
     String filename =
         type.name().toLowerCase().replace('_', '-')
@@ -186,5 +192,20 @@ public class ProfileService {
     return userRepository
         .findById(userId)
         .orElseThrow(() -> ApiException.notFound("user_not_found", "User not found"));
+  }
+
+  /**
+   * Decides whether a profile must prompt for a TOTP code at connect time. AUTO_LOGIN is
+   * certificate-only and never prompts. USER_LOCKED follows the owning user's MFA state (or the
+   * server-wide require-mfa-on-connect policy); SERVER_LOCKED/GENERIC profiles are not bound to a
+   * single account, so only the server policy applies.
+   */
+  private boolean requiresMfaChallenge(User user, ProfileType type) {
+    if (type == ProfileType.AUTO_LOGIN) {
+      return false;
+    }
+    boolean serverPolicy =
+        Boolean.TRUE.equals(settingsService.serverSettings().get(SettingKeys.REQUIRE_MFA_ON_CONNECT));
+    return type == ProfileType.USER_LOCKED ? user.isMfaEnabled() || serverPolicy : serverPolicy;
   }
 }

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
+import { AuthProvider } from "@/hooks/useAuth";
 import { ToastProvider } from "@/hooks/useToast";
 import { UsersPage } from "@/pages/UsersPage";
 
@@ -38,6 +39,26 @@ const users = [
 
 const groups = [{ id: "g1", name: "devs", memberCount: 1 }];
 
+const currentUser = {
+  id: "admin1",
+  username: "admin",
+  fullName: "Root Admin",
+  email: null,
+  role: "ADMIN",
+  mfaEnabled: false,
+  banned: false,
+  mustChangePassword: false,
+  groups: [],
+  createdAt: "2026-01-01T00:00:00Z",
+  lastLoginAt: null,
+};
+
+const mfaSetup = {
+  secret: "JBSWY3DPEHPK3PXP",
+  otpAuthUrl: "otpauth://totp/OpenVPN%20Panel:alice?secret=JBSWY3DPEHPK3PXP",
+  qrDataUrl: "data:image/png;base64,QUJD",
+};
+
 function json(body: unknown) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -52,9 +73,11 @@ function renderPage() {
   return render(
     <ThemeProvider theme={darkTheme}>
       <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <UsersPage />
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <UsersPage />
+          </ToastProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>,
   );
@@ -63,10 +86,18 @@ function renderPage() {
 describe("UsersPage", () => {
   beforeEach(() => {
     localStorage.clear();
-    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
-      if (url.startsWith("/api/admin/groups")) return Promise.resolve(json(groups));
-      return Promise.resolve(json(users));
-    }));
+    localStorage.setItem("opnl.access", "test-token");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url.startsWith("/api/auth/me")) return Promise.resolve(json(currentUser));
+        if (url.includes("/mfa/setup")) return Promise.resolve(json(mfaSetup));
+        if (url.includes("/mfa/enable")) return Promise.resolve(json(users[0]));
+        if (url.includes("/mfa/disable")) return Promise.resolve(json(users[0]));
+        if (url.startsWith("/api/admin/groups")) return Promise.resolve(json(groups));
+        return Promise.resolve(json(users));
+      }),
+    );
   });
 
   afterEach(() => {
@@ -138,6 +169,68 @@ describe("UsersPage", () => {
     expect(JSON.parse(String(opts!.body))).toMatchObject({
       username: "carol",
       role: "USER",
+    });
+  });
+
+  it("sets up MFA for a user via QR dialog", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("alice");
+
+    await user.click(screen.getByTestId("manage-mfa-bob"));
+    let dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/two-factor authentication is disabled/i)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: /set up mfa/i }));
+
+    await waitFor(() => {
+      dialog = screen.getByRole("dialog");
+      expect(within(dialog).getByLabelText(/secret/i)).toHaveValue("JBSWY3DPEHPK3PXP");
+    });
+    expect(within(dialog).getByAltText(/totp qr code/i)).toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByLabelText(/verification code/i), {
+      target: { value: "123456" },
+    });
+    await user.click(within(dialog).getByRole("button", { name: /^enable$/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, opts]) => url === "/api/admin/users/u2/mfa/enable" && opts?.method === "POST",
+      );
+      expect(post).toBeDefined();
+    });
+    const [, opts] = fetchMock.mock.calls.find(
+      ([url, o]) => url === "/api/admin/users/u2/mfa/enable" && o?.method === "POST",
+    )!;
+    expect(JSON.parse(String(opts!.body))).toEqual({ code: "123456" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("disables MFA for a user after confirmation", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("alice");
+
+    await user.click(screen.getByTestId("manage-mfa-alice"));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/two-factor authentication is enabled/i)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: /disable mfa/i }));
+    await user.click(within(dialog).getByRole("button", { name: /^disable mfa$/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, opts]) => url === "/api/admin/users/u1/mfa/disable" && opts?.method === "POST",
+      );
+      expect(post).toBeDefined();
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
   });
 });

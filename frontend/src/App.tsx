@@ -20,6 +20,7 @@ import { DaemonsPage } from "@/pages/DaemonsPage";
 import { StatusPage } from "@/pages/StatusPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { PortalPage } from "@/pages/PortalPage";
+import { AccountPage } from "@/pages/AccountPage";
 import { SharePage } from "@/pages/SharePage";
 
 const THEME_KEY = "opnl.theme";
@@ -85,6 +86,10 @@ export default function App() {
                     <Route
                       path="/portal"
                       element={<PortalPage />}
+                    />
+                    <Route
+                      path="/portal/account"
+                      element={<AccountPage />}
                     />
                     <Route
                       path="/status"

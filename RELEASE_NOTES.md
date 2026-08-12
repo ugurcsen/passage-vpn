@@ -41,6 +41,14 @@ Legend: `[x]` released, `[~]` partial.
 - [x] RBAC: `ADMIN` / `RESELLER` / `USER`
 - [x] Local password auth (BCrypt)
 - [x] TOTP MFA (Google Authenticator compatible) — enable / disable / reset
+- [x] Password-auth .ovpn profiles render an interactive `static-challenge` prompt
+      when MFA is in force (per-user TOTP or server `require_mfa_on_connect`);
+      AUTO_LOGIN profiles are excluded
+- [x] Admin MFA management UI — Users page "Manage MFA" dialog (QR + secret copy →
+      verify code → enable; disable with confirmation)
+- [x] Portal self-service account page — MFA setup/enable/disable (current password
+      re-verified) and password change (all refresh tokens revoked,
+      `must_change_password` cleared) via `/api/portal/account`
 - [x] Brute-force lockout policy
 - [x] VPN `auth-user-pass-verify` → `/internal/auth/verify` with password + OTP,
       lockout and ban checks
@@ -198,6 +206,18 @@ Legend: `[x]` released, `[~]` partial.
   lint` clean (0 errors), `tsc -b` and `vite build` pass; backend suite
   unaffected and green. SSH-verified on production `65.21.108.250` (tests run
   on the deployed checkout).
+- MFA integration completion: `OvpnGenerator` renders `static-challenge` on
+  password-auth profiles when MFA is in force (`ProfileService.requiresMfaChallenge`:
+  per-user TOTP or server `require_mfa_on_connect`; AUTO_LOGIN excluded) so
+  MFA-on-connect actually prompts for the OTP; admin Users page gains a
+  Manage-MFA dialog (setup → QR + secret copy → code verify → enable, disable
+  with confirm, ADMIN-only); new `PortalAccountController`/`PortalAccountService`
+  add self-service MFA setup/enable/disable (current password re-verified) and
+  password change (all refresh tokens revoked, `must_change_password` cleared)
+  under `/api/portal/account`, surfaced in a new My Account page
+  (`/portal/account`). Covered by `PortalAccountServiceTest`,
+  `ProfileServiceTest` static-challenge cases and frontend UsersPage/AccountPage
+  tests; suites green via SSH on the production checkout.
 
 ### Not yet released
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group

@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Alert,
   Box,
   Button,
   Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -22,10 +24,13 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import BlockIcon from "@mui/icons-material/Block";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import KeyIcon from "@mui/icons-material/Key";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import SearchIcon from "@mui/icons-material/Search";
-import { api, endpoints } from "@/lib/api";
+import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
+import { api, copyToClipboard, endpoints, type MfaSetup } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Role } from "@/hooks/useAuth";
@@ -78,6 +83,7 @@ function formatDateTime(iso?: string) {
 export function UsersPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<UserForm>(EMPTY_FORM);
@@ -93,6 +99,12 @@ export function UsersPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "disabled">("all");
+  const [mfaTarget, setMfaTarget] = useState<UserRow | null>(null);
+  const [mfaSetup, setMfaSetup] = useState<MfaSetup | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaDisableConfirm, setMfaDisableConfirm] = useState(false);
+
+  const canManageMfa = currentUser?.role === "ADMIN";
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -170,6 +182,63 @@ export function UsersPage() {
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Delete failed"),
   });
+
+  const mfaSetupMutation = useMutation({
+    mutationFn: (row: UserRow) =>
+      api<MfaSetup>(endpoints.users + `/${row.id}/mfa/setup`, { method: "POST" }),
+    onSuccess: (data) => {
+      setMfaSetup(data);
+      setMfaCode("");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "MFA setup failed"),
+  });
+
+  const mfaEnableMutation = useMutation({
+    mutationFn: () =>
+      api(endpoints.users + `/${mfaTarget?.id}/mfa/enable`, {
+        method: "POST",
+        body: JSON.stringify({ code: mfaCode }),
+      }),
+    onSuccess: () => {
+      toast.success("MFA enabled");
+      closeMfaDialog();
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Enable failed"),
+  });
+
+  const mfaDisableMutation = useMutation({
+    mutationFn: () =>
+      api(endpoints.users + `/${mfaTarget?.id}/mfa/disable`, { method: "POST" }),
+    onSuccess: () => {
+      toast.success("MFA disabled");
+      setMfaDisableConfirm(false);
+      closeMfaDialog();
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Disable failed"),
+  });
+
+  const openMfaDialog = (row: UserRow) => {
+    setMfaTarget(row);
+    setMfaSetup(null);
+    setMfaCode("");
+    setMfaDisableConfirm(false);
+  };
+
+  const closeMfaDialog = () => {
+    setMfaTarget(null);
+    setMfaSetup(null);
+    setMfaCode("");
+    setMfaDisableConfirm(false);
+  };
+
+  const copySecret = async () => {
+    if (!mfaSetup) return;
+    const ok = await copyToClipboard(mfaSetup.secret);
+    if (ok) toast.success("Secret copied");
+    else toast.error("Copy failed");
+  };
 
   const bulkMutation = useMutation({
     mutationFn: ({ action, ids }: { action: "ban" | "unban" | "delete"; ids: string[] }) =>
@@ -274,7 +343,7 @@ export function UsersPage() {
     {
       field: "actions",
       headerName: "Actions",
-      width: 160,
+      width: 200,
       sortable: false,
       filterable: false,
       renderCell: (params) => {
@@ -296,6 +365,20 @@ export function UsersPage() {
                 <KeyIcon fontSize="small" />
               </IconButton>
             </Tooltip>
+            {canManageMfa && (
+              <Tooltip title="Manage MFA">
+                <IconButton
+                  size="small"
+                  onClick={() => openMfaDialog(row)}
+                  data-testid={`manage-mfa-${row.username}`}
+                >
+                  <VerifiedUserIcon
+                    fontSize="small"
+                    color={row.mfaEnabled ? "success" : "action"}
+                  />
+                </IconButton>
+              </Tooltip>
+            )}
             <Tooltip title="Delete">
               <IconButton
                 size="small"
@@ -498,6 +581,104 @@ export function UsersPage() {
           <Button variant="contained" disabled={resetPassword.length < 8} onClick={() => resetMutation.mutate()}>
             Reset
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!mfaTarget} onClose={closeMfaDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Manage MFA — {mfaTarget?.username}</DialogTitle>
+        <DialogContent>
+          {mfaTarget?.mfaEnabled && !mfaSetup ? (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Alert severity="success">Two-factor authentication is enabled.</Alert>
+              {mfaDisableConfirm ? (
+                <>
+                  <Alert severity="warning">
+                    Disable MFA for {mfaTarget.username}? They will no longer be asked for a code at
+                    sign-in.
+                  </Alert>
+                  <Button
+                    color="error"
+                    variant="contained"
+                    disabled={mfaDisableMutation.isPending}
+                    onClick={() => mfaDisableMutation.mutate()}
+                  >
+                    {mfaDisableMutation.isPending ? <CircularProgress size={18} /> : "Disable MFA"}
+                  </Button>
+                </>
+              ) : (
+                <Button color="error" variant="outlined" onClick={() => setMfaDisableConfirm(true)}>
+                  Disable MFA
+                </Button>
+              )}
+            </Stack>
+          ) : mfaSetup ? (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Alert severity="info">
+                Scan the QR code with Google Authenticator (or any TOTP app), then enter the
+                6-digit code to enable two-factor authentication.
+              </Alert>
+              <Box sx={{ display: "flex", justifyContent: "center" }}>
+                <img src={mfaSetup.qrDataUrl} alt="TOTP QR code" width={180} height={180} />
+              </Box>
+              <TextField
+                label="Secret"
+                value={mfaSetup.secret}
+                fullWidth
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Tooltip title="Copy secret">
+                          <IconButton size="small" onClick={copySecret}>
+                            <ContentCopyIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+              <TextField
+                label="Verification code"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value)}
+                fullWidth
+                inputProps={{ inputMode: "numeric", maxLength: 6 }}
+                helperText="Confirm the code to finish enabling MFA."
+              />
+            </Stack>
+          ) : (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Alert severity="info">
+                Two-factor authentication is disabled for this user. Set it up to require a code
+                from an authenticator app at sign-in.
+              </Alert>
+              <Button
+                variant="contained"
+                disabled={mfaSetupMutation.isPending}
+                onClick={() => mfaSetupMutation.mutate(mfaTarget!)}
+              >
+                {mfaSetupMutation.isPending ? <CircularProgress size={18} /> : "Set up MFA"}
+              </Button>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          {mfaSetup ? (
+            <>
+              <Button onClick={() => setMfaSetup(null)}>Back</Button>
+              <Button
+                variant="contained"
+                disabled={mfaCode.length < 6 || mfaEnableMutation.isPending}
+                onClick={() => mfaEnableMutation.mutate()}
+              >
+                {mfaEnableMutation.isPending ? <CircularProgress size={18} /> : "Enable"}
+              </Button>
+            </>
+          ) : (
+            <Button onClick={closeMfaDialog}>Close</Button>
+          )}
         </DialogActions>
       </Dialog>
 

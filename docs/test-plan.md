@@ -63,6 +63,7 @@ cd frontend && npm run lint && npm run test
 | `access/RuleEngineTest` | Rule resolution + nested groups + iptables rendering/teardown | [x] |
 | `access/AccessRuleServiceTest` | Rule CRUD validation, priority, target-name resolution | [x] |
 | `profile/ProfileServiceTest` | 4 profile types + token lifecycle (uses/expiry/generic) | [x] |
+| `api/portal/PortalAccountServiceTest` | Self-service MFA setup/enable/disable + password change | [x] |
 | `internal/InternalControllerTest` | `/internal/connect|disconnect|auth/verify|seed-admin` contract + filter | [x] |
 
 ### 4.2 Frontend — 13 test files, 40 tests
@@ -82,6 +83,7 @@ cd frontend && npm run lint && npm run test
 | `pages/SetupWizardPage.test.tsx` | Full flow: admin POST, server config POST, PKI provision gate, finish | [x] |
 | `components/ProfileCard.test.tsx` | Download blob, QR render | [x] |
 | `pages/PortalPage.test.tsx` | Profile list render, download endpoint | [x] |
+| `pages/AccountPage.test.tsx` | Self-service MFA setup/disable flow + password change | [x] |
 
 ## 5. Backend test plan by feature area
 

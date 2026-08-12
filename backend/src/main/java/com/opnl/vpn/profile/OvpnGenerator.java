@@ -36,6 +36,9 @@ public class OvpnGenerator {
    *
    * @param adminHost override for the remote endpoint host; falls back to the server config when
    *     blank/null.
+   * @param mfaChallenge when true and the profile uses password auth, an interactive
+   *     {@code static-challenge} prompt is added so the client can supply a TOTP code. A blank
+   *     response is tolerated by the backend when MFA is not required.
    */
   public String render(
       ProfileType type,
@@ -44,7 +47,8 @@ public class OvpnGenerator {
       String caCert,
       String taKey,
       String cert,
-      String key) {
+      String key,
+      boolean mfaChallenge) {
     String host =
         adminHost == null || adminHost.isBlank()
             ? (config.adminHost() == null || config.adminHost().isBlank()
@@ -54,7 +58,12 @@ public class OvpnGenerator {
     int port = config.port();
     Protocol proto = config.proto();
 
-    String authUserPass = type == ProfileType.AUTO_LOGIN ? "" : "auth-user-pass";
+    String authUserPass =
+        type == ProfileType.AUTO_LOGIN
+            ? ""
+            : mfaChallenge
+                ? "auth-user-pass\nstatic-challenge \"Verification code\" 1"
+                : "auth-user-pass";
     String certBlock =
         switch (type) {
           case AUTO_LOGIN, USER_LOCKED, SERVER_LOCKED ->

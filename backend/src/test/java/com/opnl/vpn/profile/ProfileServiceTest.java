@@ -13,6 +13,8 @@ import com.opnl.vpn.pki.CertService;
 import com.opnl.vpn.pki.EasyRsaService;
 import com.opnl.vpn.profile.ProfileService.OvpnFile;
 import com.opnl.vpn.profile.ProfileService.QrPayload;
+import com.opnl.vpn.setting.SettingKeys;
+import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
@@ -28,6 +30,7 @@ class ProfileServiceTest {
   private DaemonService daemonService;
   private UserRepository userRepository;
   private ProfileTokenRepository tokenRepository;
+  private SettingsService settingsService;
   private OpnlProperties properties;
   private OpnlProperties.OpenVpn openvpn;
   private ProfileService service;
@@ -48,9 +51,11 @@ class ProfileServiceTest {
     daemonService = mock(DaemonService.class);
     userRepository = mock(UserRepository.class);
     tokenRepository = mock(ProfileTokenRepository.class);
+    settingsService = mock(SettingsService.class);
     properties = mock(OpnlProperties.class);
     openvpn = mock(OpnlProperties.OpenVpn.class);
     when(properties.openvpn()).thenReturn(openvpn);
+    when(settingsService.serverSettings()).thenReturn(java.util.Map.of());
     service =
         new ProfileService(
             new OvpnGenerator(),
@@ -59,6 +64,7 @@ class ProfileServiceTest {
             daemonService,
             userRepository,
             tokenRepository,
+            settingsService,
             properties);
 
     ServerConfig config = ServerConfig.defaults();
@@ -112,6 +118,71 @@ class ProfileServiceTest {
     OvpnFile file = service.downloadForUser("u1", ProfileType.AUTO_LOGIN);
 
     assertThat(file.content()).doesNotContain("auth-user-pass").contains("<cert>\nCERT");
+  }
+
+  @Test
+  void userLockedProfileAddsStaticChallengeWhenUserHasMfa() {
+    User mfaUser =
+        User.builder()
+            .id("u1")
+            .username("alice")
+            .role(User.Role.USER)
+            .mfaEnabled(true)
+            .mfaSecret("SECRET")
+            .createdAt(Instant.now())
+            .build();
+    when(userRepository.findById("u1")).thenReturn(Optional.of(mfaUser));
+
+    OvpnFile file = service.downloadForUser("u1", ProfileType.USER_LOCKED);
+
+    assertThat(file.content())
+        .contains("auth-user-pass")
+        .contains("static-challenge \"Verification code\" 1");
+  }
+
+  @Test
+  void userLockedProfileOmitsStaticChallengeWhenNoMfaInForce() {
+    OvpnFile file = service.downloadForUser("u1", ProfileType.USER_LOCKED);
+
+    assertThat(file.content())
+        .contains("auth-user-pass")
+        .doesNotContain("static-challenge");
+  }
+
+  @Test
+  void genericProfileAddsStaticChallengeWhenServerRequiresMfaOnConnect() {
+    when(settingsService.serverSettings())
+        .thenReturn(java.util.Map.of(SettingKeys.REQUIRE_MFA_ON_CONNECT, true));
+
+    OvpnFile file = service.downloadForUser("u1", ProfileType.GENERIC);
+
+    assertThat(file.content())
+        .contains("auth-user-pass")
+        .contains("static-challenge \"Verification code\" 1");
+  }
+
+  @Test
+  void serverLockedProfileAddsStaticChallengeWhenServerRequiresMfaOnConnect() {
+    when(settingsService.serverSettings())
+        .thenReturn(java.util.Map.of(SettingKeys.REQUIRE_MFA_ON_CONNECT, true));
+
+    OvpnFile file = service.downloadForUser("u1", ProfileType.SERVER_LOCKED);
+
+    assertThat(file.content())
+        .contains("auth-user-pass")
+        .contains("static-challenge \"Verification code\" 1");
+  }
+
+  @Test
+  void autoLoginProfileNeverAddsStaticChallengeEvenWithServerPolicy() {
+    when(settingsService.serverSettings())
+        .thenReturn(java.util.Map.of(SettingKeys.REQUIRE_MFA_ON_CONNECT, true));
+
+    OvpnFile file = service.downloadForUser("u1", ProfileType.AUTO_LOGIN);
+
+    assertThat(file.content())
+        .doesNotContain("auth-user-pass")
+        .doesNotContain("static-challenge");
   }
 
   @Test

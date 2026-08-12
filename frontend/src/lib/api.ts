@@ -220,6 +220,10 @@ export const endpoints = {
   daemons: "/admin/daemons",
   profileTokens: "/admin/profile-tokens",
   portalProfiles: "/portal/profiles",
+  portalAccountMfaSetup: "/portal/account/mfa/setup",
+  portalAccountMfaEnable: "/portal/account/mfa/enable",
+  portalAccountMfaDisable: "/portal/account/mfa/disable",
+  portalAccountPassword: "/portal/account/password",
   connections: "/admin/connections",
   status: "/admin/status",
   settings: "/admin/settings",
@@ -351,6 +355,13 @@ export interface ConnectionLog {
 /** Server-level settings store: arbitrary JSON values keyed by string. */
 export interface ServerSettings {
   [key: string]: unknown;
+}
+
+/** TOTP provisioning payload: fresh secret plus QR/otpauth for the authenticator app. */
+export interface MfaSetup {
+  secret: string;
+  otpAuthUrl: string;
+  qrDataUrl: string;
 }
 
 /** Triggers a browser download for a backend-generated profile file. */
