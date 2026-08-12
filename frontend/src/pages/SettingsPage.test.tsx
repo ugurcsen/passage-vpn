@@ -199,6 +199,43 @@ describe("SettingsPage", () => {
     expect(body.value.dnsServers).toEqual(["1.1.1.1", "8.8.8.8"]);
   });
 
+  it("switches the network mode via the inline select and saves it", async () => {
+    const fetchMock = makeFetch({ network_mode: "nat" });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+
+    expect(await screen.findByText("Network mode")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("combobox", { name: "Network mode" }));
+    await userEvent.setup().click(screen.getByRole("option", { name: "routed" }));
+
+    await waitFor(() => {
+      expect(putCalls(fetchMock)).toContainEqual({
+        url: "/api/admin/settings/network_mode",
+        body: { value: "routed" },
+      });
+    });
+  });
+
+  it("edits the network mode through the add-default dialog", async () => {
+    const fetchMock = makeFetch({});
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Add default" }));
+    await userEvent.setup().click(screen.getByRole("combobox", { name: "Setting" }));
+    await userEvent.setup().click(screen.getByRole("option", { name: "Network mode" }));
+    await userEvent.setup().click(screen.getByRole("combobox", { name: "Value" }));
+    await userEvent.setup().click(screen.getByRole("option", { name: "routed" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(putCalls(fetchMock)).toContainEqual({
+        url: "/api/admin/settings/network_mode",
+        body: { value: "routed" },
+      });
+    });
+  });
+
   it("keeps custom settings out of the defaults section and shows them in the advanced section", async () => {
     vi.stubGlobal("fetch", makeFetch({ brand: "OpenVPN Panel", max_conn: 5 }));
     renderPage();

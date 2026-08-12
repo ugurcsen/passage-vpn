@@ -22,6 +22,7 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import GroupIcon from "@mui/icons-material/Group";
+import TuneIcon from "@mui/icons-material/Tune";
 import { api, endpoints } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -48,8 +49,11 @@ export function GroupsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [parentId, setParentId] = useState("");
+  const [tunnelMode, setTunnelMode] = useState("" as "" | "full" | "split");
   const [membersFor, setMembersFor] = useState<GroupRow | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [poolFor, setPoolFor] = useState<GroupRow | null>(null);
+  const [poolInput, setPoolInput] = useState("");
   const [confirm, setConfirm] = useState<GroupRow | null>(null);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin-groups"] });
@@ -68,9 +72,18 @@ export function GroupsPage() {
     mutationFn: async () => {
       const payload = { name, description: description || null, parentId: parentId || null };
       if (editing) {
-        return api(endpoints.groups + `/${editing.id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await api(endpoints.groups + `/${editing.id}`, { method: "PUT", body: JSON.stringify(payload) });
+      } else {
+        await api(endpoints.groups, { method: "POST", body: JSON.stringify(payload) });
       }
-      return api(endpoints.groups, { method: "POST", body: JSON.stringify(payload) });
+      if (editing) {
+        const tunnelUrl = endpoints.groups + `/${editing.id}/settings/tunnel_mode`;
+        if (tunnelMode) {
+          await api(tunnelUrl, { method: "PUT", body: JSON.stringify(tunnelMode) });
+        } else {
+          await api(tunnelUrl, { method: "DELETE" });
+        }
+      }
     },
     onSuccess: () => {
       toast.success(editing ? "Group updated" : "Group created");
@@ -108,14 +121,23 @@ export function GroupsPage() {
     setName("");
     setDescription("");
     setParentId("");
+    setTunnelMode("");
     setDialogOpen(true);
   };
 
-  const openEdit = (row: GroupRow) => {
+  const openEdit = async (row: GroupRow) => {
     setEditing(row);
     setName(row.name);
     setDescription(row.description ?? "");
     setParentId(row.parentId ?? "");
+    setTunnelMode("");
+    try {
+      const settings = await api<Record<string, unknown>>(endpoints.groups + `/${row.id}/settings`);
+      const mode = settings.tunnel_mode;
+      setTunnelMode(mode === "full" || mode === "split" ? mode : "");
+    } catch {
+      /* settings are optional; keep the dialog usable */
+    }
     setDialogOpen(true);
   };
 
@@ -123,6 +145,30 @@ export function GroupsPage() {
     setMembersFor(row);
     const memberIds = await api<string[]>(endpoints.groups + `/${row.id}/members`);
     setSelectedUsers(memberIds);
+  };
+
+  const poolMutation = useMutation({
+    mutationFn: () =>
+      api(endpoints.groups + `/${poolFor?.id}/static-ip-pool`, {
+        method: "PUT",
+        body: JSON.stringify({ pool: poolInput.trim() }),
+      }),
+    onSuccess: () => {
+      toast.success("Static IP pool updated");
+      setPoolFor(null);
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Update failed"),
+  });
+
+  const openPool = async (row: GroupRow) => {
+    setPoolFor(row);
+    try {
+      const pool = await api<string | null>(endpoints.groups + `/${row.id}/static-ip-pool`);
+      setPoolInput(pool ?? "");
+    } catch {
+      setPoolInput("");
+    }
   };
 
   const columns: GridColDef[] = [
@@ -133,7 +179,7 @@ export function GroupsPage() {
     {
       field: "actions",
       headerName: "Actions",
-      width: 150,
+      width: 190,
       sortable: false,
       filterable: false,
       renderCell: (params) => {
@@ -143,6 +189,11 @@ export function GroupsPage() {
             <Tooltip title="Edit members">
               <IconButton size="small" onClick={() => openMembers(row)}>
                 <GroupIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Static IP pool">
+              <IconButton size="small" onClick={() => openPool(row)} data-testid={`edit-pool-${row.name}`}>
+                <TuneIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Edit">
@@ -210,6 +261,22 @@ export function GroupsPage() {
                   </MenuItem>
                 ))}
             </TextField>
+            <TextField
+              select
+              label="Tunnel mode"
+              value={tunnelMode}
+              onChange={(e) => setTunnelMode(e.target.value as "" | "full" | "split")}
+              disabled={!editing}
+              helperText={
+                editing
+                  ? "Full routes all traffic through the VPN; split routes only the configured networks. Empty inherits the server default."
+                  : "Set tunnel mode after creating the group."
+              }
+            >
+              <MenuItem value="">Inherit default</MenuItem>
+              <MenuItem value="full">Full tunnel</MenuItem>
+              <MenuItem value="split">Split tunnel</MenuItem>
+            </TextField>
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -246,6 +313,27 @@ export function GroupsPage() {
           <Button onClick={() => setMembersFor(null)}>Cancel</Button>
           <Button variant="contained" onClick={() => membersMutation.mutate()}>
             Save members
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!poolFor} onClose={() => setPoolFor(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Static IP pool — {poolFor?.name}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="IP range"
+              value={poolInput}
+              onChange={(e) => setPoolInput(e.target.value)}
+              placeholder="e.g. 10.8.0.100-10.8.0.199"
+              helperText="Single IP range (e.g. 10.8.0.100-10.8.0.199). Empty clears the pool. Members can be auto-allocated from here."
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPoolFor(null)}>Cancel</Button>
+          <Button variant="contained" disabled={poolMutation.isPending} onClick={() => poolMutation.mutate()}>
+            Save pool
           </Button>
         </DialogActions>
       </Dialog>

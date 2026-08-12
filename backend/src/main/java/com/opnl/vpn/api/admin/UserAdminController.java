@@ -108,6 +108,11 @@ public class UserAdminController {
     return userAdminService.setStaticIp(id, request.staticIp());
   }
 
+  @PostMapping("/{id}/static-ip/allocate")
+  public UserDto allocateStaticIp(@PathVariable String id) {
+    return userAdminService.allocateStaticIp(id);
+  }
+
   @DeleteMapping("/{id}/static-ip")
   public UserDto clearStaticIp(@PathVariable String id) {
     return userAdminService.clearStaticIp(id);

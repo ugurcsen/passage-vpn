@@ -3,9 +3,9 @@ package com.opnl.vpn.network;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,6 +13,7 @@ import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.network.ServerConfig.Protocol;
 import com.opnl.vpn.profile.ProfileType;
+import com.opnl.vpn.setting.SettingKeys;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -223,6 +224,7 @@ class DaemonServiceTest {
     when(repository.findAll()).thenReturn(List.of(primary()));
     when(repository.save(any(Daemon.class))).thenAnswer(inv -> inv.getArgument(0));
     when(repository.findAllByOrderByDaemonIndexAsc()).thenReturn(List.of(primary()));
+    when(settingRepository.findById(SettingKeys.NETWORK_MODE)).thenReturn(Optional.empty());
 
     service.create(
         new DaemonService.DaemonRequest(
@@ -241,7 +243,7 @@ class DaemonServiceTest {
             null,
             true));
 
-    verify(configWriter).writeDaemon(any(), any(), any());
+    verify(configWriter).writeDaemon(any(), any(), any(), any());
   }
 
   @Test
@@ -270,11 +272,39 @@ class DaemonServiceTest {
     disabled.setEnabled(false);
     when(repository.findByDaemonIndex(0)).thenReturn(Optional.of(primary()));
     when(repository.findAllByOrderByDaemonIndexAsc()).thenReturn(List.of(primary(), disabled));
+    when(settingRepository.findById(SettingKeys.NETWORK_MODE)).thenReturn(Optional.empty());
 
     service.writeAll();
 
-    verify(configWriter).writeDaemon(any(), any(), any());
+    verify(configWriter).writeDaemon(any(), any(), any(), eq("nat"));
     verify(configWriter).removeDaemon(1);
-    verifyNoInteractions(settingRepository);
+  }
+
+  @Test
+  void writeAllPassesRoutedNetworkModeToConfigWriter() {
+    when(repository.findByDaemonIndex(0)).thenReturn(Optional.of(primary()));
+    when(repository.findAllByOrderByDaemonIndexAsc()).thenReturn(List.of(primary()));
+    when(settingRepository.findById(SettingKeys.NETWORK_MODE))
+        .thenReturn(
+            Optional.of(
+                ServerSetting.builder().key(SettingKeys.NETWORK_MODE).value("\"routed\"").build()));
+
+    service.writeAll();
+
+    verify(configWriter).writeDaemon(any(), any(), any(), eq("routed"));
+  }
+
+  @Test
+  void writeAllDefaultsToNatForUnrecognizedNetworkMode() {
+    when(repository.findByDaemonIndex(0)).thenReturn(Optional.of(primary()));
+    when(repository.findAllByOrderByDaemonIndexAsc()).thenReturn(List.of(primary()));
+    when(settingRepository.findById(SettingKeys.NETWORK_MODE))
+        .thenReturn(
+            Optional.of(
+                ServerSetting.builder().key(SettingKeys.NETWORK_MODE).value("bridged").build()));
+
+    service.writeAll();
+
+    verify(configWriter).writeDaemon(any(), any(), any(), eq("nat"));
   }
 }

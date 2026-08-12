@@ -1,10 +1,12 @@
 package com.opnl.vpn.api.admin;
 
+import com.opnl.vpn.ccd.CcdService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.group.Group;
 import com.opnl.vpn.group.GroupMember;
 import com.opnl.vpn.group.GroupMemberRepository;
 import com.opnl.vpn.group.GroupRepository;
+import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
@@ -22,16 +24,19 @@ public class GroupAdminService {
   private final GroupMemberRepository memberRepository;
   private final UserRepository userRepository;
   private final SettingsService settingsService;
+  private final CcdService ccdService;
 
   public GroupAdminService(
       GroupRepository groupRepository,
       GroupMemberRepository memberRepository,
       UserRepository userRepository,
-      SettingsService settingsService) {
+      SettingsService settingsService,
+      CcdService ccdService) {
     this.groupRepository = groupRepository;
     this.memberRepository = memberRepository;
     this.userRepository = userRepository;
     this.settingsService = settingsService;
+    this.ccdService = ccdService;
   }
 
   @Transactional(readOnly = true)
@@ -121,6 +126,25 @@ public class GroupAdminService {
     requireGroup(id);
     settingsService.setGroupSetting(id, key, value);
     return settingsService.groupSettings(id);
+  }
+
+  @Transactional(readOnly = true)
+  public String staticIpPool(String id) {
+    requireGroup(id);
+    Object pool = settingsService.groupSettings(id).get(SettingKeys.STATIC_IP_POOL);
+    return pool == null ? null : pool.toString();
+  }
+
+  @Transactional
+  public String setStaticIpPool(String id, String pool) {
+    requireGroup(id);
+    ccdService.validatePool(pool);
+    if (pool == null || pool.isBlank()) {
+      settingsService.deleteGroupSetting(id, SettingKeys.STATIC_IP_POOL);
+    } else {
+      settingsService.setGroupSetting(id, SettingKeys.STATIC_IP_POOL, pool.trim());
+    }
+    return staticIpPool(id);
   }
 
   @Transactional

@@ -16,9 +16,25 @@ const rules = [
     action: "ALLOW" as const,
     protocol: "TCP" as const,
     dstCidr: "10.0.0.0/8",
+    dstGroupId: null,
+    dstGroupName: null,
     dstPort: 443,
     enabled: true,
     priority: 1,
+  },
+  {
+    id: "r2",
+    targetType: "GLOBAL" as const,
+    targetId: null,
+    targetName: null,
+    action: "DENY" as const,
+    protocol: null,
+    dstCidr: null,
+    dstGroupId: "g1",
+    dstGroupName: "devs",
+    dstPort: null,
+    enabled: true,
+    priority: 2,
   },
 ];
 
@@ -66,7 +82,7 @@ describe("AccessRulesPage", () => {
   it("renders a global rule row", async () => {
     renderPage();
 
-    expect(await screen.findByText("All users")).toBeInTheDocument();
+    expect((await screen.findAllByText("All users")).length).toBeGreaterThan(0);
     expect(screen.getByText("ALLOW")).toBeInTheDocument();
     expect(screen.getByText("10.0.0.0/8:443")).toBeInTheDocument();
   });
@@ -74,7 +90,7 @@ describe("AccessRulesPage", () => {
   it("creates a global rule without a target select", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("All users");
+    await screen.findAllByText("All users");
 
     await user.click(screen.getByRole("button", { name: /new rule/i }));
     const dialog = screen.getByRole("dialog");
@@ -107,7 +123,7 @@ describe("AccessRulesPage", () => {
   it("creates a user-scoped rule with the chosen target", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("All users");
+    await screen.findAllByText("All users");
 
     await user.click(screen.getByRole("button", { name: /new rule/i }));
     const dialog = screen.getByRole("dialog");
@@ -133,10 +149,44 @@ describe("AccessRulesPage", () => {
     });
   });
 
+  it("creates a rule targeting a destination group", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findAllByText("All users");
+
+    await user.click(screen.getByRole("button", { name: /new rule/i }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("combobox", { name: /destination group/i }));
+    await user.click(await screen.findByRole("option", { name: "devs" }));
+    await user.click(within(dialog).getByRole("button", { name: /^create$/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, opts]) => url === "/api/admin/rules" && opts?.method === "POST",
+      );
+      expect(post).toBeDefined();
+    });
+    const [, opts] = fetchMock.mock.calls.find(
+      ([url, o]) => url === "/api/admin/rules" && o?.method === "POST",
+    )!;
+    expect(JSON.parse(String(opts!.body))).toMatchObject({
+      targetType: "GLOBAL",
+      dstGroupId: "g1",
+      dstCidr: null,
+    });
+  });
+
+  it("renders a destination group column", async () => {
+    renderPage();
+
+    expect(await screen.findByText("Group: devs")).toBeInTheDocument();
+  });
+
   it("toggles a rule enabled state", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("All users");
+    await screen.findAllByText("All users");
 
     const switchEl = document.body.querySelector("input[type='checkbox']");
     expect(switchEl).not.toBeNull();

@@ -50,6 +50,17 @@ public class GroupAdminController {
     return groupAdminService.memberIds(id);
   }
 
+  @GetMapping("/{id}/static-ip-pool")
+  public String staticIpPool(@PathVariable String id) {
+    return groupAdminService.staticIpPool(id);
+  }
+
+  @PutMapping("/{id}/static-ip-pool")
+  public String setStaticIpPool(
+      @PathVariable String id, @Valid @RequestBody StaticIpPoolRequest request) {
+    return groupAdminService.setStaticIpPool(id, request.pool());
+  }
+
   @PutMapping("/{id}/members")
   public GroupDto setMembers(
       @PathVariable String id, @Valid @RequestBody GroupMembersRequest request) {

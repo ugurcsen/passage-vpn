@@ -159,6 +159,7 @@ export function SettingsPage() {
   };
 
   const toggleKnown = (key: string, checked: boolean) => save.mutate({ key, value: checked });
+  const toggleChoice = (key: string, value: string) => save.mutate({ key, value });
 
   return (
     <Box>
@@ -244,6 +245,22 @@ export function SettingsPage() {
                             {v === true || v === "true" ? "On" : "Off"}
                           </Typography>
                         </Stack>
+                      ) : setting.type === "choice" ? (
+                        <TextField
+                          select
+                          size="small"
+                          value={v === null || v === undefined ? "" : String(v)}
+                          onChange={(e) => toggleChoice(k, e.target.value)}
+                          disabled={save.isPending}
+                          inputProps={{ "aria-label": setting.label }}
+                          sx={{ minWidth: 140 }}
+                        >
+                          {(setting.options ?? []).map((opt) => (
+                            <MenuItem key={opt} value={opt}>
+                              {opt}
+                            </MenuItem>
+                          ))}
+                        </TextField>
                       ) : (
                         <Typography variant="body2" color="text.secondary">
                           {displaySetting(setting.type, v)}
@@ -507,6 +524,20 @@ export function SettingsPage() {
                 }
                 label={dialog?.value === "true" ? "On" : "Off"}
               />
+            ) : dialogType === "choice" ? (
+              <TextField
+                select
+                label="Value"
+                value={dialog?.value ?? ""}
+                onChange={(e) => setDialog((d) => (d ? { ...d, value: e.target.value } : d))}
+                helperText={dialogSetting?.description}
+              >
+                {(dialogSetting?.options ?? []).map((opt) => (
+                  <MenuItem key={opt} value={opt}>
+                    {opt}
+                  </MenuItem>
+                ))}
+              </TextField>
             ) : dialogType === "number" ? (
               <TextField
                 label="Value"

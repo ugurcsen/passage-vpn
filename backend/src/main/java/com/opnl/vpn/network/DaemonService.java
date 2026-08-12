@@ -4,6 +4,7 @@ import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.network.ServerConfig.Protocol;
 import com.opnl.vpn.profile.ProfileType;
+import com.opnl.vpn.setting.SettingKeys;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -79,9 +80,10 @@ public class DaemonService {
   @Transactional
   public void writeAll() {
     ensurePrimary();
+    String networkMode = networkMode();
     for (Daemon daemon : repository.findAllByOrderByDaemonIndexAsc()) {
       if (daemon.isEnabled()) {
-        configWriter.writeDaemon(toServerConfig(daemon), generator, properties);
+        configWriter.writeDaemon(toServerConfig(daemon), generator, properties, networkMode);
       } else {
         configWriter.removeDaemon(daemon.getDaemonIndex());
       }
@@ -260,6 +262,24 @@ public class DaemonService {
         .findById(NETWORK_SETTING_KEY)
         .map(s -> generator.fromJson(s.getValue()))
         .orElseGet(ServerConfig::defaults);
+  }
+
+  /**
+   * Resolves the server-wide traffic mode from the {@code network_mode} setting. Values are stored
+   * JSON-encoded, so surrounding quotes are stripped. Anything other than "routed" means NAT.
+   */
+  private String networkMode() {
+    return settingRepository
+        .findById(SettingKeys.NETWORK_MODE)
+        .map(ServerSetting::getValue)
+        .map(v -> v == null ? "nat" : v.trim())
+        .map(
+            v ->
+                v.length() >= 2 && v.charAt(0) == '"' && v.charAt(v.length() - 1) == '"'
+                    ? v.substring(1, v.length() - 1)
+                    : v)
+        .filter(v -> v.equals("nat") || v.equals("routed"))
+        .orElse("nat");
   }
 
   private Daemon toEntity(ServerConfig config, int daemonIndex) {

@@ -1,5 +1,12 @@
 /** Editor type used for a known setting value. */
-export type SettingValueType = "string" | "number" | "boolean" | "list" | "serverConfig" | "json";
+export type SettingValueType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "list"
+  | "serverConfig"
+  | "json"
+  | "choice";
 
 /** Metadata describing a well-known server setting so it can be edited with a friendly control. */
 export interface KnownSetting {
@@ -13,6 +20,8 @@ export interface KnownSetting {
   type: SettingValueType;
   /** Placeholder for text-based editors. */
   placeholder?: string;
+  /** Allowed values for `choice`-typed settings (rendered as a select). */
+  options?: string[];
 }
 
 /**
@@ -75,6 +84,13 @@ export const KNOWN_SETTINGS: KnownSetting[] = [
     type: "boolean",
   },
   {
+    key: "tunnel_mode",
+    label: "Tunnel mode",
+    description: "Full tunnel routes all traffic through the VPN; split tunnel routes only the configured networks.",
+    type: "string",
+    placeholder: "full or split",
+  },
+  {
     key: "account_disabled",
     label: "Account disabled",
     description: "Deny VPN connections entirely for the account.",
@@ -85,6 +101,13 @@ export const KNOWN_SETTINGS: KnownSetting[] = [
     label: "Must change password",
     description: "Force the account to set a new password at its next login.",
     type: "boolean",
+  },
+  {
+    key: "network_mode",
+    label: "Network mode",
+    description: "nat masks client traffic behind the server; routed keeps client source IPs and relies on return routes.",
+    type: "choice",
+    options: ["nat", "routed"],
   },
 ];
 

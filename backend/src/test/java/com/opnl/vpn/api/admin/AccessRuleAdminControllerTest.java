@@ -67,6 +67,8 @@ class AccessRuleAdminControllerTest {
             Action.ALLOW,
             Protocol.TCP,
             "192.168.0.0/24",
+            null,
+            null,
             443,
             true,
             null);

@@ -18,7 +18,8 @@ class ServerConfigGeneratorTest {
 
   @Test
   void fullTunnelPushesRedirectGateway() {
-    String conf = generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs");
+    String conf =
+        generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs", "nat");
     assertThat(conf).contains("push \"redirect-gateway def1 bypass-dhcp\"");
     assertThat(conf).contains("port 1194");
     assertThat(conf).contains("proto udp");
@@ -48,7 +49,7 @@ class ServerConfigGeneratorTest {
             false,
             true,
             "vpn.example.com");
-    String conf = generator.render(split, "/pki", "/ccd", "/scripts", "/logs");
+    String conf = generator.render(split, "/pki", "/ccd", "/scripts", "/logs", "nat");
     assertThat(conf).doesNotContain("redirect-gateway");
     assertThat(conf).contains("proto tcp");
     assertThat(conf).contains("port 1195");
@@ -74,9 +75,22 @@ class ServerConfigGeneratorTest {
             true,
             true,
             "vpn.example.com");
-    String conf = generator.render(generic, "/pki", "/ccd", "/scripts", "/logs");
+    String conf = generator.render(generic, "/pki", "/ccd", "/scripts", "/logs", "nat");
     assertThat(conf).contains("verify-client-cert none");
     assertThat(conf).doesNotContain("client-cert-not-required");
+  }
+
+  @Test
+  void renderSurfacesNetworkMode() {
+    String routed =
+        generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs", "routed");
+    assertThat(routed).contains("# network-mode routed");
+    String nat =
+        generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs", "nat");
+    assertThat(nat).contains("# network-mode nat");
+    String blank =
+        generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs", null);
+    assertThat(blank).contains("# network-mode nat");
   }
 
   @Test
@@ -94,7 +108,8 @@ class ServerConfigGeneratorTest {
 
   @Test
   void renderSubstitutesEveryPlaceholder() {
-    String conf = generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs");
+    String conf =
+        generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs", "nat");
     for (String token :
         List.of(
             "__PORT__",
@@ -102,6 +117,7 @@ class ServerConfigGeneratorTest {
             "__MGMT_PORT__",
             "__SUBNET__",
             "__SUBNET_MASK__",
+            "__NETWORK_MODE__",
             "__PKI_DIR__",
             "__CCD_DIR__",
             "__SCRIPTS_DIR__",

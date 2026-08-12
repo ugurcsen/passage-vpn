@@ -26,12 +26,24 @@ extract_pool() {
     [[ -n "$net" && -n "$mask" ]] && echo "$net/$(mask_to_prefix "$mask")"
 }
 
-if [ -n "$(ls "$OPNL_CONFIG_DIR"/daemon-*.conf 2>/dev/null)" ]; then
-    pool="$(extract_pool "$(ls "$OPNL_CONFIG_DIR"/daemon-*.conf 2>/dev/null | head -1)")"
-    if [[ -n "$pool" ]]; then
-        OPNL_VPN_POOL="$pool" /etc/openvpn/scripts/apply-rules.sh
-    fi
-fi
+extract_mode() {
+    local conf="$1" mode
+    mode="$(grep -m1 '^# network-mode ' "$conf" 2>/dev/null | awk '{print $3}')"
+    echo "${mode:-nat}"
+}
+
+# (Re)applies the base firewall for the first daemon's pool. Runs after daemons
+# are up so routed mode can install its tun return route; re-run on config
+# reloads so pool/mode changes refresh NAT or return routes.
+reapply_rules() {
+    local conf pool mode
+    conf="$(ls "$OPNL_CONFIG_DIR"/daemon-*.conf 2>/dev/null | head -1 || true)"
+    [[ -z "$conf" ]] && return 0
+    pool="$(extract_pool "$conf" 2>/dev/null || true)"
+    [[ -z "$pool" ]] && return 0
+    mode="$(extract_mode "$conf" 2>/dev/null || true)"
+    OPNL_VPN_POOL="$pool" OPNL_NETWORK_MODE="$mode" /etc/openvpn/scripts/apply-rules.sh || true
+}
 
 start_daemon() {
     local conf="$1"
@@ -67,6 +79,7 @@ restart_all() {
     for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do
         start_daemon "$conf" || true
     done
+    reapply_rules
 }
 
 # Start whatever is present on boot.
@@ -75,6 +88,10 @@ for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do
     start_daemon "$conf"
     boot_sig="$(conf_sig)"
 done
+
+# Base firewall (NAT or routed) after daemons are up so routed mode can install
+# its return route; re-applied on every config reload via restart_all.
+reapply_rules
 
 if [ -z "$boot_sig" ]; then
     echo "[entrypoint] no daemon configs found; waiting for backend to provision."

@@ -27,7 +27,12 @@ public class ServerConfigGenerator {
   }
 
   public String render(
-      ServerConfig config, String pkiDir, String ccdDir, String scriptsDir, String logDir) {
+      ServerConfig config,
+      String pkiDir,
+      String ccdDir,
+      String scriptsDir,
+      String logDir,
+      String networkMode) {
     String template;
     try {
       template = new ClassPathResource(TEMPLATE_PATH).getContentAsString(StandardCharsets.UTF_8);
@@ -44,6 +49,7 @@ public class ServerConfigGenerator {
         .replace("__MGMT_PORT__", String.valueOf(mgmtPort))
         .replace("__SUBNET__", config.subnet())
         .replace("__SUBNET_MASK__", config.subnetMask())
+        .replace("__NETWORK_MODE__", normalizeMode(networkMode))
         .replace("__PKI_DIR__", pkiDir)
         .replace("__CCD_DIR__", ccdDir)
         .replace("__SCRIPTS_DIR__", scriptsDir)
@@ -67,6 +73,10 @@ public class ServerConfigGenerator {
         .replace("__DNS_PUSH__", renderDnsPushes(config))
         .replace("__ROUTE_PUSH__", renderRoutePushes(config))
         .replace("__EXTRA_PUSH__", renderExtraPushes(config));
+  }
+
+  private static String normalizeMode(String mode) {
+    return "routed".equalsIgnoreCase(mode) ? "routed" : "nat";
   }
 
   private String renderDnsPushes(ServerConfig config) {

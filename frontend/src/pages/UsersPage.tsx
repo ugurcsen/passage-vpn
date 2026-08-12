@@ -10,11 +10,13 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
   InputAdornment,
   MenuItem,
   Paper,
   Stack,
+  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -24,10 +26,12 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import BlockIcon from "@mui/icons-material/Block";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ClearIcon from "@mui/icons-material/Clear";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import KeyIcon from "@mui/icons-material/Key";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import SearchIcon from "@mui/icons-material/Search";
+import TuneIcon from "@mui/icons-material/Tune";
 import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
 import { api, copyToClipboard, endpoints, type MfaSetup } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,6 +51,7 @@ interface UserRow {
   groups: string[];
   createdAt?: string;
   lastLoginAt?: string;
+  staticIp?: string;
 }
 
 interface GroupRow {
@@ -103,6 +108,13 @@ export function UsersPage() {
   const [mfaSetup, setMfaSetup] = useState<MfaSetup | null>(null);
   const [mfaCode, setMfaCode] = useState("");
   const [mfaDisableConfirm, setMfaDisableConfirm] = useState(false);
+  const [ccdTarget, setCcdTarget] = useState<UserRow | null>(null);
+  const [ccdDns, setCcdDns] = useState("");
+  const [ccdDomain, setCcdDomain] = useState("");
+  const [ccdRoutes, setCcdRoutes] = useState("");
+  const [ccdMfaOnConnect, setCcdMfaOnConnect] = useState(false);
+  const [ccdTunnelMode, setCcdTunnelMode] = useState("" as "" | "full" | "split");
+  const [ccdStaticIp, setCcdStaticIp] = useState("");
 
   const canManageMfa = currentUser?.role === "ADMIN";
 
@@ -240,6 +252,84 @@ export function UsersPage() {
     else toast.error("Copy failed");
   };
 
+  const openCcdEditor = async (row: UserRow) => {
+    setCcdTarget(row);
+    setCcdDns("");
+    setCcdDomain("");
+    setCcdRoutes("");
+    setCcdMfaOnConnect(false);
+    setCcdTunnelMode("");
+    setCcdStaticIp(row.staticIp ?? "");
+    try {
+      const settings = await api<Record<string, unknown>>(
+        endpoints.users + `/${row.id}/settings`,
+      );
+      setCcdDns(Array.isArray(settings.dns_servers) ? settings.dns_servers.join(", ") : String(settings.dns_servers ?? ""));
+      setCcdDomain(String(settings.dns_domain ?? ""));
+      setCcdRoutes(Array.isArray(settings.route_restriction) ? settings.route_restriction.join(", ") : String(settings.route_restriction ?? ""));
+      setCcdMfaOnConnect(settings.require_mfa_on_connect === true);
+      const mode = settings.tunnel_mode;
+      setCcdTunnelMode(mode === "full" || mode === "split" ? mode : "");
+    } catch {
+      toast.error("Failed to load per-user settings");
+    }
+  };
+
+  const closeCcdEditor = () => setCcdTarget(null);
+
+  const saveCcdSettings = useMutation({
+    mutationFn: async () => {
+      if (!ccdTarget) return;
+      const base = endpoints.users + `/${ccdTarget.id}/settings`;
+      await api(base + "/dns_servers", { method: "PUT", body: JSON.stringify(ccdDns) });
+      await api(base + "/dns_domain", { method: "PUT", body: JSON.stringify(ccdDomain) });
+      await api(base + "/route_restriction", { method: "PUT", body: JSON.stringify(ccdRoutes) });
+      await api(base + "/require_mfa_on_connect", {
+        method: "PUT",
+        body: JSON.stringify(ccdMfaOnConnect),
+      });
+      await api(base + "/tunnel_mode", { method: "PUT", body: JSON.stringify(ccdTunnelMode) });
+    },
+    onSuccess: () => {
+      toast.success("Per-user settings saved");
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Save failed"),
+  });
+
+  const saveStaticIp = useMutation({
+    mutationFn: async (ip: string) => {
+      if (!ccdTarget) return;
+      if (ip.trim()) {
+        await api(endpoints.users + `/${ccdTarget.id}/static-ip`, {
+          method: "PUT",
+          body: JSON.stringify({ staticIp: ip.trim() }),
+        });
+      } else {
+        await api(endpoints.users + `/${ccdTarget.id}/static-ip`, { method: "DELETE" });
+      }
+    },
+    onSuccess: () => {
+      toast.success("Static IP updated");
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Update failed"),
+  });
+
+  const allocateStaticIp = useMutation({
+    mutationFn: async () => {
+      if (!ccdTarget) return;
+      return api(endpoints.users + `/${ccdTarget.id}/static-ip/allocate`, { method: "POST" });
+    },
+    onSuccess: (updated) => {
+      toast.success("Static IP allocated");
+      const row = updated as unknown as UserRow;
+      setCcdStaticIp(row.staticIp ?? "");
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Allocation failed"),
+  });
+
   const bulkMutation = useMutation({
     mutationFn: ({ action, ids }: { action: "ban" | "unban" | "delete"; ids: string[] }) =>
       api(endpoints.users + "/bulk", {
@@ -341,9 +431,23 @@ export function UsersPage() {
       renderCell: (params) => <Typography variant="body2">{formatDateTime(params.value as string)}</Typography>,
     },
     {
+      field: "staticIp",
+      headerName: "Static IP",
+      width: 130,
+      valueGetter: (_, row) => (row as UserRow).staticIp ?? "",
+      renderCell: (params) =>
+        params.value ? (
+          <Chip label={params.value as string} size="small" variant="outlined" color="info" />
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            —
+          </Typography>
+        ),
+    },
+    {
       field: "actions",
       headerName: "Actions",
-      width: 200,
+      width: 250,
       sortable: false,
       filterable: false,
       renderCell: (params) => {
@@ -363,6 +467,11 @@ export function UsersPage() {
             <Tooltip title="Reset password">
               <IconButton size="small" onClick={() => setResetTarget(row)}>
                 <KeyIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="CCD settings">
+              <IconButton size="small" onClick={() => openCcdEditor(row)} data-testid={`edit-ccd-${row.username}`}>
+                <TuneIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             {canManageMfa && (
@@ -679,6 +788,121 @@ export function UsersPage() {
           ) : (
             <Button onClick={closeMfaDialog}>Close</Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!ccdTarget} onClose={closeCcdEditor} maxWidth="sm" fullWidth>
+        <DialogTitle>CCD settings — {ccdTarget?.username}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 1 }}>
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                Static IP
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <TextField
+                  size="small"
+                  placeholder="e.g. 10.8.0.42"
+                  value={ccdStaticIp}
+                  onChange={(e) => setCcdStaticIp(e.target.value)}
+                  sx={{ flex: 1 }}
+                  helperText={ccdTarget?.staticIp ? "Override the group pool allocation." : "Leave empty to clear."}
+                />
+                <Button
+                  variant="outlined"
+                  startIcon={<TuneIcon />}
+                  disabled={saveStaticIp.isPending}
+                  onClick={() => saveStaticIp.mutate(ccdStaticIp)}
+                >
+                  Set
+                </Button>
+                <Button
+                  variant="contained"
+                  disabled={allocateStaticIp.isPending}
+                  onClick={() => allocateStaticIp.mutate()}
+                  title="Allocate next free IP from the group pool"
+                >
+                  {allocateStaticIp.isPending ? <CircularProgress size={18} /> : "Allocate"}
+                </Button>
+                {ccdTarget?.staticIp && (
+                  <Tooltip title="Clear static IP">
+                    <IconButton
+                      size="small"
+                      disabled={saveStaticIp.isPending}
+                      onClick={() => {
+                        setCcdStaticIp("");
+                        saveStaticIp.mutate("");
+                      }}
+                    >
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Stack>
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                Per-user settings (override group/server defaults)
+              </Typography>
+              <Stack spacing={2}>
+                <TextField
+                  label="DNS servers"
+                  size="small"
+                  placeholder="e.g. 1.1.1.1, 8.8.8.8"
+                  value={ccdDns}
+                  onChange={(e) => setCcdDns(e.target.value)}
+                  helperText="Comma-separated DNS servers pushed to this client."
+                />
+                <TextField
+                  label="DNS domain"
+                  size="small"
+                  placeholder="e.g. vpn.example.com"
+                  value={ccdDomain}
+                  onChange={(e) => setCcdDomain(e.target.value)}
+                  helperText="Search domain pushed to this client."
+                />
+                <TextField
+                  label="Tunnel mode"
+                  size="small"
+                  select
+                  value={ccdTunnelMode}
+                  onChange={(e) => setCcdTunnelMode(e.target.value as "" | "full" | "split")}
+                  helperText="Full routes all traffic through the VPN; split routes only the networks below. Empty inherits the group/server default."
+                >
+                  <MenuItem value="">Inherit default</MenuItem>
+                  <MenuItem value="full">Full tunnel</MenuItem>
+                  <MenuItem value="split">Split tunnel</MenuItem>
+                </TextField>
+                <TextField
+                  label="Route restriction"
+                  size="small"
+                  placeholder="e.g. 10.0.0.0/8, 192.168.0.0/16"
+                  value={ccdRoutes}
+                  onChange={(e) => setCcdRoutes(e.target.value)}
+                  helperText="Comma-separated CIDRs this client may reach. Empty allows all."
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={ccdMfaOnConnect}
+                      onChange={(e) => setCcdMfaOnConnect(e.target.checked)}
+                    />
+                  }
+                  label="Require MFA on connect"
+                />
+              </Stack>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeCcdEditor}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={saveCcdSettings.isPending}
+            onClick={() => saveCcdSettings.mutate()}
+          >
+            {saveCcdSettings.isPending ? <CircularProgress size={18} /> : "Save"}
+          </Button>
         </DialogActions>
       </Dialog>
 

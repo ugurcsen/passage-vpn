@@ -43,7 +43,18 @@ class AccessRuleServiceTest {
 
   private AccessRuleDto dto(TargetType type, String targetId, Action action) {
     return new AccessRuleDto(
-        null, type, targetId, null, action, Protocol.TCP, "10.0.0.0/8", 443, true, null);
+        null,
+        type,
+        targetId,
+        null,
+        action,
+        Protocol.TCP,
+        "10.0.0.0/8",
+        null,
+        null,
+        443,
+        true,
+        null);
   }
 
   @Test
@@ -186,5 +197,104 @@ class AccessRuleServiceTest {
 
     assertThat(rules).hasSize(1);
     assertThat(rules.get(0).targetName()).isEqualTo("devs");
+  }
+
+  @Test
+  void createStoresAndResolvesDstGroup() {
+    Group devs = Group.builder().id("g2").name("devs").build();
+    when(groupRepository.findById("g2")).thenReturn(Optional.of(devs));
+    when(ruleRepository.findAll()).thenReturn(List.of());
+
+    AccessRuleDto dto =
+        new AccessRuleDto(
+            null,
+            TargetType.GLOBAL,
+            null,
+            null,
+            Action.ALLOW,
+            null,
+            null,
+            "g2",
+            null,
+            null,
+            true,
+            null);
+    AccessRuleDto created = service.create(dto);
+
+    assertThat(created.dstGroupId()).isEqualTo("g2");
+    assertThat(created.dstGroupName()).isEqualTo("devs");
+  }
+
+  @Test
+  void createValidatesDstGroup() {
+    when(groupRepository.findById("ghost")).thenReturn(Optional.empty());
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new AccessRuleDto(
+                        null,
+                        TargetType.GLOBAL,
+                        null,
+                        null,
+                        Action.ALLOW,
+                        null,
+                        null,
+                        "ghost",
+                        null,
+                        null,
+                        true,
+                        null)))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "dst_group_not_found");
+  }
+
+  @Test
+  void updateAppliesDstGroup() {
+    AccessRule existing =
+        AccessRule.builder().id("r1").targetType(TargetType.GLOBAL).action(Action.ALLOW).build();
+    when(ruleRepository.findById("r1")).thenReturn(Optional.of(existing));
+    when(groupRepository.findById("g2"))
+        .thenReturn(Optional.of(Group.builder().id("g2").name("devs").build()));
+
+    AccessRuleDto updated =
+        service.update(
+            "r1",
+            new AccessRuleDto(
+                null,
+                TargetType.GLOBAL,
+                null,
+                null,
+                Action.DENY,
+                null,
+                null,
+                "g2",
+                null,
+                null,
+                true,
+                null));
+
+    assertThat(updated.dstGroupId()).isEqualTo("g2");
+    assertThat(existing.getDstGroupId()).isEqualTo("g2");
+  }
+
+  @Test
+  void setEnabledPreservesDstGroupName() {
+    AccessRule existing =
+        AccessRule.builder()
+            .id("r1")
+            .targetType(TargetType.GLOBAL)
+            .action(Action.ALLOW)
+            .dstGroupId("g2")
+            .enabled(true)
+            .build();
+    when(ruleRepository.findById("r1")).thenReturn(Optional.of(existing));
+    when(groupRepository.findById("g2"))
+        .thenReturn(Optional.of(Group.builder().id("g2").name("devs").build()));
+
+    AccessRuleDto updated = service.setEnabled("r1", false);
+
+    assertThat(updated.dstGroupId()).isEqualTo("g2");
+    assertThat(updated.dstGroupName()).isEqualTo("devs");
+    assertThat(existing.isEnabled()).isFalse();
   }
 }

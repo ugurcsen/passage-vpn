@@ -234,6 +234,14 @@ public class UserAdminService {
     return getUser(id);
   }
 
+  /** Allocates the next free static IP from the user's group pool. */
+  @Transactional
+  public UserDto allocateStaticIp(String id) {
+    requireUser(id);
+    ccdService.allocateFromGroupPool(id);
+    return getUser(id);
+  }
+
   @Transactional
   public UserDto clearStaticIp(String id) {
     requireUser(id);

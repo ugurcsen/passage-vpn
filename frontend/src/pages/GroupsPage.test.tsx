@@ -49,6 +49,7 @@ describe("GroupsPage", () => {
           if (opts?.method === "POST") return Promise.resolve(json({ id: "g3" }));
           return Promise.resolve(json(groups));
         }
+        if (url.endsWith("/settings")) return Promise.resolve(json({}));
         return Promise.resolve(json([]));
       }),
     );
@@ -117,5 +118,80 @@ describe("GroupsPage", () => {
       ([url, o]) => url === "/api/admin/groups/g1/members" && o?.method === "PUT",
     )!;
     expect(JSON.parse(String(opts!.body))).toEqual({ userIds: ["u1"] });
+  });
+
+  it("sets a static IP pool for a group", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("devs");
+
+    await user.click(screen.getByTestId("edit-pool-devs"));
+    await screen.findByText(/static ip pool — devs/i);
+
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/ip range/i), {
+      target: { value: "10.8.0.100-10.8.0.199" },
+    });
+    await user.click(within(dialog).getByRole("button", { name: /save pool/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const put = fetchMock.mock.calls.find(
+        ([url, o]) => url === "/api/admin/groups/g1/static-ip-pool" && o?.method === "PUT",
+      );
+      expect(put).toBeDefined();
+    });
+    const [, opts] = fetchMock.mock.calls.find(
+      ([url, o]) => url === "/api/admin/groups/g1/static-ip-pool" && o?.method === "PUT",
+    )!;
+    expect(JSON.parse(String(opts!.body))).toEqual({ pool: "10.8.0.100-10.8.0.199" });
+  });
+
+  it("sets a tunnel mode for a group", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("devs");
+
+    const row = screen.getByRole("row", { name: /devs/i });
+    const actions = within(row).getAllByRole("button");
+    await user.click(actions[2]);
+
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByLabelText(/tunnel mode/i));
+    await user.click(await screen.findByRole("option", { name: /split tunnel/i }));
+    await user.click(within(dialog).getByRole("button", { name: /^save$/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const put = fetchMock.mock.calls.find(
+        ([url, o]) => url === "/api/admin/groups/g1/settings/tunnel_mode" && o?.method === "PUT",
+      );
+      expect(put).toBeDefined();
+    });
+    const [, opts] = fetchMock.mock.calls.find(
+      ([url, o]) => url === "/api/admin/groups/g1/settings/tunnel_mode" && o?.method === "PUT",
+    )!;
+    expect(JSON.parse(String(opts!.body))).toBe("split");
+  });
+
+  it("clears a group tunnel mode when left on inherit default", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("devs");
+
+    const row = screen.getByRole("row", { name: /devs/i });
+    const actions = within(row).getAllByRole("button");
+    await user.click(actions[2]);
+
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /^save$/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const del = fetchMock.mock.calls.find(
+        ([url, o]) => url === "/api/admin/groups/g1/settings/tunnel_mode" && o?.method === "DELETE",
+      );
+      expect(del).toBeDefined();
+    });
   });
 });

@@ -45,29 +45,36 @@ public class AccessRuleService {
                 AccessRuleDto.from(
                     rule,
                     targets.get(
-                        rule.getTargetType().name().toLowerCase() + ":" + rule.getTargetId())))
+                        rule.getTargetType().name().toLowerCase() + ":" + rule.getTargetId()),
+                    dstGroupName(rule.getDstGroupId())))
         .toList();
   }
 
   @Transactional
   public AccessRuleDto create(AccessRuleDto dto) {
     validateTarget(dto.targetType(), dto.targetId());
+    validateDestination(dto.dstGroupId());
     AccessRule rule = new AccessRule();
     rule.setId(UUID.randomUUID().toString());
     rule.setCreatedAt(java.time.Instant.now());
     apply(rule, dto);
     rule.setPriority(nextPriority());
     return AccessRuleDto.from(
-        ruleRepository.save(rule), targetName(dto.targetType(), dto.targetId()));
+        ruleRepository.save(rule),
+        targetName(dto.targetType(), dto.targetId()),
+        dstGroupName(dto.dstGroupId()));
   }
 
   @Transactional
   public AccessRuleDto update(String id, AccessRuleDto dto) {
     AccessRule rule = requireRule(id);
     validateTarget(dto.targetType(), dto.targetId());
+    validateDestination(dto.dstGroupId());
     apply(rule, dto);
     return AccessRuleDto.from(
-        ruleRepository.save(rule), targetName(dto.targetType(), dto.targetId()));
+        ruleRepository.save(rule),
+        targetName(dto.targetType(), dto.targetId()),
+        dstGroupName(dto.dstGroupId()));
   }
 
   @Transactional
@@ -80,7 +87,10 @@ public class AccessRuleService {
   public AccessRuleDto setEnabled(String id, boolean enabled) {
     AccessRule rule = requireRule(id);
     rule.setEnabled(enabled);
-    return AccessRuleDto.from(ruleRepository.save(rule), null);
+    return AccessRuleDto.from(
+        ruleRepository.save(rule),
+        targetName(rule.getTargetType(), rule.getTargetId()),
+        dstGroupName(rule.getDstGroupId()));
   }
 
   /** Renders the per-client iptables commands for an active connection. */
@@ -95,6 +105,7 @@ public class AccessRuleService {
     rule.setAction(dto.action());
     rule.setProtocol(dto.protocol());
     rule.setDstCidr(dto.dstCidr());
+    rule.setDstGroupId(dto.dstGroupId());
     rule.setDstPort(dto.dstPort());
     rule.setEnabled(dto.enabled() == null || dto.enabled());
   }
@@ -122,6 +133,22 @@ public class AccessRuleService {
     if (type == AccessRule.TargetType.GROUP && groupRepository.findById(targetId).isEmpty()) {
       throw ApiException.notFound("group_not_found", "Target group not found");
     }
+  }
+
+  private void validateDestination(String dstGroupId) {
+    if (dstGroupId == null || dstGroupId.isBlank()) {
+      return;
+    }
+    if (groupRepository.findById(dstGroupId).isEmpty()) {
+      throw ApiException.notFound("dst_group_not_found", "Destination group not found");
+    }
+  }
+
+  private String dstGroupName(String dstGroupId) {
+    if (dstGroupId == null || dstGroupId.isBlank()) {
+      return null;
+    }
+    return groupRepository.findById(dstGroupId).map(Group::getName).orElse(null);
   }
 
   private String targetName(AccessRule.TargetType type, String targetId) {

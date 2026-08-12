@@ -69,9 +69,13 @@ public class AccessRule {
   @Column(name = "src_cidr", length = 64)
   private String srcCidr;
 
-  /** Destination CIDR, e.g. 10.0.0.0/8. Null = any. */
+  /** Destination CIDR, e.g. 10.0.0.0/8. Null = any. Mutually exclusive with dstGroupId. */
   @Column(name = "dst_cidr", length = 64)
   private String dstCidr;
+
+  /** When set, the destination is the target group's allocated subnet rather than a CIDR. */
+  @Column(name = "dst_group_id", length = 36)
+  private String dstGroupId;
 
   /** Destination port; null = any port. */
   @Column(name = "dst_port")

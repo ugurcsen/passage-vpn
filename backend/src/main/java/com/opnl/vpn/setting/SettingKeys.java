@@ -20,8 +20,17 @@ public final class SettingKeys {
   /** Static VPN IP for the account (CCD `ifconfig-push`). */
   public static final String STATIC_IP = "static_ip";
 
+  /** Group-level static IP pool, e.g. "10.8.0.100-10.8.0.199". */
+  public static final String STATIC_IP_POOL = "static_ip_pool";
+
   /** Restrict routing to these networks, comma separated. Empty = allow all. */
   public static final String ROUTE_RESTRICTION = "route_restriction";
+
+  /** How the VPN server forwards client traffic: "nat" (masquerade) or "routed" (no NAT). */
+  public static final String NETWORK_MODE = "network_mode";
+
+  /** Tunnel mode for the account: "full" (redirect all traffic) or "split" (routes only). */
+  public static final String TUNNEL_MODE = "tunnel_mode";
 
   /** Comma-separated DNS servers pushed to this account's clients. */
   public static final String DNS_SERVERS = "dns_servers";

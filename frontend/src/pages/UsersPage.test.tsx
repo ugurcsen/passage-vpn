@@ -94,6 +94,8 @@ describe("UsersPage", () => {
         if (url.includes("/mfa/setup")) return Promise.resolve(json(mfaSetup));
         if (url.includes("/mfa/enable")) return Promise.resolve(json(users[0]));
         if (url.includes("/mfa/disable")) return Promise.resolve(json(users[0]));
+        if (url.includes("/settings")) return Promise.resolve(json({}));
+        if (url.includes("/static-ip/allocate")) return Promise.resolve(json({ ...users[0], staticIp: "10.8.0.100" }));
         if (url.startsWith("/api/admin/groups")) return Promise.resolve(json(groups));
         return Promise.resolve(json(users));
       }),
@@ -233,6 +235,80 @@ describe("UsersPage", () => {
     });
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("opens the CCD editor and saves per-user settings", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("alice");
+
+    await user.click(screen.getByTestId("edit-ccd-alice"));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/static ip/i)).toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByLabelText(/dns servers/i), {
+      target: { value: "1.1.1.1, 8.8.8.8" },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/route restriction/i), {
+      target: { value: "10.0.0.0/8" },
+    });
+    await user.click(within(dialog).getByRole("button", { name: /^save$/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const put = fetchMock.mock.calls.find(
+        ([url, opts]) => url === "/api/admin/users/u1/settings/dns_servers" && opts?.method === "PUT",
+      );
+      expect(put).toBeDefined();
+    });
+    const [, opts] = fetchMock.mock.calls.find(
+      ([url, o]) => url === "/api/admin/users/u1/settings/dns_servers" && o?.method === "PUT",
+    )!;
+    expect(JSON.parse(String(opts!.body))).toBe("1.1.1.1, 8.8.8.8");
+  });
+
+  it("saves the tunnel mode in the CCD editor", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("alice");
+
+    await user.click(screen.getByTestId("edit-ccd-alice"));
+    const dialog = screen.getByRole("dialog");
+
+    await user.click(within(dialog).getByLabelText(/tunnel mode/i));
+    await user.click(await screen.findByRole("option", { name: /full tunnel/i }));
+    await user.click(within(dialog).getByRole("button", { name: /^save$/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const put = fetchMock.mock.calls.find(
+        ([url, opts]) => url === "/api/admin/users/u1/settings/tunnel_mode" && opts?.method === "PUT",
+      );
+      expect(put).toBeDefined();
+    });
+    const [, opts] = fetchMock.mock.calls.find(
+      ([url, o]) => url === "/api/admin/users/u1/settings/tunnel_mode" && o?.method === "PUT",
+    )!;
+    expect(JSON.parse(String(opts!.body))).toBe("full");
+  });
+
+  it("allocates a static IP from the group pool", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("alice");
+
+    await user.click(screen.getByTestId("edit-ccd-alice"));
+    const dialog = screen.getByRole("dialog");
+
+    await user.click(within(dialog).getByRole("button", { name: /^allocate$/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, opts]) => url === "/api/admin/users/u1/static-ip/allocate" && opts?.method === "POST",
+      );
+      expect(post).toBeDefined();
     });
   });
 });

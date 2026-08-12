@@ -13,6 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.opnl.vpn.common.GlobalExceptionHandler;
+import com.opnl.vpn.monitor.MgmtClientManager;
+import com.opnl.vpn.monitor.MgmtStatus;
 import com.opnl.vpn.network.Daemon;
 import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.network.DaemonService.DaemonRequest;
@@ -30,6 +32,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class DaemonAdminControllerTest {
 
   private DaemonService daemonService;
+  private MgmtClientManager mgmtClientManager;
   private MockMvc mvc;
 
   private Daemon daemon(int index, String name, int port, boolean clientCertNotRequired) {
@@ -54,8 +57,9 @@ class DaemonAdminControllerTest {
   @BeforeEach
   void setUp() {
     daemonService = mock(DaemonService.class);
+    mgmtClientManager = mock(MgmtClientManager.class);
     mvc =
-        MockMvcBuilders.standaloneSetup(new DaemonAdminController(daemonService))
+        MockMvcBuilders.standaloneSetup(new DaemonAdminController(daemonService, mgmtClientManager))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -70,6 +74,23 @@ class DaemonAdminControllerTest {
         .andExpect(jsonPath("$[0].name").value("Primary"))
         .andExpect(jsonPath("$[0].primary").value(true))
         .andExpect(jsonPath("$[0].enabled").value(true));
+  }
+
+  @Test
+  void listSurfacesCachedDcoWhenKnown() throws Exception {
+    when(daemonService.list()).thenReturn(List.of(daemon(0, "Primary", 1194, false)));
+    when(mgmtClientManager.cachedStatus(0))
+        .thenReturn(
+            new MgmtStatus(Instant.now(), "OpenVPN 2.6.12 x86_64 [DCO] [SSL]", 0, List.of(), true));
+
+    mvc.perform(get("/api/admin/daemons"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].dco").value(true));
+
+    when(mgmtClientManager.cachedStatus(0)).thenReturn(null);
+    mvc.perform(get("/api/admin/daemons"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].dco").doesNotExist());
   }
 
   @Test

@@ -17,11 +17,11 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 > phase sections below; this is the execution order.
 
 **P1 — finish Phase 3 gaps**
-- [ ] Static IP + CCD editor UI (backend ready: `CcdService`)
-- [ ] Group subnet allocation from pool + static IP from group settings
-- [ ] Per-user/group full-tunnel vs split-tunnel (now global only)
+- [x] Static IP + CCD editor UI (backend ready: `CcdService`)
+- [x] Group subnet allocation from pool + static IP from group settings
+- [x] Per-user/group full-tunnel vs split-tunnel (now global only)
 - [x] Per-daemon profile mapping (generic/auto-login daemons as first-class configs)
-- [ ] Inter-group connectivity rules + NAT-vs-routing mode
+- [x] Inter-group connectivity rules + NAT-vs-routing mode
 - [ ] `CertService` restore/rotate + expiry-warning scheduler
 - [~] Multi-daemon (`daemons` entity) + DCO detection display
 - [ ] Domain-based control via dnsmasq (advanced)
@@ -202,7 +202,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 ### 3.1 CCD (Client Config Dir)
 - [x] `CcdService` — per-user CCD files (static IP, routes, per-user directives)
-- [ ] Group subnet allocation from pool
+- [x] Group subnet allocation from pool
 - [x] Static IP conflict detection
 - [x] CCD written to shared volume, applied per connection
 
@@ -211,9 +211,9 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] `RuleEngine` — evaluate rules → iptables rule set
 - [x] iptables generator + `apply-rules.sh` (requires `NET_ADMIN`)
 - [x] End-to-end validated: ALLOW/DENY → ACCEPT/DROP targets; per-client chain enforced over live tunnel
-- [ ] Full-tunnel / split-tunnel per user/group
-- [ ] Inter-group connectivity rules
-- [ ] NAT vs routing mode
+- [x] Full-tunnel / split-tunnel per user/group
+- [x] Inter-group connectivity rules (dstGroupId target → pool range / member IPs)
+- [x] NAT vs routing mode (network_mode setting; apply-rules skips MASQUERADE in routed mode)
 - [ ] Domain-based control via dnsmasq (advanced)
 
 ### 3.3 Connection profiles (.ovpn)
@@ -227,7 +227,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Access rules editor page
 - [x] Profile download/QR/token management UI
 - [x] Client portal UI (self-service)
-- [ ] Static IP + CCD editor UI
+- [x] Static IP + CCD editor UI
 
 ## Phase 4 — Monitoring, Admin & Deployment
 

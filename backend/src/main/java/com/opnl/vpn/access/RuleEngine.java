@@ -1,7 +1,13 @@
 package com.opnl.vpn.access;
 
+import com.opnl.vpn.group.Group;
+import com.opnl.vpn.group.GroupMember;
 import com.opnl.vpn.group.GroupMemberRepository;
 import com.opnl.vpn.group.GroupRepository;
+import com.opnl.vpn.setting.SettingKeys;
+import com.opnl.vpn.setting.SettingsService;
+import com.opnl.vpn.user.User;
+import com.opnl.vpn.user.UserRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -21,14 +27,20 @@ public class RuleEngine {
   private final AccessRuleRepository ruleRepository;
   private final GroupMemberRepository memberRepository;
   private final GroupRepository groupRepository;
+  private final SettingsService settingsService;
+  private final UserRepository userRepository;
 
   public RuleEngine(
       AccessRuleRepository ruleRepository,
       GroupMemberRepository memberRepository,
-      GroupRepository groupRepository) {
+      GroupRepository groupRepository,
+      SettingsService settingsService,
+      UserRepository userRepository) {
     this.ruleRepository = ruleRepository;
     this.memberRepository = memberRepository;
     this.groupRepository = groupRepository;
+    this.settingsService = settingsService;
+    this.userRepository = userRepository;
   }
 
   /** All enabled rules that apply to a user: global, then group (child-first), then user-level. */
@@ -68,7 +80,15 @@ public class RuleEngine {
 
     String src = virtualIp == null || virtualIp.isBlank() ? "" : "-s " + virtualIp + " ";
     for (AccessRule rule : rules) {
-      apply.add("iptables -A " + chain + " " + args(rule, src) + " -j " + target(rule.getAction()));
+      for (String dst : destinationSpecs(rule)) {
+        apply.add(
+            "iptables -A "
+                + chain
+                + " "
+                + args(rule, src, dst)
+                + " -j "
+                + target(rule.getAction()));
+      }
     }
     // Default deny for clients with any rule.
     apply.add("iptables -A " + chain + " -j DROP");
@@ -78,6 +98,60 @@ public class RuleEngine {
     remove.add("iptables -F " + chain);
     remove.add("iptables -X " + chain);
     return new IptablesResult(apply, remove);
+  }
+
+  /**
+   * Resolves a rule's destination to one or more iptables match fragments. A {@code dstGroupId}
+   * rule targets the group's allocated subnet: the group's static IP pool range as an exact {@code
+   * --dst-range}, or the members' static IPs as individual /32 matches when no pool exists. An
+   * empty list means the destination cannot be resolved and the rule is skipped.
+   */
+  List<String> destinationSpecs(AccessRule rule) {
+    if (rule.getDstGroupId() != null && !rule.getDstGroupId().isBlank()) {
+      return groupDestinationSpecs(rule.getDstGroupId());
+    }
+    if (rule.getDstCidr() != null && !rule.getDstCidr().isBlank()) {
+      return List.of("-d " + rule.getDstCidr() + " ");
+    }
+    return List.of("");
+  }
+
+  private List<String> groupDestinationSpecs(String groupId) {
+    String pool = poolForGroupChain(groupId);
+    if (pool != null) {
+      return List.of("-m iprange --dst-range " + normalizeRange(pool) + " ");
+    }
+    List<String> specs = new ArrayList<>();
+    for (GroupMember member : memberRepository.findById_GroupId(groupId)) {
+      userRepository
+          .findById(member.getId().getUserId())
+          .map(User::getStaticIp)
+          .filter(ip -> ip != null && !ip.isBlank())
+          .ifPresent(ip -> specs.add("-d " + ip + "/32 "));
+    }
+    return specs;
+  }
+
+  /** The nearest static IP pool defined on the group or any of its ancestors, or null. */
+  private String poolForGroupChain(String groupId) {
+    String current = groupId;
+    while (current != null && !current.isBlank()) {
+      Object pool = settingsService.groupSettings(current).get(SettingKeys.STATIC_IP_POOL);
+      if (pool != null && !pool.toString().isBlank()) {
+        return pool.toString();
+      }
+      current = groupRepository.findById(current).map(Group::getParentId).orElse(null);
+    }
+    return null;
+  }
+
+  /** Normalizes a "start-end" pool expression into iptables iprange syntax. */
+  private String normalizeRange(String pool) {
+    String[] parts = pool.trim().split("-");
+    if (parts.length == 2) {
+      return parts[0].trim() + "-" + parts[1].trim();
+    }
+    return pool.trim();
   }
 
   /** Maps a rule action to a real iptables target (ALLOW/DENY are panel-level concepts). */
@@ -100,7 +174,7 @@ public class RuleEngine {
     return "OPNL_" + HexFormat.of().formatHex(digest, 0, 6);
   }
 
-  private String args(AccessRule rule, String src) {
+  private String args(AccessRule rule, String src, String dst) {
     StringBuilder sb = new StringBuilder();
     sb.append(src);
     if (rule.getProtocol() != null) {
@@ -110,9 +184,7 @@ public class RuleEngine {
       sb.append("--dport ").append(rule.getDstPort()).append(" ");
     }
     // The source is always the client's VPN IP (matched by the per-client chain jump).
-    if (rule.getDstCidr() != null && !rule.getDstCidr().isBlank()) {
-      sb.append("-d ").append(rule.getDstCidr()).append(" ");
-    }
+    sb.append(dst);
     return sb.toString().trim();
   }
 

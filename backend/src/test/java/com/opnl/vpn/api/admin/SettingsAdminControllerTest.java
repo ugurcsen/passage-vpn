@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opnl.vpn.common.GlobalExceptionHandler;
+import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.setting.SettingsService;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,15 +26,17 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class SettingsAdminControllerTest {
 
   private SettingsService settingsService;
+  private DaemonService daemonService;
   private MockMvc mvc;
   private ObjectMapper objectMapper;
 
   @BeforeEach
   void setUp() {
     settingsService = mock(SettingsService.class);
+    daemonService = mock(DaemonService.class);
     objectMapper = new ObjectMapper();
     mvc =
-        MockMvcBuilders.standaloneSetup(new SettingsAdminController(settingsService))
+        MockMvcBuilders.standaloneSetup(new SettingsAdminController(settingsService, daemonService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -84,6 +87,56 @@ class SettingsAdminControllerTest {
         .andExpect(jsonPath("$.code").value("validation_failed"));
 
     verify(settingsService, never()).setServerSetting(any(), any());
+  }
+
+  @Test
+  void putNetworkModeTriggersConfigRewrite() throws Exception {
+    when(settingsService.serverSettings()).thenReturn(Map.of("network_mode", "routed"));
+
+    mvc.perform(
+            put("/api/admin/settings/network_mode")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("value", "routed"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.network_mode").value("routed"));
+
+    verify(settingsService).setServerSetting("network_mode", "routed");
+    verify(daemonService).writeAll();
+  }
+
+  @Test
+  void putNetworkModeRejectsInvalidValue() throws Exception {
+    mvc.perform(
+            put("/api/admin/settings/network_mode")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("value", "bridged"))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("invalid_network_mode"));
+
+    verify(settingsService, never()).setServerSetting(any(), any());
+    verify(daemonService, never()).writeAll();
+  }
+
+  @Test
+  void putUnrelatedSettingDoesNotRewriteConfigs() throws Exception {
+    when(settingsService.serverSettings()).thenReturn(Map.of("brand", "MyPanel"));
+
+    mvc.perform(
+            put("/api/admin/settings/brand")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("value", "MyPanel"))))
+        .andExpect(status().isOk());
+
+    verify(settingsService).setServerSetting("brand", "MyPanel");
+    verify(daemonService, never()).writeAll();
+  }
+
+  @Test
+  void deleteNetworkModeRestoresNatAndRewritesConfigs() throws Exception {
+    mvc.perform(delete("/api/admin/settings/network_mode")).andExpect(status().isNoContent());
+
+    verify(settingsService).deleteServerSetting("network_mode");
+    verify(daemonService).writeAll();
   }
 
   @Test

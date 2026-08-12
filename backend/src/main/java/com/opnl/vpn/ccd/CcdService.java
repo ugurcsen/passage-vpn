@@ -90,6 +90,52 @@ public class CcdService {
     deleteCcd(user.getUsername());
   }
 
+  /**
+   * Allocates the next free static IP from the user's most specific group pool and assigns it.
+   * Returns the allocated IP. Throws {@code no_ip_pool} when no group defines a pool and {@code
+   * pool_exhausted} when every address in the pool is already in use.
+   */
+  @Transactional
+  public String allocateFromGroupPool(String userId) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> ApiException.notFound("user_not_found", "User not found"));
+    String pool = groupPoolFor(user.getId());
+    if (pool == null || pool.isBlank()) {
+      throw ApiException.badRequest(
+          "no_ip_pool", "No static IP pool configured for the user's groups");
+    }
+    PoolRange range = parsePool(pool);
+    String candidate = findFreeIp(range, user);
+    if (candidate == null) {
+      throw ApiException.conflict("pool_exhausted", "Static IP pool exhausted for " + pool);
+    }
+    user.setStaticIp(candidate);
+    userRepository.save(user);
+    writeUserCcd(user);
+    return candidate;
+  }
+
+  /** The static IP pool of the user's most specific group with one defined, or null. */
+  public String groupPoolFor(String userId) {
+    for (String groupId : settingsService.groupChainForUser(userId)) {
+      Object pool = settingsService.groupSettings(groupId).get(SettingKeys.STATIC_IP_POOL);
+      if (pool != null && !pool.toString().isBlank()) {
+        return pool.toString();
+      }
+    }
+    return null;
+  }
+
+  /** Validates a pool expression; throws {@code invalid_ip_pool} when malformed. */
+  public void validatePool(String pool) {
+    if (pool == null || pool.isBlank()) {
+      return;
+    }
+    parsePool(pool);
+  }
+
   /** Regenerates all CCD files and removes files for users that no longer have one. */
   @Transactional(readOnly = true)
   public void syncAll() {
@@ -120,8 +166,12 @@ public class CcdService {
     List<String> lines = new ArrayList<>();
     lines.add("ifconfig-push " + staticIp + " " + subnetMask());
     Map<String, Object> effective = settingsService.effectiveForUser(user.getId());
+    if (isFullTunnel(effective)) {
+      lines.add("push \"redirect-gateway def1 bypass-dhcp\"");
+    } else {
+      appendRoutePushes(lines, effective);
+    }
     appendDns(lines, effective);
-    appendRoutePushes(lines, effective);
     writeCcd(user.getUsername(), lines);
   }
 
@@ -172,6 +222,95 @@ public class CcdService {
         | (octets[3] & 0xff);
   }
 
+  private record PoolRange(long start, long end) {}
+
+  /** Parses a pool of the form "start-end", both IPv4 addresses (start <= end). */
+  private PoolRange parsePool(String pool) {
+    String[] parts = pool.trim().split("-");
+    if (parts.length != 2) {
+      throw ApiException.badRequest(
+          "invalid_ip_pool", "IP pool must be of the form 10.8.0.100-10.8.0.199");
+    }
+    long start = toLong(parts[0].trim());
+    long end = toLong(parts[1].trim());
+    if (start > end) {
+      throw ApiException.badRequest(
+          "invalid_ip_pool", "IP pool start must not be greater than its end");
+    }
+    long[] bounds = subnetHostBounds();
+    if (bounds == null) {
+      throw ApiException.badRequest(
+          "invalid_ip_pool", "Cannot validate pool against the VPN subnet");
+    }
+    if (start < bounds[0] || end > bounds[1] || start == bounds[0] || end == bounds[1]) {
+      throw ApiException.badRequest(
+          "invalid_ip_pool", "IP pool must be host addresses inside the VPN subnet");
+    }
+    return new PoolRange(start, end);
+  }
+
+  /** Resolves the server VPN subnet's [network, broadcast] addresses as longs, or null. */
+  private long[] subnetHostBounds() {
+    try {
+      var network = serverConfigGenerator.fromJson(networkSettingValue());
+      long net = toInt(InetAddress.getByName(network.subnet()).getAddress()) & 0xffff_ffffL;
+      long mask = toInt(InetAddress.getByName(network.subnetMask()).getAddress()) & 0xffff_ffffL;
+      return new long[] {net, (net | ~mask) & 0xffff_ffffL};
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private long toLong(String ip) {
+    long value;
+    try {
+      InetAddress address = InetAddress.getByName(ip);
+      if (!(address instanceof Inet4Address)) {
+        throw ApiException.badRequest("invalid_ip_pool", "Only IPv4 pool addresses are supported");
+      }
+      value = toInt(address.getAddress()) & 0xffff_ffffL;
+    } catch (ApiException e) {
+      throw e;
+    } catch (Exception e) {
+      throw ApiException.badRequest("invalid_ip_pool", "Invalid pool address: " + ip);
+    }
+    if (value == 0 || value == 0xffff_ffffL) {
+      throw ApiException.badRequest("invalid_ip_pool", "Invalid pool address: " + ip);
+    }
+    return value;
+  }
+
+  /** First free address in the range not assigned to another user (and not the user's own). */
+  private String findFreeIp(PoolRange range, User self) {
+    Set<String> used =
+        userRepository.findAll().stream()
+            .map(User::getStaticIp)
+            .filter(ip -> ip != null && !ip.isBlank())
+            .filter(ip -> !(self.getStaticIp() != null && self.getStaticIp().equals(ip)))
+            .collect(Collectors.toSet());
+    long guard = range.end - range.start + 1;
+    if (guard > 65536) {
+      throw ApiException.badRequest("invalid_ip_pool", "IP pool range is too large");
+    }
+    for (long candidate = range.start; candidate <= range.end; candidate++) {
+      String ip = formatIp(candidate);
+      if (!used.contains(ip)) {
+        return ip;
+      }
+    }
+    return null;
+  }
+
+  private String formatIp(long value) {
+    return ((value >> 24) & 0xff)
+        + "."
+        + ((value >> 16) & 0xff)
+        + "."
+        + ((value >> 8) & 0xff)
+        + "."
+        + (value & 0xff);
+  }
+
   private void appendDns(List<String> lines, Map<String, Object> effective) {
     String dns = stringSetting(effective, SettingKeys.DNS_SERVERS);
     if (dns != null && !dns.isBlank()) {
@@ -198,6 +337,19 @@ public class CcdService {
         lines.add("push \"route " + trimmed + "\"");
       }
     }
+  }
+
+  /**
+   * True when the account should get full tunnel (all traffic through the VPN). Resolution: the
+   * effective `tunnel_mode` setting (user &gt; group &gt; server); when unset, falls back to the
+   * server network config's global {@code fullTunnel} flag.
+   */
+  private boolean isFullTunnel(Map<String, Object> effective) {
+    String mode = stringSetting(effective, SettingKeys.TUNNEL_MODE);
+    if (mode != null && !mode.isBlank()) {
+      return "full".equalsIgnoreCase(mode.trim());
+    }
+    return serverConfigGenerator.fromJson(networkSettingValue()).fullTunnel();
   }
 
   private String stringSetting(Map<String, Object> effective, String key) {

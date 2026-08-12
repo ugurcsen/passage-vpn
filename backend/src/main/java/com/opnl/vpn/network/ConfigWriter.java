@@ -25,9 +25,14 @@ public class ConfigWriter {
   /**
    * Renders and writes daemon-<index>.conf for the given config. Removes the previous config file
    * of the same daemon index first.
+   *
+   * @param networkMode "nat" or "routed"; surfaced in the rendered config for the firewall script.
    */
   public synchronized void writeDaemon(
-      ServerConfig config, ServerConfigGenerator generator, OpnlProperties props) {
+      ServerConfig config,
+      ServerConfigGenerator generator,
+      OpnlProperties props,
+      String networkMode) {
     try {
       Files.createDirectories(configDir);
       Files.createDirectories(logDir);
@@ -43,7 +48,8 @@ public class ConfigWriter {
             props.openvpn().pkiDir(),
             props.openvpn().ccdDir(),
             props.openvpn().scriptsDir(),
-            logDir.toString());
+            logDir.toString(),
+            networkMode);
 
     Path file = configDir.resolve("daemon-" + config.daemonIndex() + ".conf");
     try {
