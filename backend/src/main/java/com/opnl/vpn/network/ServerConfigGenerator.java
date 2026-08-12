@@ -51,7 +51,13 @@ public class ServerConfigGenerator {
         .replace(
             "__AUTH_VERIFY__",
             config.authUserPass()
-                ? "auth-user-pass-verify " + scriptsDir + "/verify-user-pass.sh via-env"
+                ? "auth-user-pass-verify "
+                    + scriptsDir
+                    + "/verify-user-pass.sh via-env\n"
+                    + "client-crresponse "
+                    + scriptsDir
+                    + "/verify-user-pass.sh\n"
+                    + "auth-gen-token 43200"
                 : "")
         .replace(
             "__VERIFY_CLIENT_CERT__",

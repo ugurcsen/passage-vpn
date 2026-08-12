@@ -87,8 +87,10 @@ public class InternalController {
   }
 
   /**
-   * Credential verification for auth-user-pass-verify. Supports password-only and password+TOTP
-   * (static-challenge MFA). The OpenVPN scripts pass the code in the challenge response.
+   * Credential verification for auth-user-pass-verify (phase 1). Supports password-only and
+   * password+TOTP (static-challenge MFA). When the account requires MFA and no code was supplied,
+   * the verify-user-pass.sh script triggers the auth-pending flow and completes it via {@link
+   * #verifyOtp}.
    */
   @PostMapping("/auth/verify")
   public VerifyResult verify(@RequestBody VerifyRequest request) {
@@ -98,6 +100,20 @@ public class InternalController {
     AuthService.VpnVerification result =
         authService.verifyVpnLogin(
             request.username(), request.password(), request.otp(), request.remoteIp());
+    return new VerifyResult(result.allowed(), result.reason());
+  }
+
+  /**
+   * Second factor for the OpenVPN auth-pending flow (client-crresponse). The password was already
+   * accepted in phase 1 ({@link #verify}); only the TOTP code is checked here.
+   */
+  @PostMapping("/auth/verify-otp")
+  public VerifyResult verifyOtp(@RequestBody VerifyOtpRequest request) {
+    if (!setupService.complete()) {
+      return new VerifyResult(false, "setup_incomplete");
+    }
+    AuthService.VpnVerification result =
+        authService.verifyVpnOtp(request.username(), request.otp(), request.remoteIp());
     return new VerifyResult(result.allowed(), result.reason());
   }
 
@@ -190,6 +206,8 @@ public class InternalController {
 
   public record VerifyRequest(
       String username, String password, String otp, String commonName, String remoteIp) {}
+
+  public record VerifyOtpRequest(String username, String otp, String remoteIp) {}
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public record VerifyResult(boolean allowed, String reason) {}

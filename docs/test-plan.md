@@ -195,7 +195,8 @@ cd frontend && npm run lint && npm run test
       blocked destination unreachable, allowed destination reachable.
 - [ ] GENERIC profile on `client-cert-not-required` daemon connects with credentials only.
 - [ ] Share-token URL downloads the profile; exhausted/revoked token returns 409/404.
-- [ ] MFA user connects via `static-challenge` OTP challenge flow.
+- [ ] MFA user connects via OTP challenge: OpenVPN Connect (auth-pending/crtext)
+      and CLI (inline `password\nOTP` static-challenge) flows.
 - [ ] Kill/ban a connected user → immediate disconnect (management interface).
 
 ## 8. Fixtures & test data

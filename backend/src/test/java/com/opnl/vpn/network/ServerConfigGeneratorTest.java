@@ -28,6 +28,8 @@ class ServerConfigGeneratorTest {
     // daemon (dropping all sessions) whenever the management client disconnects.
     assertThat(conf).doesNotContain("management-signal");
     assertThat(conf).contains("auth-user-pass-verify /scripts/verify-user-pass.sh via-env");
+    assertThat(conf).contains("client-crresponse /scripts/verify-user-pass.sh");
+    assertThat(conf).contains("auth-gen-token 43200");
   }
 
   @Test

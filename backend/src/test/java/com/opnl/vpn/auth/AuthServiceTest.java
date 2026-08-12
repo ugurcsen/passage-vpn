@@ -302,6 +302,53 @@ class AuthServiceTest {
     assertThat(result.reason()).isEqualTo("account_locked");
   }
 
+  @Test
+  void vpnVerifyOtpAllowsValidCode() {
+    String secret = new TotpService().generateSecret();
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", true, secret)));
+    var result = service.verifyVpnOtp("alice", totpCode(secret), "1.2.3.4");
+    assertThat(result.allowed()).isTrue();
+  }
+
+  @Test
+  void vpnVerifyOtpRejectsInvalidCodeAndRecordsFailure() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", true, "JBSWY3DPEHPK3PXP")));
+    var result = service.verifyVpnOtp("alice", "000000", "1.2.3.4");
+    assertThat(result.allowed()).isFalse();
+    assertThat(result.reason()).isEqualTo("invalid_code");
+    verify(userRepository).save(any());
+  }
+
+  @Test
+  void vpnVerifyOtpRejectsUnknownUser() {
+    when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+    var result = service.verifyVpnOtp("ghost", "123456", "1.2.3.4");
+    assertThat(result.allowed()).isFalse();
+    assertThat(result.reason()).isEqualTo("invalid_credentials");
+  }
+
+  @Test
+  void vpnVerifyOtpRejectsWhenMfaNotRequired() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    when(settingsService.effectiveForUser(anyString())).thenReturn(Map.of());
+    var result = service.verifyVpnOtp("alice", "123456", "1.2.3.4");
+    assertThat(result.allowed()).isFalse();
+    assertThat(result.reason()).isEqualTo("mfa_not_required");
+  }
+
+  @Test
+  void vpnVerifyOtpRejectsLockedAccount() {
+    User locked = user("carol", true, "JBSWY3DPEHPK3PXP");
+    locked.setLockedUntil(Instant.now().plusSeconds(300));
+    when(userRepository.findByUsername("carol")).thenReturn(Optional.of(locked));
+    var result = service.verifyVpnOtp("carol", "123456", "1.2.3.4");
+    assertThat(result.allowed()).isFalse();
+    assertThat(result.reason()).isEqualTo("account_locked");
+  }
+
   private String totpCode(String secret) {
     try {
       return new dev.samstevens.totp.code.DefaultCodeGenerator(

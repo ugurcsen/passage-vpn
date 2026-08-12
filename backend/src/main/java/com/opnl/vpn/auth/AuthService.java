@@ -196,6 +196,39 @@ public class AuthService {
     return new VpnVerification(true, null);
   }
 
+  /**
+   * Verifies the second factor (TOTP) of an OpenVPN auth-pending session (client-crresponse). The
+   * password has already been accepted by {@link #verifyVpnLogin}; only the code is checked here.
+   */
+  @Transactional
+  public VpnVerification verifyVpnOtp(String username, String otp, String remoteIp) {
+    User user = userRepository.findByUsername(username == null ? "" : username.trim()).orElse(null);
+    if (user == null || user.getPasswordHash() == null) {
+      return new VpnVerification(false, "invalid_credentials");
+    }
+    if (user.isBanned()) {
+      return new VpnVerification(false, "account_disabled");
+    }
+    Instant now = Instant.now();
+    if (user.isLocked(now)) {
+      return new VpnVerification(false, "account_locked");
+    }
+    boolean mfaRequired =
+        user.isMfaEnabled()
+            || Boolean.TRUE.equals(effective(user, SettingKeys.REQUIRE_MFA_ON_CONNECT));
+    if (!mfaRequired) {
+      return new VpnVerification(false, "mfa_not_required");
+    }
+    if (otp == null || otp.isBlank() || !totpService.verify(user.getMfaSecret(), otp)) {
+      recordFailure(user);
+      return new VpnVerification(false, "invalid_code");
+    }
+    user.setFailedAttempts(0);
+    user.setLockedUntil(null);
+    userRepository.save(user);
+    return new VpnVerification(true, null);
+  }
+
   // ---- helpers ------------------------------------------------------------
 
   private void pruneExpiredChallenges(long now) {

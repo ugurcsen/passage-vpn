@@ -8,10 +8,10 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
-## v0.1.0-alpha.1 — 2026-08-12
+## v0.1.0-alpha.2 — 2026-08-12
 
-First tagged milestone (SemVer pre-release). Every `[x]` item under this
-heading is included in this release. Tag: `v0.1.0-alpha.1`.
+Second tagged milestone (SemVer pre-release). Includes everything from
+`v0.1.0-alpha.1` plus the OpenVPN Connect MFA fix below. Tag: `v0.1.0-alpha.2`.
 
 ### Phase 0 — Project scaffolding
 - [x] Repo layout, `TODO.md`, `AGENTS.md`, `.gitignore`, `.env.example`
@@ -223,6 +223,23 @@ heading is included in this release. Tag: `v0.1.0-alpha.1`.
   tests. Verified via SSH on the production checkout: backend 213 tests green
   (spotlessCheck clean), frontend 76 tests across 18 files green, lint 0
   errors, `tsc -b` clean.
+- OpenVPN Connect (mobile/3.x) MFA fix: `static-challenge` is not supported by
+  OpenVPN Connect, so MFA-on-connect now uses the OpenVPN auth-pending flow —
+  `verify-user-pass.sh` runs dual-mode (`user-pass-verify` + `client-crresponse`):
+  phase 1 verifies the password (inline `password\nOTP` from static-challenge
+  CLI clients still accepted) and, when the account requires MFA without a code,
+  writes a `crtext` auth-pending file and exits 2; OpenVPN Connect then prompts
+  for the TOTP and invokes phase 2, which decodes the response and validates it
+  via the new `POST /internal/auth/verify-otp` (`AuthService.verifyVpnOtp`);
+  auth-user-pass daemon configs now emit `client-crresponse` +
+  `auth-gen-token 43200` after `auth-user-pass-verify`. Covered by
+  `AuthServiceTest` verify-otp cases, `InternalControllerTest` and
+  `ServerConfigGeneratorTest`. Verified live on production `65.21.108.250`:
+  daemon configs regenerated via the admin API (daemon-0/3 carry the new
+  directives, daemon-2 auto-login untouched), openvpn container healthy, both
+  script phases exercised in the container (exit 2 + pending file;
+  `auth_control_file` 1/0), MFA connect flow confirmed working on the user's
+  OpenVPN Connect device.
 
 ### Not yet released
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group
@@ -235,4 +252,6 @@ heading is included in this release. Tag: `v0.1.0-alpha.1`.
 
 ## Previous releases
 
-None yet — `v0.1.0-alpha.1` is the first tagged release.
+- `v0.1.0-alpha.1` — first tagged milestone (2026-08-12): project scaffolding,
+  core OpenVPN + Easy-RSA integration, users/groups/auth with MFA, access control
+  & connection profiles, operations dashboard, real-time monitoring.

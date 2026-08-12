@@ -196,6 +196,19 @@ class InternalControllerTest {
   }
 
   @Test
+  void authVerifyOtpDelegatesToAuthService() throws Exception {
+    when(setupService.complete()).thenReturn(true);
+    when(authService.verifyVpnOtp("alice", "123456", "1.2.3.4"))
+        .thenReturn(new VpnVerification(true, null));
+    mvc.perform(
+            post("/internal/auth/verify-otp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"alice\",\"otp\":\"123456\",\"remoteIp\":\"1.2.3.4\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.allowed").value(true));
+  }
+
+  @Test
   void seedAdminCreatesAdmin() throws Exception {
     when(userRepository.countByRole(User.Role.ADMIN)).thenReturn(0L);
     when(passwordEncoder.encode("strong-pass")).thenReturn("hashed");

@@ -67,6 +67,13 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       frontend (UsersPage MFA dialog, AccountPage) — run via SSH on production
       checkout: backend 213 green (spotlessCheck clean), frontend 76 green
 - [x] Docs: RELEASE_NOTES.md entry, docs/test-plan.md MFA E2E item
+- [x] OpenVPN Connect (iOS/Android/3.x) MFA fix: `static-challenge` is not
+      supported by Connect → server now uses the auth-pending flow
+      (`auth-gen-token` + `client-crresponse`); `verify-user-pass.sh` writes a
+      crtext auth-pending file and exits 2 when the account requires MFA,
+      `POST /internal/auth/verify-otp` (`AuthService.verifyVpnOtp`) validates
+      the TOTP second factor. CLI clients keep the inline `password\nOTP`
+      static-challenge path (backend `verifyVpnLogin` unchanged).
 
 **P1.5 — Status / Settings / Dashboard phase (live E2E finding 2.5)** — DONE
 > Scoped from live E2E testing (`docs/test-findings.md` §2.5): the frontend defined
