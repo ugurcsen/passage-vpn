@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Self-service account endpoints for the client portal: TOTP MFA provisioning and password
- * changes. Any authenticated user can act on their own account only.
+ * Self-service account endpoints for the client portal: TOTP MFA provisioning and password changes.
+ * Any authenticated user can act on their own account only.
  */
 @RestController
 @RequestMapping("/api/portal/account")

@@ -144,9 +144,7 @@ class ProfileServiceTest {
   void userLockedProfileOmitsStaticChallengeWhenNoMfaInForce() {
     OvpnFile file = service.downloadForUser("u1", ProfileType.USER_LOCKED);
 
-    assertThat(file.content())
-        .contains("auth-user-pass")
-        .doesNotContain("static-challenge");
+    assertThat(file.content()).contains("auth-user-pass").doesNotContain("static-challenge");
   }
 
   @Test
@@ -180,9 +178,7 @@ class ProfileServiceTest {
 
     OvpnFile file = service.downloadForUser("u1", ProfileType.AUTO_LOGIN);
 
-    assertThat(file.content())
-        .doesNotContain("auth-user-pass")
-        .doesNotContain("static-challenge");
+    assertThat(file.content()).doesNotContain("auth-user-pass").doesNotContain("static-challenge");
   }
 
   @Test

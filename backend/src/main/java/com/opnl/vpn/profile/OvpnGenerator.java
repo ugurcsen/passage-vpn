@@ -36,9 +36,9 @@ public class OvpnGenerator {
    *
    * @param adminHost override for the remote endpoint host; falls back to the server config when
    *     blank/null.
-   * @param mfaChallenge when true and the profile uses password auth, an interactive
-   *     {@code static-challenge} prompt is added so the client can supply a TOTP code. A blank
-   *     response is tolerated by the backend when MFA is not required.
+   * @param mfaChallenge when true and the profile uses password auth, an interactive {@code
+   *     static-challenge} prompt is added so the client can supply a TOTP code. A blank response is
+   *     tolerated by the backend when MFA is not required.
    */
   public String render(
       ProfileType type,

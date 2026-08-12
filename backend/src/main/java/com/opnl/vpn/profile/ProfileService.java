@@ -205,7 +205,8 @@ public class ProfileService {
       return false;
     }
     boolean serverPolicy =
-        Boolean.TRUE.equals(settingsService.serverSettings().get(SettingKeys.REQUIRE_MFA_ON_CONNECT));
+        Boolean.TRUE.equals(
+            settingsService.serverSettings().get(SettingKeys.REQUIRE_MFA_ON_CONNECT));
     return type == ProfileType.USER_LOCKED ? user.isMfaEnabled() || serverPolicy : serverPolicy;
   }
 }

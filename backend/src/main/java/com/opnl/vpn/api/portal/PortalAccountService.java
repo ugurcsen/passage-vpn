@@ -16,9 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Self-service account operations for the client portal: TOTP MFA setup/enable/disable and
- * password changes. Sensitive operations re-verify the current password so a hijacked session
- * cannot silently take over the account.
+ * Self-service account operations for the client portal: TOTP MFA setup/enable/disable and password
+ * changes. Sensitive operations re-verify the current password so a hijacked session cannot
+ * silently take over the account.
  */
 @Service
 public class PortalAccountService {
@@ -90,8 +90,7 @@ public class PortalAccountService {
   @Transactional
   public void changePassword(String userId, String currentPassword, String newPassword) {
     if (newPassword == null || newPassword.length() < 8) {
-      throw ApiException.badRequest(
-          "weak_password", "New password must be at least 8 characters");
+      throw ApiException.badRequest("weak_password", "New password must be at least 8 characters");
     }
     User user = requireUser(userId);
     verifyPassword(user, currentPassword);
