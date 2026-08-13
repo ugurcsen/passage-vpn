@@ -43,6 +43,15 @@ plus the changes below. Tag: `v0.1.0-alpha.12`.
 ### Verified
 - Backend suite green (407 tests, spotless clean); frontend suite green
   (26 files / 128 tests, lint 0 errors, `tsc -b` clean).
+- Live on `65.21.108.250`: reconcile from a cold PKI created 7 rows
+  (1 skipped) and is idempotent on repeat ("0 created, 0 updated"); a
+  reconciled cert with no issue date renders correctly in the UI (fix
+  `173200b`, null-safe sort). Single-user delete with "revoke certs +
+  delete access rules" removed the user and audited the options
+  (`USER_DELETE` → `{"accessRules":true,"certificates":true,...}`); bulk
+  delete of two users with "revoke certs + clear static IP" audited
+  `USER_BULK` (`{"count":2,"action":"DELETE"}`) plus one `USER_DELETE` per
+  user carrying the cleanup options.
 
 ---
 
