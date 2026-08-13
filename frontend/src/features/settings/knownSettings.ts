@@ -109,6 +109,34 @@ export const KNOWN_SETTINGS: KnownSetting[] = [
     type: "choice",
     options: ["nat", "routed"],
   },
+  {
+    key: "brand_name",
+    label: "Brand name",
+    description: "Product name shown in the login page, title bar and theming.",
+    type: "string",
+    placeholder: "e.g. Acme VPN",
+  },
+  {
+    key: "brand_primary_color",
+    label: "Brand primary color",
+    description: "Accent color (hex) used for buttons and highlights.",
+    type: "string",
+    placeholder: "#4f8cff",
+  },
+  {
+    key: "brand_footer",
+    label: "Brand footer",
+    description: "Footer text shown on the login page.",
+    type: "string",
+    placeholder: "e.g. Support: help@acme.com",
+  },
+  {
+    key: "brand_logo_url",
+    label: "Brand logo URL",
+    description: "Optional logo URL shown instead of the default icon.",
+    type: "string",
+    placeholder: "https://…/logo.png",
+  },
 ];
 
 /** Looks up metadata for a setting key, falling back to a raw JSON editor for unknown keys. */

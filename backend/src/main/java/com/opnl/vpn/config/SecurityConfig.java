@@ -70,6 +70,7 @@ public class SecurityConfig {
     "/api/auth/refresh",
     "/api/auth/mfa",
     "/api/setup/**",
+    "/api/public/**",
     "/internal/**",
     "/api/portal/share/**",
     "/actuator/health",

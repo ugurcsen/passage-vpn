@@ -58,4 +58,16 @@ public final class SettingKeys {
 
   /** Syslog facility used in the RFC3164 header, e.g. "local0" or "user". */
   public static final String SYSLOG_FACILITY = "syslog_facility";
+
+  /** Brand/product name shown in the UI (login, sidebar, footer). */
+  public static final String BRAND_NAME = "brand_name";
+
+  /** Brand primary color as a hex value, e.g. "#4f8cff". Applied to the UI theme. */
+  public static final String BRAND_PRIMARY_COLOR = "brand_primary_color";
+
+  /** Optional footer text shown on the login page. */
+  public static final String BRAND_FOOTER = "brand_footer";
+
+  /** Optional brand logo URL shown on the login page and sidebar. */
+  public static final String BRAND_LOGO_URL = "brand_logo_url";
 }

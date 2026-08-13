@@ -44,6 +44,7 @@ public class AuditLogService {
   public static final String CAT_AUTH = "AUTH";
   public static final String CAT_PORTAL = "PORTAL";
   public static final String CAT_API = "API";
+  public static final String CAT_BACKUP = "BACKUP";
 
   private final AuditLogRepository repository;
   private final SettingsService settingsService;

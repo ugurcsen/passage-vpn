@@ -233,6 +233,9 @@ export const endpoints = {
   monitor: "/admin/monitor",
   auditLogs: "/admin/audit-logs",
   apiTokens: "/admin/api-tokens",
+  publicBrand: "/public/brand",
+  configReport: "/admin/config-report",
+  backups: "/admin/backups",
 };
 
 export type ProfileType = "USER_LOCKED" | "AUTO_LOGIN" | "SERVER_LOCKED" | "GENERIC";
@@ -409,6 +412,41 @@ export interface ApiTokenCreated {
   rawToken: string;
 }
 
+/** Effective brand configuration resolved from settings (served anonymously). */
+export interface Brand {
+  name: string;
+  primaryColor: string;
+  footer: string;
+  logoUrl: string | null;
+}
+
+/** Snapshot of the running configuration for support/auditing. */
+export interface ConfigReport {
+  brand: string;
+  version: string;
+  generatedAt: string;
+  dbType: string;
+  dataDirs: { pki: string; ccd: string; config: string; logs: string };
+  serverSettings: Record<string, unknown>;
+  daemons: { index: number; name: string; port: number; proto: string; enabled: boolean }[];
+  pki: { total: number; valid: number; revoked: number; expired: number; expiringSoon: number };
+  users: number;
+  groups: number;
+}
+
+/** Metadata about a stored backup archive. */
+export interface BackupInfo {
+  name: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+/** Result of a restore; the backend must be restarted when the database was replaced. */
+export interface RestoreResult {
+  restartRequired: boolean;
+  message: string;
+}
+
 /** Triggers a browser download for a backend-generated profile file. */
 export function downloadOvpn(file: OvpnFile) {
   const blob = new Blob([file.content], { type: "application/x-openvpn-profile" });
@@ -416,6 +454,28 @@ export function downloadOvpn(file: OvpnFile) {
   const a = document.createElement("a");
   a.href = url;
   a.download = file.filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Downloads a backup archive to disk, honoring the backend's attachment filename. */
+export async function downloadBackup(name: string): Promise<void> {
+  const res = await fetch(`${API_BASE}${endpoints.backups}/${encodeURIComponent(name)}/download`, {
+    headers: { Authorization: `Bearer ${tokenStore.access}` },
+  });
+  if (!res.ok) {
+    throw new ApiError(res.status, `${res.status} ${res.statusText}`);
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const match = /filename="?([^";]+)"?/.exec(disposition);
+  const filename = match?.[1] ?? name;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();

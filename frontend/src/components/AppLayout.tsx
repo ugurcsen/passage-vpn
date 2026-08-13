@@ -33,7 +33,11 @@ import KeyIcon from "@mui/icons-material/Key";
 import PersonIcon from "@mui/icons-material/Person";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
+import PaletteIcon from "@mui/icons-material/Palette";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
+import BackupIcon from "@mui/icons-material/Backup";
 import { useAuth } from "@/hooks/useAuth";
+import { useBrand } from "@/hooks/useBrand";
 
 const DRAWER_WIDTH = 240;
 
@@ -49,6 +53,9 @@ const NAV_ITEMS = [
   { label: "My Account", path: "/portal/account", icon: <SecurityIcon /> },
   { label: "Live Status", path: "/status", icon: <MonitorHeartIcon /> },
   { label: "Settings", path: "/settings", icon: <SettingsIcon /> },
+  { label: "Branding", path: "/branding", icon: <PaletteIcon />, adminOnly: true },
+  { label: "Config Report", path: "/config-report", icon: <FactCheckIcon />, adminOnly: true },
+  { label: "Backups", path: "/backups", icon: <BackupIcon />, adminOnly: true },
   { label: "Audit Log", path: "/audit-logs", icon: <HistoryIcon />, adminOnly: true },
   { label: "API Tokens", path: "/api-tokens", icon: <KeyIcon />, adminOnly: true },
 ];
@@ -63,6 +70,7 @@ export function AppLayout({ darkMode, onToggleDarkMode }: AppLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenu, setAccountMenu] = useState<HTMLElement | null>(null);
   const { user, logout } = useAuth();
+  const brand = useBrand();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -70,7 +78,7 @@ export function AppLayout({ darkMode, onToggleDarkMode }: AppLayoutProps) {
     <Box>
       <Toolbar sx={{ px: 2 }}>
         <Typography variant="h6" fontWeight={700} color="primary" noWrap>
-          OpenVPN Panel
+          {brand.name}
         </Typography>
       </Toolbar>
       <List dense>
@@ -105,7 +113,7 @@ export function AppLayout({ darkMode, onToggleDarkMode }: AppLayoutProps) {
             <MenuIcon />
           </IconButton>
           <Typography variant="body1" noWrap sx={{ flexGrow: 1 }}>
-            {NAV_ITEMS.find((i) => i.path === location.pathname)?.label ?? "OpenVPN Panel"}
+            {NAV_ITEMS.find((i) => i.path === location.pathname)?.label ?? brand.name}
           </Typography>
           <Tooltip title="Toggle theme">
             <IconButton color="inherit" onClick={onToggleDarkMode}>

@@ -262,12 +262,12 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [ ] Full CRUD API for all resources (admin + portal namespaces)
 - [x] OpenAPI/Swagger UI + bearer-auth testing (v0.1.0-alpha.4)
 - [ ] `docs/api.md` generation; API tokens for automation
-- [ ] API tokens for automation
+- [x] API tokens for automation
 
 ### 4.5 Branding, backup, config report
-- [ ] Brand settings (logo, name, footer, primary color) → theme via API
-- [ ] Configuration report (settings snapshot + PKI inventory + versions)
-- [ ] Backup: tar of config + PKI + DB dump; restore flow
+- [x] Brand settings (logo, name, footer, primary color) → theme via API
+- [x] Configuration report (settings snapshot + PKI inventory + versions)
+- [x] Backup: ZIP of config + PKI + DB snapshot; restore flow
 
 ### 4.6 Multi-node
 - [ ] `openvpn_nodes` registry (name, management endpoint, admin IP)

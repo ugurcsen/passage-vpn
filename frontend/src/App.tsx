@@ -3,9 +3,10 @@ import { useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { BrandProvider, useBrand } from "@/hooks/useBrand";
 import { ToastProvider } from "@/hooks/useToast";
 import { queryClient } from "@/lib/queryClient";
-import { darkTheme, lightTheme } from "@/theme";
+import { buildTheme } from "@/theme";
 import { AppLayout } from "@/components/AppLayout";
 import { LoginPage } from "@/pages/LoginPage";
 import { MfaLoginPage } from "@/pages/MfaLoginPage";
@@ -19,6 +20,9 @@ import { ProfilesPage } from "@/pages/ProfilesPage";
 import { DaemonsPage } from "@/pages/DaemonsPage";
 import { StatusPage } from "@/pages/StatusPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { BrandingPage } from "@/pages/BrandingPage";
+import { ConfigReportPage } from "@/pages/ConfigReportPage";
+import { BackupsPage } from "@/pages/BackupsPage";
 import { AuditLogsPage } from "@/pages/AuditLogsPage";
 import { ApiTokensPage } from "@/pages/ApiTokensPage";
 import { PortalPage } from "@/pages/PortalPage";
@@ -37,7 +41,17 @@ function loadDarkMode(): boolean {
 }
 
 export default function App() {
+  return (
+    <BrandProvider>
+      <ThemedApp />
+    </BrandProvider>
+  );
+}
+
+/** App shell that derives the theme from the loaded brand color. */
+function ThemedApp() {
   const [darkMode, setDarkMode] = useState<boolean>(loadDarkMode);
+  const brand = useBrand();
 
   const toggleDarkMode = () => {
     setDarkMode((current) => {
@@ -51,7 +65,7 @@ export default function App() {
     });
   };
 
-  const theme = darkMode ? darkTheme : lightTheme;
+  const theme = buildTheme(darkMode, brand.primaryColor);
 
   return (
     <ThemeProvider theme={theme}>
@@ -100,6 +114,18 @@ export default function App() {
                     <Route
                       path="/settings"
                       element={<SettingsPage />}
+                    />
+                    <Route
+                      path="/branding"
+                      element={<BrandingPage />}
+                    />
+                    <Route
+                      path="/config-report"
+                      element={<ConfigReportPage />}
+                    />
+                    <Route
+                      path="/backups"
+                      element={<BackupsPage />}
                     />
                     <Route
                       path="/audit-logs"

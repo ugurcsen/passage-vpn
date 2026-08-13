@@ -107,6 +107,11 @@ public class SettingsAdminController {
       throw ApiException.badRequest(
           "invalid_syslog_facility", "syslog_facility must be user or local0..local7");
     }
+    if (SettingKeys.BRAND_PRIMARY_COLOR.equals(key)
+        && (!(value instanceof String s) || !s.matches("#[0-9a-fA-F]{6}"))) {
+      throw ApiException.badRequest(
+          "invalid_brand_color", "brand_primary_color must be a hex color like #4f8cff");
+    }
   }
 
   private static boolean isIntInRange(Object value, int min, int max) {

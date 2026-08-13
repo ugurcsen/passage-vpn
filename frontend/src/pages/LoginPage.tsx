@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { Box, Button, CircularProgress, Paper, TextField, Typography } from "@mui/material";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { useAuth } from "@/hooks/useAuth";
+import { useBrand } from "@/hooks/useBrand";
 import { useToast } from "@/hooks/useToast";
 import { apiPublic, endpoints } from "@/lib/api";
 
 /** Login page. MFA step handled after password verification. */
 export function LoginPage() {
   const { login } = useAuth();
+  const brand = useBrand();
   const { error: toastError } = useToast();
   const navigate = useNavigate();
 
@@ -51,9 +53,18 @@ export function LoginPage() {
     <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", p: 2 }}>
       <Paper sx={{ p: 4, width: "100%", maxWidth: 400 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
-          <LockOutlinedIcon color="primary" />
+          {brand.logoUrl ? (
+            <Box
+              component="img"
+              src={brand.logoUrl}
+              alt=""
+              sx={{ height: 32, width: 32, objectFit: "contain" }}
+            />
+          ) : (
+            <LockOutlinedIcon color="primary" />
+          )}
           <Typography variant="h5" fontWeight={700}>
-            OpenVPN Panel
+            {brand.name}
           </Typography>
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -88,6 +99,11 @@ export function LoginPage() {
             {loading ? <CircularProgress size={22} color="inherit" /> : "Sign in"}
           </Button>
         </form>
+        {brand.footer && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 3, textAlign: "center" }}>
+            {brand.footer}
+          </Typography>
+        )}
       </Paper>
     </Box>
   );
