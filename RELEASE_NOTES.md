@@ -8,6 +8,44 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.12 — 2026-08-14
+
+Twelfth tagged milestone (SemVer pre-release): PKI reconciliation and
+deletion-time resource cleanup. The Easy-RSA `index.txt` is the PKI truth and
+the `certificates` table the bookkeeping, so a manual reconcile keeps them in
+sync (rows created/updated, never deleted), and deleting a user can optionally
+revoke+purge their certificates, remove their access rules and clear their
+static IP — per user or in bulk. Includes everything from `v0.1.0-alpha.11`
+plus the changes below. Tag: `v0.1.0-alpha.12`.
+
+### Phase M4.7 follow-up — PKI reconciliation & deletion cleanup
+- [x] `IndexParser`/`CertIndexEntry` — parse the `revokedAt` column from
+      `index.txt` so revoked entries carry their revocation date into the DB
+- [x] `CertService.reconcile()` + `POST /api/admin/certs/reconcile` (ADMIN) —
+      one-click sync of the `certificates` table with the PKI index: missing
+      rows are created (linked to the user by username), existing rows are
+      updated (status/expiry/revokedAt, matched by serial then common name),
+      server certificates and phantom file-less entries are skipped, and rows
+      are never deleted; the outcome is reported as created/updated/skipped
+      and audited (`CERT_RECONCILE`)
+- [x] `CertService.purgeForUser()` — when a user is deleted with cleanup,
+      their VALID certificates are revoked (best-effort) and all certificate
+      rows are removed (`CERT_PURGE`)
+- [x] `UserAdminService.DeleteOptions` — `DELETE /api/admin/users/{id}` and
+      `POST /api/admin/users/bulk` accept an optional body
+      `{deleteCertificates, deleteAccessRules, clearCcd}` (defaults all
+      false); access-rule cleanup also refreshes the dnsmasq domain pins
+      (`AccessRuleService.deleteForUser`, `RULE_DELETE_FOR_USER` audit)
+- [x] Frontend — Certificates page gains a "Sync with PKI" button; the Users
+      page delete flow (single and bulk) opens a dialog with the three cleanup
+      checkboxes before confirming
+
+### Verified
+- Backend suite green (407 tests, spotless clean); frontend suite green
+  (26 files / 128 tests, lint 0 errors, `tsc -b` clean).
+
+---
+
 ## v0.1.0-alpha.11 — 2026-08-14
 
 Eleventh tagged milestone (SemVer pre-release): DNS override ⇄ access-rule

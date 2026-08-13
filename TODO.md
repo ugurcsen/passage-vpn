@@ -121,6 +121,12 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [ ] Makefile polish (Phase 4.7)
 - [x] M4 release — `v0.1.0-alpha.8` tag + `RELEASE_NOTES.md` entry
 
+**P1 — PKI reconciliation & deletion cleanup (v0.1.0-alpha.12)**
+- [x] `CertService.reconcile()` — manual DB↔PKI sync (`POST /api/admin/certs/reconcile`, `CERT_RECONCILE`): rows created/updated from `index.txt` (incl. `revokedAt`), linked to users by username; server/phantom entries skipped, rows never deleted
+- [x] User deletion cleanup — `DELETE /api/admin/users/{id}` + `/bulk` accept `{deleteCertificates, deleteAccessRules, clearCcd}`; certs revoked+purged (`purgeForUser`), access rules removed with dnsmasq refresh (`deleteForUser`), CCD static IP cleared
+- [x] Frontend — Certificates "Sync with PKI" button; Users page delete dialog with cleanup checkboxes (single + bulk)
+- [x] alpha.12 release — tag + `RELEASE_NOTES.md` entry
+
 **M5 — v0.1.0-alpha.9 — Multi-node & Ops** (detail: `docs/ROADMAP.md` M5)
 - [ ] `openvpn_nodes` registry + node-aware status/kill/monitoring routing (Phase 4.6)
 - [ ] Backend `agent` Spring profile (Phase 4.6)
