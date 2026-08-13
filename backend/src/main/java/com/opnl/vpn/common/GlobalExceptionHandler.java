@@ -7,9 +7,11 @@ import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /** Central exception mapping: ApiException + framework errors → ApiError DTO. */
@@ -57,6 +59,18 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiError> handleNoResource(NoResourceFoundException ex) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(ApiError.of(404, "not_found", "Resource not found"));
+  }
+
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+    String message = "Invalid value '" + ex.getValue() + "' for parameter '" + ex.getName() + "'";
+    return ResponseEntity.badRequest().body(ApiError.of(400, "invalid_parameter", message));
+  }
+
+  @ExceptionHandler(AccessDeniedException.class)
+  public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex) {
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .body(ApiError.of(403, "forbidden", "Access denied"));
   }
 
   @ExceptionHandler(Exception.class)
