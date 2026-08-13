@@ -49,7 +49,10 @@ public class CertAdminController {
     List<Certificate> source =
         expiring ? certService.expiringSoon() : certificateRepository.findAll();
     return source.stream()
-        .sorted(java.util.Comparator.comparing(Certificate::getIssuedAt).reversed())
+        .sorted(
+            java.util.Comparator.comparing(
+                Certificate::getIssuedAt,
+                java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
         .map(c -> CertificateDto.from(c, usernames.get(c.getUserId())))
         .toList();
   }

@@ -68,6 +68,20 @@ class CertAdminControllerTest {
   }
 
   @Test
+  void listHandlesReconciledCertificatesWithoutIssueDate() throws Exception {
+    when(userRepository.findAll())
+        .thenReturn(List.of(User.builder().id("u1").username("alice").build()));
+    Certificate reconciled = cert("c2", "legacy-user", Status.VALID, "u1");
+    reconciled.setIssuedAt(null);
+    when(certificateRepository.findAll()).thenReturn(List.of(reconciled));
+
+    mvc.perform(get("/api/admin/certs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value("c2"))
+        .andExpect(jsonPath("$[0].issuedAt").isEmpty());
+  }
+
+  @Test
   void listWithExpiringFiltersToExpiringSoon() throws Exception {
     when(userRepository.findAll()).thenReturn(List.of());
     when(certService.expiringSoon()).thenReturn(List.of(cert("c1", "alice", Status.VALID, "u1")));
