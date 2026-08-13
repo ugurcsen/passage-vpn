@@ -125,7 +125,7 @@ Work started under M3 has been split: completed items shipped in
       NXDOMAIN on public DNS; USER (alice)/GROUP (DevOps) overrides → per-client
       DROP only for out-of-scope IPs, none after adding alice to DevOps; config
       regenerated and dnsmasq reloaded per change.
-- [ ] **4.8 Release** — `v0.1.0-alpha.6` tag + `RELEASE_NOTES.md` entry.
+- [x] **4.8 Release** — `v0.1.0-alpha.8` tag + `RELEASE_NOTES.md` entry.
 
 ## M5 — Multi-node & Ops — TARGET `v0.1.0-alpha.7`
 

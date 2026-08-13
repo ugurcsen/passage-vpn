@@ -8,6 +8,68 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.8 — 2026-08-13
+
+Eighth tagged milestone (SemVer pre-release): DNS overrides — admin-defined
+internal hostnames served authoritatively by the shared dnsmasq, with
+GLOBAL/GROUP/USER scope enforced per-client by the firewall. Includes
+everything from `v0.1.0-alpha.7` plus the changes below.
+Tag: `v0.1.0-alpha.8`.
+
+### Phase M4.7 — DNS overrides
+- [x] `DnsRecord` entity + `dns_records` table (Flyway V12, unique hostname,
+      strict IPv4, `enabled`, created_at); scope is GLOBAL/GROUP/USER with the
+      target group/user resolved for display (`scopeName`) and validated on the
+      DTO (`scopeValid` — `@AssertTrue`, scope required exactly when not GLOBAL)
+- [x] `DnsOverrideService` — CRUD with hostname lowercasing/normalization and
+      scope-target existence checks; `resolveDomain` / `nonGlobalEnabled` feeds
+      the firewall; every mutation is audited (`DNS_RECORD_CREATE/UPDATE/
+      DELETE/ENABLE/DISABLE`, `CAT_DNS`) and re-renders the dnsmasq override
+      config
+- [x] `GET/POST /api/admin/dns-overrides` + `PUT/DELETE .../{id}` +
+      `POST .../{id}/enabled` (JSON boolean body) — ADMIN-only, `@Valid` DTOs
+- [x] `DnsmasqConfigService` — writes `address=/<host>/<ip>` +
+      `server=/<host>/` into `dnsmasq.d/opnl-dns-overrides.conf` (enabled records
+      only), alongside the domain pins; the entrypoint watcher SIGHUPs dnsmasq on
+      every change; resolution is override-first so an override wins over public
+      DNS for a pinned access-rule domain
+- [x] `RuleEngine.scopeDenyIpsFor` — GLOBAL records are never denied; GROUP
+      records deny every group not containing the user (`groupChainFor`);
+      USER records deny all other users. The per-client chain emits one
+      `-s <vip> -d <ip>/32 -j DROP` per out-of-scope address AFTER rule ACCEPTs
+      (explicit ALLOW wins) and keeps terminal ACCEPT when only scope denials
+      exist, DROP otherwise; `AccessRuleService.iptablesFor` threads the denied
+      set through `/internal/connect` and `/internal/disconnect`
+- [x] DNS Overrides admin page (`/dns`) — DataGrid (hostname, address, scope
+      chip with target, enabled switch, actions), create/edit dialog with
+      scope select + user/group picker, delete confirmation; `api.ts`
+      `endpoints.dnsOverrides` + `DnsRecordDto`
+- [x] Tests — `DnsOverrideServiceTest`, `DnsRecordAdminControllerTest`,
+      `RuleEngineTest` (override-first resolution, scope-deny rendering,
+      ACCEPT/DROP terminals), `DnsmasqConfigServiceTest` (overrides file,
+      override-priority), `DnsOverridesPage` frontend tests
+
+### Verified
+- Backend suite green (369 tests, spotless clean); frontend suite green
+  (26 files / 123 tests, lint 0 errors, `vite build` passes); `make test`
+  green; `make lint` green.
+- Live E2E on production `65.21.108.250`: checkout synced to the milestone and
+  the stack rebuilt (backend + frontend images), all containers healthy;
+  Flyway V12 applied; backend suite re-run green on the deployed checkout.
+- DNS overrides verified end-to-end: a GLOBAL `git.internal→10.8.0.1` record
+  answers `10.8.0.1` via the VPN dnsmasq with AAAA NODATA (authoritative
+  `server=/`), while public DNS returns NXDOMAIN for `git.internal`. USER
+  (`nas.internal`→10.9.0.1 for alice) and GROUP (`mon.internal`→10.10.0.1 for
+  DevOps) records resolve for everyone but render per-client scope DENY lines:
+  alice was denied only `10.10.0.1` (not her record nor GLOBAL), an
+  out-of-scope user was denied `10.9.0.1` + `10.10.0.1` (not GLOBAL), and after
+  adding alice to DevOps the deny set became empty (scope chain terminal ACCEPT
+  when only scope denials exist). `opnl-dns-overrides.conf` regenerated and
+  dnsmasq reloaded on every create/update/delete; all test records, simulated
+  connections and the temporary group membership were purged afterwards.
+
+---
+
 ## v0.1.0-alpha.7 — 2026-08-13
 
 Seventh tagged milestone (SemVer pre-release): domain-based access control via

@@ -106,7 +106,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Audit log entity + UI; syslog integration; `connection_logs` retention
   (Flyway V8/V9, `/api/admin/audit-logs` with pagination + filters)
 
-**M4 — v0.1.0-alpha.6 — Automation & Advanced Access** (detail: `docs/ROADMAP.md` M4)
+**M4 — v0.1.0-alpha.8 — Automation & Advanced Access** (detail: `docs/ROADMAP.md` M4)
 - [x] Post-auth Python script hook support (Phase 2.4/3.6)
 - [x] Domain-based control via dnsmasq (Phase 3.2, advanced)
 - [x] DNS overrides: admin-defined hostname→IPv4 records served by dnsmasq with
@@ -115,8 +115,9 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [ ] `docs/api.md` generation (script + make target ready; regenerate live in E2E)
 - [ ] Full CRUD API completion (Phase 4.4)
 - [ ] Makefile polish (Phase 4.7)
+- [x] M4 release — `v0.1.0-alpha.8` tag + `RELEASE_NOTES.md` entry
 
-**M5 — v0.1.0-alpha.7 — Multi-node & Ops** (detail: `docs/ROADMAP.md` M5)
+**M5 — v0.1.0-alpha.9 — Multi-node & Ops** (detail: `docs/ROADMAP.md` M5)
 - [ ] `openvpn_nodes` registry + node-aware status/kill/monitoring routing (Phase 4.6)
 - [ ] Backend `agent` Spring profile (Phase 4.6)
 - [ ] PostgreSQL docker profile validation (Phase 4.7)
