@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -129,5 +131,28 @@ class ServerConfigGeneratorTest {
             "__EXTRA_PUSH__")) {
       assertThat(conf).doesNotContain(token);
     }
+  }
+
+  @Test
+  void renderDnsmasqConfigPinsEveryResolvedAddress() {
+    String conf =
+        generator.renderDnsmasqConfig(
+            Map.of(
+                "api.github.com", Set.of("140.82.112.5", "140.82.113.5"),
+                "www.example.com", Set.of("93.184.215.14")));
+
+    assertThat(conf)
+        .contains("address=/api.github.com/140.82.112.5")
+        .contains("address=/api.github.com/140.82.113.5")
+        .contains("address=/www.example.com/93.184.215.14");
+  }
+
+  @Test
+  void renderDnsmasqConfigSkipsUnresolvedDomains() {
+    String conf =
+        generator.renderDnsmasqConfig(
+            Map.of("up.example.com", Set.of(), "ok.example.com", Set.of("1.2.3.4")));
+
+    assertThat(conf).doesNotContain("up.example.com").contains("address=/ok.example.com/1.2.3.4");
   }
 }

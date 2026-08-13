@@ -28,6 +28,27 @@ if ! iptables -C FORWARD -i "$iface" -o tun+ -m conntrack --ctstate ESTABLISHED,
 fi
 iptables -P FORWARD ACCEPT
 
+# Domain matcher chain: one RETURN per pinned domain address taken from the
+# backend-generated dnsmasq config (opnl-domains.conf), then DROP. This is the
+# address set the per-client rules and the VPN DNS agree on, so a domain rule's
+# ALLOW/DENY and the addresses clients actually resolve to stay consistent.
+# Inspect with: iptables -L OPNL_DOMAINS.
+apply_domain_rules() {
+    local conf="${OPNL_CONFIG_DIR:-/etc/opnl/config}/dnsmasq.d/opnl-domains.conf"
+    local chain="OPNL_DOMAINS"
+    if ! iptables -N "$chain" 2>/dev/null; then
+        iptables -F "$chain"
+    fi
+    local count=0 ip
+    if [[ -f "$conf" ]]; then
+        while IFS= read -r ip; do
+            [[ -n "$ip" ]] && iptables -A "$chain" -d "$ip/32" -j RETURN && count=$((count + 1))
+        done < <(grep -oE '^address=/[^/]+/[0-9.]+$' "$conf" | awk -F/ '{print $3}')
+    fi
+    iptables -A "$chain" -j DROP
+    echo "apply-rules: $chain pinned $count domain address(es)"
+}
+
 if [[ "$mode" == "routed" ]]; then
     # Routed mode: keep client source IPs, so no MASQUERADE. External networks
     # must route replies for the pool back to this host. Install the explicit
@@ -45,6 +66,7 @@ if [[ "$mode" == "routed" ]]; then
     else
         echo "apply-rules: routed mode; no tun device yet, return route deferred to OpenVPN" >&2
     fi
+    apply_domain_rules
     exit 0
 fi
 
@@ -52,5 +74,7 @@ fi
 if ! iptables -t nat -C POSTROUTING -s "$pool" -o "$iface" -j MASQUERADE 2>/dev/null; then
     iptables -t nat -A POSTROUTING -s "$pool" -o "$iface" -j MASQUERADE
 fi
+
+apply_domain_rules
 
 echo "apply-rules: NAT + FORWARD configured for $pool via $iface"

@@ -97,7 +97,7 @@ Work started under M3 has been split: completed items shipped in
       captured; hook failure must not drop the connection — audit it). Script
       synced into the shared config volume by `ScriptSync`. Tests:
       `AuthServiceTest` hook success/failure/timeout cases.
-- [ ] **4.2 Domain-based control via dnsmasq** — `AccessRule` domain target
+- [x] **4.2 Domain-based control via dnsmasq** — `AccessRule` domain target
       (`dstDomain`, Flyway V11) resolved to IPs by `RuleEngine`; per-domain
       entries rendered into `/etc/dnsmasq.d/opnl-domains.conf` and the matching
       iptables rules by `apply-rules.sh`; domain picker on the Access Rules page.

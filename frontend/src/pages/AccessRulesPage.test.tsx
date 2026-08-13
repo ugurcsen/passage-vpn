@@ -18,6 +18,7 @@ const rules = [
     dstCidr: "10.0.0.0/8",
     dstGroupId: null,
     dstGroupName: null,
+    dstDomain: null,
     dstPort: 443,
     enabled: true,
     priority: 1,
@@ -32,9 +33,25 @@ const rules = [
     dstCidr: null,
     dstGroupId: "g1",
     dstGroupName: "devs",
+    dstDomain: null,
     dstPort: null,
     enabled: true,
     priority: 2,
+  },
+  {
+    id: "r3",
+    targetType: "USER" as const,
+    targetId: "u1",
+    targetName: "alice",
+    action: "DENY" as const,
+    protocol: "UDP" as const,
+    dstCidr: null,
+    dstGroupId: null,
+    dstGroupName: null,
+    dstDomain: "api.github.com",
+    dstPort: 443,
+    enabled: true,
+    priority: 3,
   },
 ];
 
@@ -181,6 +198,41 @@ describe("AccessRulesPage", () => {
     renderPage();
 
     expect(await screen.findByText("Group: devs")).toBeInTheDocument();
+  });
+
+  it("renders a destination domain column", async () => {
+    renderPage();
+
+    expect(await screen.findByText("Domain: api.github.com:443")).toBeInTheDocument();
+  });
+
+  it("creates a rule targeting a destination domain", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findAllByText("All users");
+
+    await user.click(screen.getByRole("button", { name: /new rule/i }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/destination domain/i), {
+      target: { value: "api.github.com" },
+    });
+    await user.click(within(dialog).getByRole("button", { name: /^create$/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, opts]) => url === "/api/admin/rules" && opts?.method === "POST",
+      );
+      expect(post).toBeDefined();
+    });
+    const [, opts] = fetchMock.mock.calls.find(
+      ([url, o]) => url === "/api/admin/rules" && o?.method === "POST",
+    )!;
+    expect(JSON.parse(String(opts!.body))).toMatchObject({
+      targetType: "GLOBAL",
+      dstDomain: "api.github.com",
+      dstCidr: null,
+    });
   });
 
   it("toggles a rule enabled state", async () => {

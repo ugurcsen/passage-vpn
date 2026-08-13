@@ -10,4 +10,6 @@ public interface AccessRuleRepository extends JpaRepository<AccessRule, String> 
 
   List<AccessRule> findByTargetTypeAndTargetIdOrderByPriorityAsc(
       AccessRule.TargetType targetType, String targetId);
+
+  List<AccessRule> findByEnabledTrueAndDstDomainIsNotNull();
 }

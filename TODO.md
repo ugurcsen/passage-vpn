@@ -24,7 +24,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Inter-group connectivity rules + NAT-vs-routing mode
 - [x] `CertService` restore/rotate + expiry-warning scheduler
 - [x] Multi-daemon (`daemons` entity) + DCO detection display
-- [ ] Domain-based control via dnsmasq (advanced) — → M4 (4.2)
+- [x] Domain-based control via dnsmasq (advanced) — → M4 (4.2)
 
 **P0.5 — Bugfix sweep (live E2E findings, `docs/test-findings.md`)**
 - [x] 2.1 CRIT — drop removed `client-cert-not-required` from config generator; GENERIC daemons use `verify-client-cert none`
@@ -107,7 +107,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 **M4 — v0.1.0-alpha.6 — Automation & Advanced Access** (detail: `docs/ROADMAP.md` M4)
 - [x] Post-auth Python script hook support (Phase 2.4/3.6)
-- [ ] Domain-based control via dnsmasq (Phase 3.2, advanced)
+- [x] Domain-based control via dnsmasq (Phase 3.2, advanced)
 - [ ] `docs/api.md` generation (script + make target ready; regenerate live in E2E)
 - [ ] Full CRUD API completion (Phase 4.4)
 - [ ] Makefile polish (Phase 4.7)
@@ -223,7 +223,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Full-tunnel / split-tunnel per user/group
 - [x] Inter-group connectivity rules (dstGroupId target → pool range / member IPs)
 - [x] NAT vs routing mode (network_mode setting; apply-rules skips MASQUERADE in routed mode)
-- [ ] Domain-based control via dnsmasq (advanced)
+- [x] Domain-based control via dnsmasq (advanced)
 
 ### 3.3 Connection profiles (.ovpn)
 - [x] `OvpnGenerator` — 4 profile types: user-locked, auto-login, server-locked, generic

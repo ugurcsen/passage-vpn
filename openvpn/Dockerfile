@@ -30,6 +30,7 @@ RUN mkdir -p "$OPNL_CONFIG_DIR" "$OPNL_CCD_DIR" "$OPNL_PKI_DIR" "$OPNL_LOG_DIR" 
 COPY scripts/ /etc/openvpn/scripts/
 RUN chmod +x /etc/openvpn/scripts/*.sh
 
+COPY dnsmasq.conf /etc/dnsmasq.conf
 COPY entrypoint.sh /usr/local/bin/opnl-entrypoint
 RUN chmod +x /usr/local/bin/opnl-entrypoint
 

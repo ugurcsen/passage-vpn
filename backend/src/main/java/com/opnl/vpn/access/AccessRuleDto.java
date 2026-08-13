@@ -6,6 +6,7 @@ import com.opnl.vpn.access.AccessRule.TargetType;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 /** Admin-facing access rule representation. */
 public record AccessRuleDto(
@@ -21,14 +22,23 @@ public record AccessRuleDto(
         String dstCidr,
     String dstGroupId,
     String dstGroupName,
+    @Size(max = 253, message = "dstDomain must not exceed 253 characters")
+        @Pattern(
+            regexp =
+                "^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?)(\\.([a-z0-9]([a-z0-9-]*[a-z0-9])?))*$",
+            message =
+                "dstDomain must be a valid hostname/domain like api.github.com "
+                    + "(lowercase letters, digits, dots and hyphens)")
+        String dstDomain,
     Integer dstPort,
     Boolean enabled,
     Integer priority) {
 
-  /** A destination must be either a CIDR or a group, never both. */
-  @AssertTrue(message = "dstCidr and dstGroupId are mutually exclusive")
+  /** A destination must be a CIDR, a group or a domain — never more than one. */
+  @AssertTrue(message = "dstCidr, dstGroupId and dstDomain are mutually exclusive")
   public boolean isDestinationValid() {
-    return dstCidr == null || dstGroupId == null;
+    return (dstCidr == null ? 0 : 1) + (dstGroupId == null ? 0 : 1) + (dstDomain == null ? 0 : 1)
+        <= 1;
   }
 
   public static AccessRuleDto from(AccessRule rule, String targetName, String dstGroupName) {
@@ -42,6 +52,7 @@ public record AccessRuleDto(
         rule.getDstCidr(),
         rule.getDstGroupId(),
         dstGroupName,
+        rule.getDstDomain(),
         rule.getDstPort(),
         rule.isEnabled(),
         rule.getPriority());

@@ -29,18 +29,21 @@ public class RuleEngine {
   private final GroupRepository groupRepository;
   private final SettingsService settingsService;
   private final UserRepository userRepository;
+  private final DomainResolver domainResolver;
 
   public RuleEngine(
       AccessRuleRepository ruleRepository,
       GroupMemberRepository memberRepository,
       GroupRepository groupRepository,
       SettingsService settingsService,
-      UserRepository userRepository) {
+      UserRepository userRepository,
+      DomainResolver domainResolver) {
     this.ruleRepository = ruleRepository;
     this.memberRepository = memberRepository;
     this.groupRepository = groupRepository;
     this.settingsService = settingsService;
     this.userRepository = userRepository;
+    this.domainResolver = domainResolver;
   }
 
   /** All enabled rules that apply to a user: global, then group (child-first), then user-level. */
@@ -103,17 +106,25 @@ public class RuleEngine {
   /**
    * Resolves a rule's destination to one or more iptables match fragments. A {@code dstGroupId}
    * rule targets the group's allocated subnet: the group's static IP pool range as an exact {@code
-   * --dst-range}, or the members' static IPs as individual /32 matches when no pool exists. An
+   * --dst-range}, or the members' static IPs as individual /32 matches when no pool exists. A
+   * {@code dstDomain} rule targets the domain's current IPv4 addresses (one /32 match each). An
    * empty list means the destination cannot be resolved and the rule is skipped.
    */
   List<String> destinationSpecs(AccessRule rule) {
     if (rule.getDstGroupId() != null && !rule.getDstGroupId().isBlank()) {
       return groupDestinationSpecs(rule.getDstGroupId());
     }
+    if (rule.getDstDomain() != null && !rule.getDstDomain().isBlank()) {
+      return domainDestinationSpecs(rule.getDstDomain());
+    }
     if (rule.getDstCidr() != null && !rule.getDstCidr().isBlank()) {
       return List.of("-d " + rule.getDstCidr() + " ");
     }
     return List.of("");
+  }
+
+  private List<String> domainDestinationSpecs(String domain) {
+    return domainResolver.resolve(domain).stream().map(ip -> "-d " + ip + "/32 ").toList();
   }
 
   private List<String> groupDestinationSpecs(String groupId) {

@@ -2,6 +2,7 @@ package com.opnl.vpn.access;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.access.AccessRule.Action;
@@ -17,6 +18,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class RuleEngineTest {
@@ -37,7 +39,22 @@ class RuleEngineTest {
   private RuleEngine engine(
       AccessRuleRepository repo, GroupMemberRepository members, GroupRepository groups) {
     return new RuleEngine(
-        repo, members, groups, mock(SettingsService.class), mock(UserRepository.class));
+        repo,
+        members,
+        groups,
+        mock(SettingsService.class),
+        mock(UserRepository.class),
+        mock(DomainResolver.class));
+  }
+
+  private RuleEngine engineWithResolver(DomainResolver resolver) {
+    return new RuleEngine(
+        mock(AccessRuleRepository.class),
+        mock(GroupMemberRepository.class),
+        mock(GroupRepository.class),
+        mock(SettingsService.class),
+        mock(UserRepository.class),
+        resolver);
   }
 
   @Test
@@ -189,7 +206,8 @@ class RuleEngineTest {
             mock(GroupMemberRepository.class),
             mock(GroupRepository.class),
             settings,
-            users);
+            users,
+            mock(DomainResolver.class));
 
     AccessRule rule = rule(TargetType.GLOBAL, null, Action.ALLOW, 0, true);
     rule.setDstGroupId("g2");
@@ -215,7 +233,8 @@ class RuleEngineTest {
             mock(GroupMemberRepository.class),
             groups,
             settings,
-            mock(UserRepository.class));
+            mock(UserRepository.class),
+            mock(DomainResolver.class));
 
     AccessRule rule = rule(TargetType.GLOBAL, null, Action.ALLOW, 0, true);
     rule.setDstGroupId("g2");
@@ -247,7 +266,8 @@ class RuleEngineTest {
             members,
             mock(GroupRepository.class),
             settings,
-            users);
+            users,
+            mock(DomainResolver.class));
 
     AccessRule rule = rule(TargetType.GLOBAL, null, Action.DENY, 0, true);
     rule.setDstGroupId("g2");
@@ -273,7 +293,8 @@ class RuleEngineTest {
             members,
             mock(GroupRepository.class),
             settings,
-            users);
+            users,
+            mock(DomainResolver.class));
 
     AccessRule rule = rule(TargetType.GLOBAL, null, Action.DENY, 0, true);
     rule.setDstGroupId("g2");
@@ -302,5 +323,63 @@ class RuleEngineTest {
     RuleEngine.IptablesResult result = engine.iptablesFor("alice", "10.8.0.5", List.of(allow));
 
     assertThat(result.apply()).anyMatch(cmd -> cmd.contains("-d 10.0.0.0/8 "));
+  }
+
+  @Test
+  void dstDomainResolvesToPerIpMatches() {
+    DomainResolver resolver = mock(DomainResolver.class);
+    when(resolver.resolve("api.github.com")).thenReturn(Set.of("140.82.112.5", "140.82.113.5"));
+    RuleEngine engine = engineWithResolver(resolver);
+
+    AccessRule allow = rule(TargetType.GLOBAL, null, Action.ALLOW, 0, true);
+    allow.setProtocol(AccessRule.Protocol.TCP);
+    allow.setDstDomain("api.github.com");
+
+    RuleEngine.IptablesResult result = engine.iptablesFor("alice", "10.8.0.5", List.of(allow));
+
+    assertThat(result.apply())
+        .anyMatch(cmd -> cmd.contains("-d 140.82.112.5/32"))
+        .anyMatch(cmd -> cmd.contains("-d 140.82.113.5/32"))
+        .anyMatch(cmd -> cmd.contains("-j ACCEPT"))
+        .anyMatch(cmd -> cmd.contains("-j DROP"));
+    verify(resolver).resolve("api.github.com");
+  }
+
+  @Test
+  void unresolvableDstDomainSkipsRuleButKeepsDefaults() {
+    DomainResolver resolver = mock(DomainResolver.class);
+    when(resolver.resolve("down.example.com")).thenReturn(Set.of());
+    RuleEngine engine = engineWithResolver(resolver);
+
+    AccessRule rule = rule(TargetType.GLOBAL, null, Action.DENY, 0, true);
+    rule.setDstDomain("down.example.com");
+
+    RuleEngine.IptablesResult result = engine.iptablesFor("alice", "10.8.0.5", List.of(rule));
+
+    String chain = engine.chainName("alice");
+    assertThat(result.apply())
+        .anyMatch(cmd -> cmd.contains("iptables -N " + chain))
+        .anyMatch(cmd -> cmd.contains("-j DROP"));
+    assertThat(result.apply().stream().filter(cmd -> cmd.contains("-j DROP")).count())
+        .isEqualTo(1L);
+    assertThat(result.apply()).noneMatch(cmd -> cmd.contains("/32"));
+  }
+
+  @Test
+  void dstDomainTakesPrecedenceOverCidrWhenBothSetOnEntity() {
+    DomainResolver resolver = mock(DomainResolver.class);
+    when(resolver.resolve("x.example.com")).thenReturn(Set.of("1.2.3.4"));
+    RuleEngine engine = engineWithResolver(resolver);
+
+    AccessRule rule = rule(TargetType.GLOBAL, null, Action.ALLOW, 0, true);
+    rule.setDstDomain("x.example.com");
+    rule.setDstCidr("10.0.0.0/8");
+
+    RuleEngine.IptablesResult result = engine.iptablesFor("alice", "10.8.0.5", List.of(rule));
+
+    assertThat(result.apply())
+        .anyMatch(cmd -> cmd.contains("-d 1.2.3.4/32"))
+        .noneMatch(cmd -> cmd.contains("-d 10.0.0.0/8"));
+    verify(resolver).resolve("x.example.com");
   }
 }

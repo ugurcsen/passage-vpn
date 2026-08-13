@@ -40,6 +40,7 @@ interface RuleRow {
   dstCidr: string | null;
   dstGroupId: string | null;
   dstGroupName: string | null;
+  dstDomain: string | null;
   dstPort: number | null;
   enabled: boolean;
   priority: number;
@@ -62,6 +63,7 @@ interface RuleForm {
   protocol: Protocol;
   dstCidr: string;
   dstGroupId: string;
+  dstDomain: string;
   dstPort: string;
   enabled: boolean;
 }
@@ -73,6 +75,7 @@ const EMPTY_FORM: RuleForm = {
   protocol: "TCP",
   dstCidr: "",
   dstGroupId: "",
+  dstDomain: "",
   dstPort: "",
   enabled: true,
 };
@@ -111,6 +114,7 @@ export function AccessRulesPage() {
         protocol: form.protocol,
         dstCidr: form.dstCidr || null,
         dstGroupId: form.dstGroupId || null,
+        dstDomain: form.dstDomain || null,
         dstPort: form.dstPort ? Number(form.dstPort) : null,
         enabled: form.enabled,
       };
@@ -161,6 +165,7 @@ export function AccessRulesPage() {
       protocol: row.protocol,
       dstCidr: row.dstCidr ?? "",
       dstGroupId: row.dstGroupId ?? "",
+      dstDomain: row.dstDomain ?? "",
       dstPort: row.dstPort?.toString() ?? "",
       enabled: row.enabled,
     });
@@ -211,7 +216,9 @@ export function AccessRulesPage() {
         const r = row as RuleRow;
         const dest = r.dstGroupName
           ? `Group: ${r.dstGroupName}`
-          : (r.dstCidr ?? "any");
+          : r.dstDomain
+            ? `Domain: ${r.dstDomain}`
+            : (r.dstCidr ?? "any");
         return r.dstPort ? `${dest}:${r.dstPort}` : dest;
       },
     },
@@ -355,9 +362,9 @@ export function AccessRulesPage() {
               select
               label="Destination group (empty = none)"
               value={form.dstGroupId}
-              onChange={(e) => setForm({ ...form, dstGroupId: e.target.value, dstCidr: "" })}
+              onChange={(e) => setForm({ ...form, dstGroupId: e.target.value, dstCidr: "", dstDomain: "" })}
               helperText="Targets the group's allocated subnet (static IP pool or member IPs)."
-              disabled={!!form.dstCidr}
+              disabled={!!form.dstCidr || !!form.dstDomain}
             >
               <MenuItem value="">
                 <em>None</em>
@@ -371,10 +378,18 @@ export function AccessRulesPage() {
             <TextField
               label="Destination CIDR (empty = any)"
               value={form.dstCidr}
-              onChange={(e) => setForm({ ...form, dstCidr: e.target.value, dstGroupId: "" })}
+              onChange={(e) => setForm({ ...form, dstCidr: e.target.value, dstGroupId: "", dstDomain: "" })}
               placeholder="e.g. 10.0.0.0/8"
               helperText="The client's own VPN IP is always the source; rules target destinations."
-              disabled={!!form.dstGroupId}
+              disabled={!!form.dstGroupId || !!form.dstDomain}
+            />
+            <TextField
+              label="Destination domain (empty = none)"
+              value={form.dstDomain}
+              onChange={(e) => setForm({ ...form, dstDomain: e.target.value, dstCidr: "", dstGroupId: "" })}
+              placeholder="e.g. api.github.com"
+              helperText="Resolved to its current IPv4 addresses and pinned via dnsmasq (advanced)."
+              disabled={!!form.dstCidr || !!form.dstGroupId}
             />
             <FormControlLabel
               control={

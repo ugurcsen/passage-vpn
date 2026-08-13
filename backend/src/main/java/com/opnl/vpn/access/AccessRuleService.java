@@ -4,6 +4,7 @@ import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.group.Group;
 import com.opnl.vpn.group.GroupRepository;
+import com.opnl.vpn.network.DnsmasqConfigService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.util.List;
@@ -22,18 +23,21 @@ public class AccessRuleService {
   private final GroupRepository groupRepository;
   private final RuleEngine ruleEngine;
   private final AuditLogService auditLogService;
+  private final DnsmasqConfigService dnsmasqConfigService;
 
   public AccessRuleService(
       AccessRuleRepository ruleRepository,
       UserRepository userRepository,
       GroupRepository groupRepository,
       RuleEngine ruleEngine,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService,
+      DnsmasqConfigService dnsmasqConfigService) {
     this.ruleRepository = ruleRepository;
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
     this.ruleEngine = ruleEngine;
     this.auditLogService = auditLogService;
+    this.dnsmasqConfigService = dnsmasqConfigService;
   }
 
   @Transactional(readOnly = true)
@@ -73,7 +77,10 @@ public class AccessRuleService {
             "target",
             dto.targetType().name().toLowerCase() + ":" + dto.targetId(),
             "action",
-            dto.action().name()));
+            dto.action().name(),
+            "dst",
+            destinationLabel(dto)));
+    refreshDnsmasq();
     return AccessRuleDto.from(
         saved, targetName(dto.targetType(), dto.targetId()), dstGroupName(dto.dstGroupId()));
   }
@@ -86,6 +93,7 @@ public class AccessRuleService {
     apply(rule, dto);
     AccessRule saved = ruleRepository.save(rule);
     auditLogService.record("RULE_UPDATE", AuditLogService.CAT_RULE, id, "rule", null);
+    refreshDnsmasq();
     return AccessRuleDto.from(
         saved, targetName(dto.targetType(), dto.targetId()), dstGroupName(dto.dstGroupId()));
   }
@@ -95,6 +103,7 @@ public class AccessRuleService {
     requireRule(id);
     ruleRepository.deleteById(id);
     auditLogService.record("RULE_DELETE", AuditLogService.CAT_RULE, id, "rule", null);
+    refreshDnsmasq();
   }
 
   @Transactional
@@ -103,6 +112,7 @@ public class AccessRuleService {
     rule.setEnabled(enabled);
     auditLogService.record(
         enabled ? "RULE_ENABLE" : "RULE_DISABLE", AuditLogService.CAT_RULE, id, "rule", null);
+    refreshDnsmasq();
     return AccessRuleDto.from(
         ruleRepository.save(rule),
         targetName(rule.getTargetType(), rule.getTargetId()),
@@ -122,8 +132,32 @@ public class AccessRuleService {
     rule.setProtocol(dto.protocol());
     rule.setDstCidr(dto.dstCidr());
     rule.setDstGroupId(dto.dstGroupId());
+    rule.setDstDomain(dto.dstDomain());
     rule.setDstPort(dto.dstPort());
     rule.setEnabled(dto.enabled() == null || dto.enabled());
+  }
+
+  private void refreshDnsmasq() {
+    try {
+      dnsmasqConfigService.refresh();
+    } catch (RuntimeException e) {
+      // A dnsmasq render/write failure must never break rule CRUD.
+    }
+  }
+
+  /** Human-readable destination for audit detail: "cidr:10.0.0.0/8", "group:<name>", "domain:x". */
+  private String destinationLabel(AccessRuleDto dto) {
+    if (dto.dstDomain() != null && !dto.dstDomain().isBlank()) {
+      return "domain:" + dto.dstDomain();
+    }
+    if (dto.dstGroupId() != null && !dto.dstGroupId().isBlank()) {
+      String name = dstGroupName(dto.dstGroupId());
+      return "group:" + (name == null ? dto.dstGroupId() : name);
+    }
+    if (dto.dstCidr() != null && !dto.dstCidr().isBlank()) {
+      return "cidr:" + dto.dstCidr();
+    }
+    return "any";
   }
 
   private int nextPriority() {

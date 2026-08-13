@@ -8,6 +8,42 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.7 — 2026-08-13
+
+Seventh tagged milestone (SemVer pre-release): domain-based access control via
+dnsmasq. Includes everything from `v0.1.0-alpha.6` plus the changes below.
+Tag: `v0.1.0-alpha.7`.
+
+### Phase M4.2 — Domain-based control via dnsmasq
+- [x] `AccessRule` domain target — new `dstDomain` column (Flyway V11) that is
+      mutually exclusive with the CIDR and group destinations; hostname syntax
+      validated on the DTO and only one of the three destination types may be set
+- [x] `DomainResolver` — resolves a domain target to its IPv4 addresses at
+      render time (2s timeout, IPv4 only, one resolver thread per domain group)
+- [x] `RuleEngine` — a domain rule emits one `-d <ip>/32 ` match per resolved
+      address, inheriting the rule's action/protocol/port; unresolvable domains
+      are skipped defensively so the firewall never blocks a live network
+- [x] `DnsmasqConfigService` — pins each domain to its resolved IPs in
+      `opnl-domains.conf` inside the shared config volume, regenerated on every
+      access-rule change and at backend startup; the openvpn container's dnsmasq
+      SIGHUPs to re-read it
+- [x] dnsmasq in the openvpn container — base `/etc/dnsmasq.conf` (upstream
+      Cloudflare/Google resolvers, `conf-dir` for pinning) plus `start_dnsmasq()`
+      in the entrypoint, listening on loopback and the tun server IP so VPN
+      clients resolve through it; retried until the tun address exists
+- [x] `apply-rules.sh` `OPNL_DOMAINS` chain — `RETURN` per pinned IP and a final
+      `DROP`, so domain rules match exactly the addresses dnsmasq hands out; kept
+      in sync on every rule application
+- [x] Access Rules page — "Destination domain" picker with mutual exclusion
+      against CIDR/group; the rules table shows `Domain: <name>`
+
+### Verified
+- Backend suite green (344 test cases, spotless clean); frontend suite green
+  (25 files / 118 tests, lint 0 errors, `tsc -b` clean); `make test` green.
+- Live E2E on production `65.21.108.250`: pending (see follow-up commit).
+
+---
+
 ## v0.1.0-alpha.6 — 2026-08-13
 
 Sixth tagged milestone (SemVer pre-release): post-auth Python script hook for

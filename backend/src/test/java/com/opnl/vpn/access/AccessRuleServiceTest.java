@@ -15,6 +15,7 @@ import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.group.Group;
 import com.opnl.vpn.group.GroupRepository;
+import com.opnl.vpn.network.DnsmasqConfigService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
@@ -30,6 +31,7 @@ class AccessRuleServiceTest {
   private UserRepository userRepository;
   private GroupRepository groupRepository;
   private RuleEngine ruleEngine;
+  private DnsmasqConfigService dnsmasqConfigService;
   private AccessRuleService service;
 
   @BeforeEach
@@ -38,13 +40,15 @@ class AccessRuleServiceTest {
     userRepository = mock(UserRepository.class);
     groupRepository = mock(GroupRepository.class);
     ruleEngine = mock(RuleEngine.class);
+    dnsmasqConfigService = mock(DnsmasqConfigService.class);
     service =
         new AccessRuleService(
             ruleRepository,
             userRepository,
             groupRepository,
             ruleEngine,
-            mock(AuditLogService.class));
+            mock(AuditLogService.class),
+            dnsmasqConfigService);
     when(ruleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
   }
 
@@ -57,6 +61,7 @@ class AccessRuleServiceTest {
         action,
         Protocol.TCP,
         "10.0.0.0/8",
+        null,
         null,
         null,
         443,
@@ -224,6 +229,7 @@ class AccessRuleServiceTest {
             "g2",
             null,
             null,
+            null,
             true,
             null);
     AccessRuleDto created = service.create(dto);
@@ -247,6 +253,7 @@ class AccessRuleServiceTest {
                         null,
                         null,
                         "ghost",
+                        null,
                         null,
                         null,
                         true,
@@ -277,6 +284,7 @@ class AccessRuleServiceTest {
                 "g2",
                 null,
                 null,
+                null,
                 true,
                 null));
 
@@ -303,5 +311,65 @@ class AccessRuleServiceTest {
     assertThat(updated.dstGroupId()).isEqualTo("g2");
     assertThat(updated.dstGroupName()).isEqualTo("devs");
     assertThat(existing.isEnabled()).isFalse();
+  }
+
+  @Test
+  void createStoresAndReturnsDstDomain() {
+    when(ruleRepository.findAll()).thenReturn(List.of());
+
+    AccessRuleDto created =
+        service.create(
+            new AccessRuleDto(
+                null,
+                TargetType.GLOBAL,
+                null,
+                null,
+                Action.ALLOW,
+                Protocol.TCP,
+                null,
+                null,
+                null,
+                "api.github.com",
+                443,
+                true,
+                null));
+
+    assertThat(created.dstDomain()).isEqualTo("api.github.com");
+  }
+
+  @Test
+  void updateAppliesDstDomainAndRefreshesDnsmasq() {
+    AccessRule existing =
+        AccessRule.builder().id("r1").targetType(TargetType.GLOBAL).action(Action.ALLOW).build();
+    when(ruleRepository.findById("r1")).thenReturn(Optional.of(existing));
+
+    AccessRuleDto updated =
+        service.update(
+            "r1",
+            new AccessRuleDto(
+                null,
+                TargetType.GLOBAL,
+                null,
+                null,
+                Action.DENY,
+                null,
+                null,
+                null,
+                null,
+                "blocked.example.com",
+                null,
+                true,
+                null));
+
+    assertThat(updated.dstDomain()).isEqualTo("blocked.example.com");
+    assertThat(existing.getDstDomain()).isEqualTo("blocked.example.com");
+    verify(dnsmasqConfigService).refresh();
+  }
+
+  @Test
+  void everyMutationRefreshesDnsmasqConfig() {
+    when(ruleRepository.findAll()).thenReturn(List.of());
+    service.create(dto(TargetType.GLOBAL, null, Action.ALLOW));
+    verify(dnsmasqConfigService).refresh();
   }
 }

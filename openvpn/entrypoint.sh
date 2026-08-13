@@ -32,6 +32,52 @@ extract_mode() {
     echo "${mode:-nat}"
 }
 
+# OpenVPN's `server net mask` assigns the first pool address (network+1, e.g.
+# 10.8.0.0/24 -> 10.8.0.1) to the server-side tun device. dnsmasq listens there
+# so VPN clients can reach it as their DNS resolver.
+server_ip_of() {
+    local conf="$1" net mask
+    net="$(grep -m1 '^server ' "$conf" | awk '{print $2}')"
+    mask="$(grep -m1 '^server ' "$conf" | awk '{print $3}')"
+    [[ -z "$net" || -z "$mask" ]] && return 1
+    awk -v ip="$net" 'BEGIN{
+        split(ip, o, ".");
+        v = o[1]*16777216 + o[2]*65536 + o[3]*256 + o[4] + 1;
+        printf "%d.%d.%d.%d\n", int(v/16777216)%256, int(v/65536)%256, int(v/256)%256, v%256
+    }'
+}
+
+# Starts dnsmasq once per container boot and SIGHUPs it on later reloads so the
+# backend's domain-pinning config (opnl-domains.conf) is re-read. The resolver
+# listens on the tun server IP of the first daemon plus loopback.
+start_dnsmasq() {
+    local conf ip pid args
+    conf="$(ls "$OPNL_CONFIG_DIR"/daemon-*.conf 2>/dev/null | head -1 || true)"
+    ip=""
+    [[ -n "$conf" ]] && ip="$(server_ip_of "$conf" 2>/dev/null || true)"
+    mkdir -p "$OPNL_CONFIG_DIR/dnsmasq.d"
+    pid="$(cat /var/run/dnsmasq.pid 2>/dev/null || true)"
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+        kill -HUP "$pid" 2>/dev/null || true
+        echo "[entrypoint] dnsmasq reloaded (pid $pid)"
+        return 0
+    fi
+    args=(--conf-file=/etc/dnsmasq.conf --pid-file=/var/run/dnsmasq.pid --listen-address=127.0.0.1)
+    [[ -n "$ip" ]] && args+=(--listen-address="$ip")
+    # bind-interfaces fails while the tun IP does not exist yet; the tun comes up
+    # a moment after the daemon is started, so retry briefly.
+    local tries
+    for tries in $(seq 1 15); do
+        if dnsmasq "${args[@]}"; then
+            echo "[entrypoint] dnsmasq listening on ${ip:-127.0.0.1}:53"
+            return 0
+        fi
+        sleep 2
+    done
+    echo "[entrypoint] WARNING dnsmasq failed to start after retries" >&2
+    return 1
+}
+
 # (Re)applies the base firewall for the first daemon's pool. Runs after daemons
 # are up so routed mode can install its tun return route; re-run on config
 # reloads so pool/mode changes refresh NAT or return routes.
@@ -43,6 +89,7 @@ reapply_rules() {
     [[ -z "$pool" ]] && return 0
     mode="$(extract_mode "$conf" 2>/dev/null || true)"
     OPNL_VPN_POOL="$pool" OPNL_NETWORK_MODE="$mode" /etc/openvpn/scripts/apply-rules.sh || true
+    start_dnsmasq || true
 }
 
 start_daemon() {

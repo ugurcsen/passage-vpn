@@ -77,6 +77,10 @@ public class AccessRule {
   @Column(name = "dst_group_id", length = 36)
   private String dstGroupId;
 
+  /** When set, the destination is a domain name resolved to its current IPv4 addresses. */
+  @Column(name = "dst_domain", length = 255)
+  private String dstDomain;
+
   /** Destination port; null = any port. */
   @Column(name = "dst_port")
   private Integer dstPort;

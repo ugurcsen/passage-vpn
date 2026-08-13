@@ -69,6 +69,7 @@ class AccessRuleAdminControllerTest {
             "192.168.0.0/24",
             null,
             null,
+            null,
             443,
             true,
             null);
@@ -87,5 +88,70 @@ class AccessRuleAdminControllerTest {
                             "dstPort", 443))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.dstCidr").value("192.168.0.0/24"));
+  }
+
+  @Test
+  void createRejectsMalformedDstDomain() throws Exception {
+    mvc.perform(
+            post("/api/admin/rules")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        Map.of(
+                            "targetType", "GLOBAL",
+                            "action", "ALLOW",
+                            "dstDomain", "not a domain!/x",
+                            "dstPort", 443))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation_failed"));
+  }
+
+  @Test
+  void createRejectsDomainAndCidrTogether() throws Exception {
+    mvc.perform(
+            post("/api/admin/rules")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        Map.of(
+                            "targetType", "GLOBAL",
+                            "action", "ALLOW",
+                            "dstDomain", "api.github.com",
+                            "dstCidr", "192.168.0.0/24"))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation_failed"));
+  }
+
+  @Test
+  void createAcceptsValidDstDomain() throws Exception {
+    AccessRuleDto returned =
+        new AccessRuleDto(
+            "r2",
+            TargetType.GLOBAL,
+            null,
+            null,
+            Action.ALLOW,
+            Protocol.TCP,
+            null,
+            null,
+            null,
+            "api.github.com",
+            443,
+            true,
+            null);
+    when(ruleService.create(any())).thenReturn(returned);
+    mvc.perform(
+            post("/api/admin/rules")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        Map.of(
+                            "targetType", "GLOBAL",
+                            "action", "ALLOW",
+                            "protocol", "TCP",
+                            "dstDomain", "api.github.com",
+                            "dstPort", 443))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.dstDomain").value("api.github.com"));
   }
 }
