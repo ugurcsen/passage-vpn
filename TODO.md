@@ -22,8 +22,8 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Per-user/group full-tunnel vs split-tunnel (now global only)
 - [x] Per-daemon profile mapping (generic/auto-login daemons as first-class configs)
 - [x] Inter-group connectivity rules + NAT-vs-routing mode
-- [ ] `CertService` restore/rotate + expiry-warning scheduler
-- [~] Multi-daemon (`daemons` entity) + DCO detection display
+- [x] `CertService` restore/rotate + expiry-warning scheduler
+- [x] Multi-daemon (`daemons` entity) + DCO detection display
 - [ ] Domain-based control via dnsmasq (advanced)
 
 **P0.5 — Bugfix sweep (live E2E findings, `docs/test-findings.md`)**
@@ -106,12 +106,15 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
   (Flyway V8/V9, `/api/admin/audit-logs` with pagination + filters)
 
 **P3 — Phase 4: API, ops, deployment**
-- [ ] OpenAPI/Swagger UI + `docs/api.md`; API tokens for automation
+- [x] OpenAPI/Swagger UI + bearer-auth testing (shipped in `v0.1.0-alpha.4`)
+- [ ] `docs/api.md` generation; API tokens for automation
 - [ ] Brand settings, configuration report, backup/restore flow
 - [ ] Multi-node registry + node-aware status/kill routing
-- [ ] `install.sh` full installer, first-run wizard UI, demo/seed mode
+- [x] `install.sh` full installer + first-run wizard UI
+- [ ] Demo/seed mode
 - [ ] PostgreSQL docker profile validation, Makefile polish
-- [ ] E2E test pass, README/docs finalization, CI workflow
+- [ ] E2E test pass, README/docs finalization
+- [x] CI workflow (backend test + spotless, frontend lint + build + test)
 - [x] Profile settings page (portal: password + MFA setup)
 - [ ] Post-auth Python script hook support
 
@@ -141,7 +144,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] `ProcessRunner` — safe subprocess wrapper with timeouts + env
 - [x] `EasyRsaService` — init-pki, build-ca, build-server-full, build-client-full, revoke, gen-crl
 - [x] `index.txt` parser → certificate metadata sync into DB
-- [~] `CertService` — issue, revoke, restore, rotate; expiry warnings (scheduler)
+- [x] `CertService` — issue, revoke, restore, rotate; expiry warnings (scheduler)
 - [x] Certificate entity + Flyway migration (metadata sync in Phase 2)
 - [x] Shared PKI volume mounted into openvpn container
 
@@ -150,7 +153,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] `ServerConfigGenerator` — renders `server.conf` from settings
 - [x] Multi-daemon support (`daemons` entity) — per-daemon conf + management port
 - [x] Apply flow: write conf → management `signal` reload / container restart
-- [~] DCO (Data Channel Offload) detection + display (status-based, UI in Phase 4)
+- [x] DCO (Data Channel Offload) detection + display (status-based, UI on Status/Daemons)
 
 ### 1.4 Database layer
 - [x] SQLite + Flyway wired (community dialect, WAL mode)
@@ -256,7 +259,8 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 ### 4.4 REST API
 - [ ] Full CRUD API for all resources (admin + portal namespaces)
-- [ ] OpenAPI/Swagger UI + `docs/api.md`
+- [x] OpenAPI/Swagger UI + bearer-auth testing (v0.1.0-alpha.4)
+- [ ] `docs/api.md` generation; API tokens for automation
 - [ ] API tokens for automation
 
 ### 4.5 Branding, backup, config report
@@ -271,13 +275,13 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 ### 4.7 Deployment & polish
 - [ ] Complete `Makefile` targets
-- [ ] `install.sh` full installer (preflight, env, build, up, wizard)
+- [x] `install.sh` full installer (preflight, env, build, up, wizard)
 - [x] First-run wizard UI (frontend) — admin → VPN server → PKI → complete; login gated on `COMPLETE`
 - [ ] PostgreSQL docker profile + `application-postgres.yml` validation
 - [ ] Seed data + demo mode
 - [ ] E2E test pass (backend unit+integration, frontend unit)
 - [ ] README + docs finalization
-- [ ] CI workflow (build, test, docker)
+- [~] CI workflow (backend test + spotless, frontend lint + build + test; docker build job pending)
 
 ---
 

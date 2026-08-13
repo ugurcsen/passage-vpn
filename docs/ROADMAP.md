@@ -18,7 +18,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
    push script, tag when a milestone ships.
 5. Flip the checkbox to `[x]`; update `RELEASE_NOTES.md` when a milestone is released.
 
-## M1 — Phase 3 completion (network & access) — CURRENT
+## M1 — Phase 3 completion (network & access) — DONE (v0.1.0-alpha.2, 2026-08-12)
 
 - [x] **1.1 Static IP pool + CCD editor UI** — backend `CcdService` is ready
       (`setStaticIp`/`clearStaticIp`/`writeUserCcd` + conflict detection).
@@ -51,32 +51,34 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       toggle on the Settings page. Tests: `ServerConfigGeneratorTest`
       surfacing/normalization, `DaemonServiceTest` mode resolution, and
       `SettingsAdminControllerTest` validation + rewrite trigger.
-- [ ] **1.5 CertService restore/rotate + expiry-warning scheduler** —
+- [x] **1.5 CertService restore/rotate + expiry-warning scheduler** —
       `CertService.restore(id)` (re-verify a revoked cert in `index.txt`),
       `CertService.rotate(userId)` (issue new cert + revoke old), and a
       `@Scheduled` daily expiry scan exposing
       `GET /api/admin/certs?expiring=true`. UI: Restore/Rotate actions and an
       expiry badge on the Certs page. Tests: restore/rotate + scheduler cases.
-- [ ] **1.6 DCO detection display** — surface DCO (Data Channel Offload)
+- [x] **1.6 DCO detection display** — surface DCO (Data Channel Offload)
       availability consistently on the Status and Daemons pages (per-daemon
       badge; backend `ServerStatusDto`/`DaemonDto` already carry fields).
 
-## M2 — Monitoring & ops completion
+## M2 — Monitoring & ops completion — DONE (v0.1.0-alpha.3, 2026-08-13)
 
-- [ ] **2.1 Audit log (UI included)** — new `audit_logs` entity + Flyway V9;
+- [x] **2.1 Audit log (UI included)** — new `audit_logs` entity + Flyway V9;
       audit service records admin actions (user/group/rule/daemon/settings
       mutations, MFA changes, login events); `GET /api/admin/audit-logs`
       (paginated, filterable); new Audit Log page with DataGrid. Tests: backend
       audit recording + frontend page.
-- [ ] **2.2 Syslog integration** — ship audit + auth events to syslog
+- [x] **2.2 Syslog integration** — ship audit + auth events to syslog
       (configurable target; RFC3164 line format) while still storing in DB.
-- [ ] **2.3 `connection_logs` retention** — periodic purge of closed rows older
+- [x] **2.3 `connection_logs` retention** — periodic purge of closed rows older
       than a configurable retention window (server setting), plus index tuning.
 
 ## M3 — API, ops & deployment
 
-- [ ] **3.1 OpenAPI/Swagger + `docs/api.md` + API tokens** — Springdoc UI,
+- [~] **3.1 OpenAPI/Swagger + `docs/api.md` + API tokens** — Springdoc UI,
       generated `docs/api.md`, API token entity + header auth for automation.
+      Springdoc UI + global bearer-auth scheme shipped in `v0.1.0-alpha.4`;
+      `docs/api.md` generation and API tokens remain.
 - [ ] **3.2 Brand settings + configuration report + backup/restore (DB dump)** —
       brand settings (name/logo/colors) surfaced through the theme API;
       configuration report (settings snapshot + PKI inventory + versions);
@@ -84,15 +86,17 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       (upload/extract + SQLite dump import). UI on the Settings page.
 - [ ] **3.3 Multi-node registry + node-aware routing** — `openvpn_nodes`
       registry, node-aware status/kill/monitor routing, backend `agent` profile.
-- [ ] **3.4 `install.sh` full installer + demo/seed mode** — preflight, env,
-      build, up, wizard trigger; optional seed/demo data mode.
+- [~] **3.4 `install.sh` full installer + demo/seed mode** — preflight, env,
+      build, up, wizard trigger; optional seed/demo data mode. Installer done;
+      demo/seed data mode remains.
 - [ ] **3.5 PostgreSQL profile validation + Makefile polish** — validate
       `application-postgres.yml` + `docker-compose.postgres.yml` end-to-end.
 - [ ] **3.6 Post-auth Python script hook** — optional per-account post-auth
       hook (configurable script path, timeout, stderr capture).
-- [ ] **3.7 E2E pass + docs finalization + CI** — full E2E test pass against a
+- [~] **3.7 E2E pass + docs finalization + CI** — full E2E test pass against a
       fresh install, `README.md`/`docs/` finalization, CI workflow
-      (`.github/workflows/ci.yml` build/test/docker).
+      (`.github/workflows/ci.yml` build/test/docker). CI workflow shipped; E2E
+      pass against a fresh install and docs finalization remain.
 
 ## Cross-cutting
 

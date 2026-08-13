@@ -250,11 +250,11 @@ Second tagged milestone (SemVer pre-release). Includes everything from
 
 ---
 
-## v0.1.0-alpha.4 — unreleased
+## v0.1.0-alpha.4 — 2026-08-13
 
-Fourth milestone (SemVer pre-release): interactive Swagger/OpenAPI documentation
+Fourth tagged milestone (SemVer pre-release): interactive Swagger/OpenAPI documentation
 with bearer-token testing support. Includes everything from `v0.1.0-alpha.3`
-plus the changes below.
+plus the changes below. Tag: `v0.1.0-alpha.4`.
 
 ### Phase 4 — API documentation
 - [x] `OpenApiConfig` — global `bearerAuth` HTTP/Bearer-JWT security scheme +
@@ -277,7 +277,8 @@ plus the changes below.
 
 Third tagged milestone (SemVer pre-release): admin & auth audit trail with real
 client-IP capture, syslog shipping and connection-log retention. Includes
-everything from `v0.1.0-alpha.2` plus the changes below.
+everything from `v0.1.0-alpha.2` plus the changes below. Tag: `v0.1.0-alpha.3`
+(back-tagged on `502a094` during the `v0.1.0-alpha.4` release).
 
 ### Phase 4 — Logging & audit
 - [x] `audit_logs` entity + `AuditLogService` — every mutating admin/auth flow
