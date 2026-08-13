@@ -11,6 +11,7 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -154,11 +155,7 @@ public class BackupService {
       replaceTree(staging.resolve("ccd"), ccdDir());
       boolean replacedDb = false;
       if (isSqlite() && Files.exists(staging.resolve(DB_ENTRY))) {
-        Files.copy(
-            staging.resolve(DB_ENTRY),
-            currentDbPath(),
-            StandardCopyOption.REPLACE_EXISTING,
-            StandardCopyOption.COPY_ATTRIBUTES);
+        replaceDatabase(staging.resolve(DB_ENTRY));
         replacedDb = true;
       }
       String message =
@@ -231,6 +228,31 @@ public class BackupService {
       path = path.substring(0, q);
     }
     return Path.of(path);
+  }
+
+  /**
+   * Replaces the live SQLite database file with a restored snapshot. SQLite WAL mode keeps {@code
+   * -wal}/{@code -shm} sidecar files next to the database; copying the main file over while stale
+   * sidecars remain corrupts the database on the next open, so the sidecars are removed first and
+   * the snapshot is swapped in atomically. A backend restart is still required because the running
+   * pool keeps the previous file open.
+   */
+  private void replaceDatabase(Path snapshot) throws IOException {
+    Path db = currentDbPath();
+    Path temp = Files.createTempFile(db.getParent(), "restore-", ".db");
+    try {
+      Files.copy(snapshot, temp, StandardCopyOption.REPLACE_EXISTING);
+      for (String suffix : List.of("-wal", "-shm")) {
+        Files.deleteIfExists(Path.of(db.toString() + suffix));
+      }
+      try {
+        Files.move(temp, db, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+      } catch (AtomicMoveNotSupportedException e) {
+        Files.move(temp, db, StandardCopyOption.REPLACE_EXISTING);
+      }
+    } finally {
+      Files.deleteIfExists(temp);
+    }
   }
 
   private void writeManifest(Path staging, boolean sqlite) throws IOException {

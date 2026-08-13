@@ -172,6 +172,42 @@ class BackupServiceTest {
     assertThatThrownBy(() -> backupService.restore("junk.zip")).isInstanceOf(ApiException.class);
   }
 
+  @Test
+  void restoreRemovesStaleWalSidecarsSoTheSwappedDatabaseStaysClean() throws Exception {
+    // Keep a connection open so the -wal/-shm sidecars survive, mirroring the live backend.
+    try (Connection keepOpen = java.sql.DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+        Statement st = keepOpen.createStatement()) {
+      st.execute("PRAGMA journal_mode=WAL");
+      st.executeUpdate("INSERT INTO widgets (name) VALUES ('widget-2')");
+      assertThat(dbPath.resolveSibling("opnl.db-wal")).exists();
+
+      BackupInfo info = backupService.createBackup();
+
+      try (Connection conn = dataSource.getConnection();
+          Statement st2 = conn.createStatement()) {
+        st2.executeUpdate("INSERT INTO widgets (name) VALUES ('widget-3')");
+      }
+
+      backupService.restore(info.name());
+    }
+
+    assertThat(dbPath.resolveSibling("opnl.db-wal")).doesNotExist();
+    assertThat(dbPath.resolveSibling("opnl.db-shm")).doesNotExist();
+    // The restored main file is the clean snapshot, readable by a fresh connection.
+    try (Connection conn = java.sql.DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery("PRAGMA integrity_check")) {
+      rs.next();
+      assertThat(rs.getString(1)).isEqualTo("ok");
+    }
+    try (Connection conn = java.sql.DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM widgets")) {
+      rs.next();
+      assertThat(rs.getInt(1)).isEqualTo(2);
+    }
+  }
+
   // ---- helpers ------------------------------------------------------------
 
   private static void createDatabase(Path path) throws Exception {
