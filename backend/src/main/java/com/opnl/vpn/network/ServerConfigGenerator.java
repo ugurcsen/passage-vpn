@@ -81,13 +81,52 @@ public class ServerConfigGenerator {
 
   private String renderDnsPushes(ServerConfig config) {
     StringBuilder sb = new StringBuilder();
+    String dnsmasq = dnsmasqServerIp(config.subnet());
+    if (dnsmasq != null) {
+      sb.append("push \"dhcp-option DNS ").append(dnsmasq).append("\"\n");
+    }
     for (String dns : config.dnsServers()) {
-      sb.append("push \"dhcp-option DNS ").append(dns).append("\"\n");
+      if (!dns.equals(dnsmasq)) {
+        sb.append("push \"dhcp-option DNS ").append(dns).append("\"\n");
+      }
     }
     if (config.domain() != null && !config.domain().isBlank()) {
       sb.append("push \"dhcp-option DOMAIN ").append(config.domain()).append("\"\n");
     }
     return sb.toString();
+  }
+
+  /**
+   * Computes the resolver address the openvpn container's dnsmasq serves for this daemon: the tun
+   * server IP, which OpenVPN assigns as the pool network + 1. Pushed to clients before the
+   * configured public servers so domain-pinned rules resolve through dnsmasq.
+   */
+  static String dnsmasqServerIp(String subnet) {
+    if (subnet == null || subnet.isBlank()) {
+      return null;
+    }
+    String[] octets = subnet.split("\\.");
+    if (octets.length != 4) {
+      return null;
+    }
+    long value = 0;
+    for (String octet : octets) {
+      int b;
+      try {
+        b = Integer.parseInt(octet);
+      } catch (NumberFormatException e) {
+        return null;
+      }
+      if (b < 0 || b > 255) {
+        return null;
+      }
+      value = value * 256 + b;
+    }
+    if (value == 0xFFFFFFFFL) {
+      return null;
+    }
+    long ip = value + 1;
+    return (ip >> 24) + "." + ((ip >> 16) & 0xFF) + "." + ((ip >> 8) & 0xFF) + "." + (ip & 0xFF);
   }
 
   private String renderRoutePushes(ServerConfig config) {

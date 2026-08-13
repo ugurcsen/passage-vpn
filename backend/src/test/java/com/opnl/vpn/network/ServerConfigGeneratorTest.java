@@ -55,10 +55,23 @@ class ServerConfigGeneratorTest {
     assertThat(conf).doesNotContain("redirect-gateway");
     assertThat(conf).contains("proto tcp");
     assertThat(conf).contains("port 1195");
+    assertThat(conf).contains("push \"dhcp-option DNS 10.9.0.1\"");
     assertThat(conf).contains("push \"dhcp-option DNS 9.9.9.9\"");
     assertThat(conf).contains("push \"dhcp-option DOMAIN corp.example.com\"");
     assertThat(conf).contains("push \"route 192.168.10.0 255.255.255.0\"");
     assertThat(conf).contains("management 0.0.0.0 7506");
+  }
+
+  @Test
+  void dnsmasqServerIpComputesTunAddress() {
+    assertThat(ServerConfigGenerator.dnsmasqServerIp("10.8.0.0")).isEqualTo("10.8.0.1");
+    assertThat(ServerConfigGenerator.dnsmasqServerIp("10.9.0.0")).isEqualTo("10.9.0.1");
+    assertThat(ServerConfigGenerator.dnsmasqServerIp("10.9.0.255")).isEqualTo("10.9.1.0");
+    assertThat(ServerConfigGenerator.dnsmasqServerIp(null)).isNull();
+    assertThat(ServerConfigGenerator.dnsmasqServerIp("")).isNull();
+    assertThat(ServerConfigGenerator.dnsmasqServerIp("not-an-ip")).isNull();
+    assertThat(ServerConfigGenerator.dnsmasqServerIp("1.2.3.300")).isNull();
+    assertThat(ServerConfigGenerator.dnsmasqServerIp("255.255.255.255")).isNull();
   }
 
   @Test

@@ -47,29 +47,54 @@ server_ip_of() {
     }'
 }
 
+# Lists the tun server IP (pool network + 1) of every daemon config. dnsmasq
+# listens on all of them so clients of any daemon reach the resolver via their
+# own tun gateway (each daemon's config pushes the matching address).
+tun_ips_of() {
+    local conf ip
+    for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do
+        ip="$(server_ip_of "$conf" 2>/dev/null || true)"
+        [ -n "$ip" ] && echo "$ip"
+    done | sort -u
+}
+
 # Starts dnsmasq once per container boot and SIGHUPs it on later reloads so the
 # backend's domain-pinning config (opnl-domains.conf) is re-read. The resolver
-# listens on the tun server IP of the first daemon plus loopback.
+# listens on loopback plus every daemon tun server IP; when the set of tun IPs
+# changes (new daemon/pool) the process is restarted instead of reloaded.
 start_dnsmasq() {
-    local conf ip pid args
-    conf="$(ls "$OPNL_CONFIG_DIR"/daemon-*.conf 2>/dev/null | head -1 || true)"
-    ip=""
-    [[ -n "$conf" ]] && ip="$(server_ip_of "$conf" 2>/dev/null || true)"
+    local ip ips current wanted args pid tries
     mkdir -p "$OPNL_CONFIG_DIR/dnsmasq.d"
+    ips=()
+    while IFS= read -r ip; do
+        [ -n "$ip" ] && ips+=("$ip")
+    done < <(tun_ips_of)
+    wanted=" --listen-address=127.0.0.1"
+    for ip in "${ips[@]}"; do
+        wanted+=" --listen-address=$ip"
+    done
+    wanted="${wanted:1} "
+    current=""
     pid="$(cat /var/run/dnsmasq.pid 2>/dev/null || true)"
-    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        current="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -oE -- '--listen-address=[^ ]+' | tr '\n' ' ')"
+    fi
+    if [ "$current" = "$wanted" ]; then
         kill -HUP "$pid" 2>/dev/null || true
         echo "[entrypoint] dnsmasq reloaded (pid $pid)"
         return 0
     fi
+    [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null || true
+    sleep 1
     args=(--conf-file=/etc/dnsmasq.conf --pid-file=/var/run/dnsmasq.pid --listen-address=127.0.0.1)
-    [[ -n "$ip" ]] && args+=(--listen-address="$ip")
-    # bind-interfaces fails while the tun IP does not exist yet; the tun comes up
+    for ip in "${ips[@]}"; do
+        args+=(--listen-address="$ip")
+    done
+    # bind-interfaces fails while a tun IP does not exist yet; the tun comes up
     # a moment after the daemon is started, so retry briefly.
-    local tries
     for tries in $(seq 1 15); do
         if dnsmasq "${args[@]}"; then
-            echo "[entrypoint] dnsmasq listening on ${ip:-127.0.0.1}:53"
+            echo "[entrypoint] dnsmasq listening on 127.0.0.1${ips:+ + }${ips[*]}"
             return 0
         fi
         sleep 2
