@@ -38,9 +38,38 @@ Tag: `v0.1.0-alpha.7`.
       against CIDR/group; the rules table shows `Domain: <name>`
 
 ### Verified
-- Backend suite green (344 test cases, spotless clean); frontend suite green
+- Backend suite green (345 test cases, spotless clean); frontend suite green
   (25 files / 118 tests, lint 0 errors, `tsc -b` clean); `make test` green.
-- Live E2E on production `65.21.108.250`: pending (see follow-up commit).
+- Live E2E on production `65.21.108.250`: checkout synced to the milestone and
+  the stack rebuilt (backend + frontend + openvpn images), all containers
+  healthy; backend suite re-run green on the deployed checkout and frontend
+  suite re-run green.
+- Domain flow verified end-to-end: `POST /api/admin/rules` with
+  `dstDomain=api.github.com` returns `destinationValid: true`; a request that
+  sets both `dstCidr` and `dstDomain` is rejected with 400. The backend writes
+  `address=/api.github.com/<ip>` + `server=/api.github.com/` into
+  `dnsmasq.d/opnl-domains.conf`; the entrypoint watcher picks up the change,
+  refreshes the `OPNL_DOMAINS` iptables chain (`RETURN` per pinned IP, final
+  `DROP`) and restarts dnsmasq. dnsmasq answers an A query for `api.github.com`
+  with exactly the pinned IP and returns NODATA for AAAA. daemon-0 pushes
+  `dhcp-option DNS 10.8.0.1` (its dnsmasq address) ahead of the public servers,
+  and dnsmasq listens on every daemon tun IP (10.8.0.1/10.9.0.1/10.10.0.1)
+  plus loopback. Deleting the rules returns the conf to zero pins, the chain to
+  `DROP`-only and `api.github.com` resolves via the upstream again; test rules
+  purged afterwards.
+
+### Live-verification fixes (found during E2E)
+- [x] Rule changes only rewrote the pinning config; the entrypoint now watches
+      `dnsmasq.d` too and refreshes the firewall + resolver without restarting
+      the running VPN daemons
+- [x] Clients were only pushed public DNS so pinning never reached them; the
+      generator now prepends the per-daemon dnsmasq address (pool network + 1)
+      and dnsmasq listens on every daemon tun IP
+- [x] SIGHUP re-read config but kept the dnsmasq cache, so a rotated IP could
+      split DNS from the firewall; pinning changes now restart dnsmasq (cache
+      cleared) after refreshing the chain
+- [x] Pinned domains answered AAAA from upstream (outside the IPv4-only rules);
+      `server=/domain/` makes dnsmasq authoritative so AAAA returns NODATA
 
 ---
 
