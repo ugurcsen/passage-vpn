@@ -50,11 +50,15 @@ public class ScriptSync implements ApplicationRunner {
       return;
     }
     try (Stream<Path> files = Files.list(srcDir)) {
-      files.filter(p -> p.toString().endsWith(".sh")).forEach(this::render);
+      files.filter(p -> isSyncedScript(p.toString())).forEach(this::render);
       log.info("Synced OpenVPN scripts from {} to {}", srcDir, destDir);
     } catch (IOException e) {
       log.warn("Failed to sync scripts: {}", e.getMessage());
     }
+  }
+
+  private static boolean isSyncedScript(String fileName) {
+    return fileName.endsWith(".sh") || fileName.endsWith(".py");
   }
 
   private void render(Path src) {

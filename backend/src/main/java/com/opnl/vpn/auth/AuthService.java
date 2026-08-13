@@ -34,6 +34,7 @@ public class AuthService {
   private final SettingsService settingsService;
   private final OpnlProperties properties;
   private final AuditLogService auditLogService;
+  private final PostAuthHookService postAuthHookService;
 
   /** Redeemed MFA challenge ids (jti) → redemption epoch-second, for single-use enforcement. */
   private final Map<String, Long> redeemedChallenges = new ConcurrentHashMap<>();
@@ -46,7 +47,8 @@ public class AuthService {
       TotpService totpService,
       SettingsService settingsService,
       OpnlProperties properties,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService,
+      PostAuthHookService postAuthHookService) {
     this.userRepository = userRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.authProvider = authProviderManager.active();
@@ -55,6 +57,7 @@ public class AuthService {
     this.settingsService = settingsService;
     this.properties = properties;
     this.auditLogService = auditLogService;
+    this.postAuthHookService = postAuthHookService;
   }
 
   public record TokenResponse(String accessToken, String refreshToken) {}
@@ -211,6 +214,7 @@ public class AuthService {
     user.setFailedAttempts(0);
     user.setLockedUntil(null);
     userRepository.save(user);
+    postAuthHookService.run(username, remoteIp);
     return new VpnVerification(true, null);
   }
 
@@ -244,6 +248,7 @@ public class AuthService {
     user.setFailedAttempts(0);
     user.setLockedUntil(null);
     userRepository.save(user);
+    postAuthHookService.run(username, remoteIp);
     return new VpnVerification(true, null);
   }
 

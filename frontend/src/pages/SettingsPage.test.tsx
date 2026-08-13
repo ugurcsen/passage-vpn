@@ -282,4 +282,27 @@ describe("SettingsPage", () => {
       expect(del).toBeDefined();
     });
   });
+
+  it("renders the post-auth hook settings and edits the script name", async () => {
+    const fetchMock = makeFetch({ post_auth_script: "post-auth-hook.py", post_auth_timeout_seconds: 10 });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+
+    expect(await screen.findByText("Post-auth hook script")).toBeInTheDocument();
+    expect(screen.getByText("post-auth-hook.py")).toBeInTheDocument();
+    expect(screen.getByText("Post-auth hook timeout")).toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByLabelText("Edit Post-auth hook script"));
+    const input = await screen.findByLabelText("Value");
+    expect(input).toHaveValue("post-auth-hook.py");
+    fireEvent.change(input, { target: { value: "custom-hook.py" } });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(putCalls(fetchMock)).toContainEqual({
+        url: "/api/admin/settings/post_auth_script",
+        body: { value: "custom-hook.py" },
+      });
+    });
+  });
 });

@@ -8,6 +8,41 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.6 — 2026-08-13
+
+Sixth tagged milestone (SemVer pre-release): post-auth Python script hook for
+VPN connect-time automation. Includes everything from `v0.1.0-alpha.5` plus the
+changes below. Tag: `v0.1.0-alpha.6`.
+
+### Phase 2.4/3.6 — Post-auth hook
+- [x] Server settings `post_auth_script` and `post_auth_timeout_seconds` —
+      a bare filename is resolved inside the shared scripts directory, an
+      absolute path is used as-is
+- [x] `PostAuthHookService` — runs the configured script after a successful VPN
+      login (env: `username`, `common_name`, `remote_ip`; timeout 1–120s,
+      default 10), best-effort: a missing script, non-zero exit or timeout never
+      drops the connection, and the outcome is recorded as a `VPN_POST_AUTH_HOOK`
+      audit event (CAT_AUTH; script/username/exitCode/success/error detail)
+- [x] Wired into `AuthService.verifyVpnLogin` + `AuthService.verifyVpnOtp`, so it
+      fires exactly once per connect: auth-pending MFA runs it at the OTP phase,
+      static-challenge MFA and password-only auth at phase 1; failed
+      authentication never triggers it
+- [x] `ScriptSync` now syncs `.py` scripts into the shared config volume;
+      example `openvpn/scripts/post-auth-hook.py` appends one JSON line per
+      login to `/var/log/opnl/post-auth.log`
+- [x] Backend runtime image gains `python3`; Settings page adds typed editors for
+      the two keys (script name + timeout)
+
+### Verified
+- Backend suite green (spotless clean); frontend suite green (25 files / 116
+  tests, lint 0 errors, build passes); `make test` green.
+- Live E2E on production `65.21.108.250`: checkout synced to the milestone
+  commit, stack rebuilt, backend + frontend suites re-run green on the deployed
+  checkout; hook flow verified end-to-end (setting → script synced → audit
+  event on successful VPN login).
+
+---
+
 ## v0.1.0-alpha.5 — 2026-08-13
 
 Fifth tagged milestone (SemVer pre-release): admin branding, configuration

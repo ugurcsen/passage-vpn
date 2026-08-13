@@ -24,7 +24,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Inter-group connectivity rules + NAT-vs-routing mode
 - [x] `CertService` restore/rotate + expiry-warning scheduler
 - [x] Multi-daemon (`daemons` entity) + DCO detection display
-- [ ] Domain-based control via dnsmasq (advanced)
+- [ ] Domain-based control via dnsmasq (advanced) — → M4 (4.2)
 
 **P0.5 — Bugfix sweep (live E2E findings, `docs/test-findings.md`)**
 - [x] 2.1 CRIT — drop removed `client-cert-not-required` from config generator; GENERIC daemons use `verify-client-cert none`
@@ -105,19 +105,23 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Audit log entity + UI; syslog integration; `connection_logs` retention
   (Flyway V8/V9, `/api/admin/audit-logs` with pagination + filters)
 
-**P3 — Phase 4: API, ops, deployment**
-- [x] OpenAPI/Swagger UI + bearer-auth testing (shipped in `v0.1.0-alpha.4`)
-- [x] API tokens for automation (`/api/admin/api-tokens`, `X-API-Token` auth)
+**M4 — v0.1.0-alpha.6 — Automation & Advanced Access** (detail: `docs/ROADMAP.md` M4)
+- [x] Post-auth Python script hook support (Phase 2.4/3.6)
+- [ ] Domain-based control via dnsmasq (Phase 3.2, advanced)
 - [ ] `docs/api.md` generation (script + make target ready; regenerate live in E2E)
-- [x] Brand settings, configuration report, backup/restore flow
-- [ ] Multi-node registry + node-aware status/kill routing
-- [x] `install.sh` full installer + first-run wizard UI
-- [ ] Demo/seed mode
-- [ ] PostgreSQL docker profile validation, Makefile polish
-- [ ] E2E test pass, README/docs finalization
-- [x] CI workflow (backend test + spotless, frontend lint + build + test)
-- [x] Profile settings page (portal: password + MFA setup)
-- [ ] Post-auth Python script hook support
+- [ ] Full CRUD API completion (Phase 4.4)
+- [ ] Makefile polish (Phase 4.7)
+
+**M5 — v0.1.0-alpha.7 — Multi-node & Ops** (detail: `docs/ROADMAP.md` M5)
+- [ ] `openvpn_nodes` registry + node-aware status/kill/monitoring routing (Phase 4.6)
+- [ ] Backend `agent` Spring profile (Phase 4.6)
+- [ ] PostgreSQL docker profile validation (Phase 4.7)
+
+**M6 — v0.1.0-beta.1 — Release Hardening** (detail: `docs/ROADMAP.md` M6)
+- [ ] Demo/seed mode (Phase 4.7)
+- [ ] CI docker build job (Phase 4.7)
+- [ ] Fresh-install E2E test pass, README/docs finalization (Phase 4.7)
+- [ ] Cross-cutting sweep
 
 ---
 
@@ -194,7 +198,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Password + OTP verification, lockout, user ban checks
 - [x] Auto-login (cert-only) + `client-connect` validation path (Phase 3)
 - [x] `static-challenge` handling for MFA-on-connect (challenge via verify-user-pass script)
-- [ ] Post-auth Python script hook support
+- [x] Post-auth Python script hook support
 
 ### 2.5 Frontend
 - [x] Login + MFA screens (dark/light) — wired to real session state

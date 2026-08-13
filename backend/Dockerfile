@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         easy-rsa \
         openvpn \
         openssl \
+        python3 \
         bash \
         curl \
         ca-certificates \

@@ -70,4 +70,13 @@ public final class SettingKeys {
 
   /** Optional brand logo URL shown on the login page and sidebar. */
   public static final String BRAND_LOGO_URL = "brand_logo_url";
+
+  /**
+   * Optional post-auth hook script executed by the backend after a successful VPN connect. A bare
+   * filename is resolved inside the shared scripts directory; an absolute path is used as-is.
+   */
+  public static final String POST_AUTH_SCRIPT = "post_auth_script";
+
+  /** Timeout in seconds for the post-auth hook script (default 10). */
+  public static final String POST_AUTH_TIMEOUT_SECONDS = "post_auth_timeout_seconds";
 }

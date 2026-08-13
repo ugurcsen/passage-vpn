@@ -137,6 +137,20 @@ export const KNOWN_SETTINGS: KnownSetting[] = [
     type: "string",
     placeholder: "https://…/logo.png",
   },
+  {
+    key: "post_auth_script",
+    label: "Post-auth hook script",
+    description: "Script run in the backend after a successful VPN login. A bare filename is looked up in the scripts directory (e.g. post-auth-hook.py); an absolute path is used as-is. Failure never drops the connection.",
+    type: "string",
+    placeholder: "e.g. post-auth-hook.py",
+  },
+  {
+    key: "post_auth_timeout_seconds",
+    label: "Post-auth hook timeout",
+    description: "Timeout in seconds for the post-auth hook script (1–120, default 10).",
+    type: "number",
+    placeholder: "10",
+  },
 ];
 
 /** Looks up metadata for a setting key, falling back to a raw JSON editor for unknown keys. */

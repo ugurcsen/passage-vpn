@@ -73,30 +73,74 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] **2.3 `connection_logs` retention** — periodic purge of closed rows older
       than a configurable retention window (server setting), plus index tuning.
 
-## M3 — API, ops & deployment
+## M3 — API, ops & deployment (superseded)
 
-- [~] **3.1 OpenAPI/Swagger + `docs/api.md` + API tokens** — Springdoc UI,
-      generated `docs/api.md`, API token entity + header auth for automation.
-      Springdoc UI + global bearer-auth scheme shipped in `v0.1.0-alpha.4`;
-      `docs/api.md` generation and API tokens remain.
-- [ ] **3.2 Brand settings + configuration report + backup/restore (DB dump)** —
-      brand settings (name/logo/colors) surfaced through the theme API;
-      configuration report (settings snapshot + PKI inventory + versions);
-      **backup with full DB dump + tar of config/PKI, and a restore flow**
-      (upload/extract + SQLite dump import). UI on the Settings page.
-- [ ] **3.3 Multi-node registry + node-aware routing** — `openvpn_nodes`
-      registry, node-aware status/kill/monitor routing, backend `agent` profile.
-- [~] **3.4 `install.sh` full installer + demo/seed mode** — preflight, env,
-      build, up, wizard trigger; optional seed/demo data mode. Installer done;
-      demo/seed data mode remains.
-- [ ] **3.5 PostgreSQL profile validation + Makefile polish** — validate
-      `application-postgres.yml` + `docker-compose.postgres.yml` end-to-end.
-- [ ] **3.6 Post-auth Python script hook** — optional per-account post-auth
-      hook (configurable script path, timeout, stderr capture).
-- [~] **3.7 E2E pass + docs finalization + CI** — full E2E test pass against a
-      fresh install, `README.md`/`docs/` finalization, CI workflow
-      (`.github/workflows/ci.yml` build/test/docker). CI workflow shipped; E2E
-      pass against a fresh install and docs finalization remain.
+Work started under M3 has been split: completed items shipped in
+`v0.1.0-alpha.4`/`v0.1.0-alpha.5`; remaining items roll into M4–M6 below.
+
+- [x] **3.1a OpenAPI/Swagger UI + bearer-auth testing** — shipped in `v0.1.0-alpha.4`
+- [x] **3.1b API tokens for automation** — shipped (`/api/admin/api-tokens`, `X-API-Token`)
+- [x] **3.2 Brand settings + configuration report + backup/restore** — shipped in `v0.1.0-alpha.5`
+- [x] **3.4a `install.sh` full installer + first-run wizard UI** — shipped
+- [ ] **3.1c `docs/api.md` generation** — → M4
+- [ ] **3.3 Multi-node registry + node-aware routing + `agent` profile** — → M5
+- [ ] **3.4b Demo/seed mode** — → M6
+- [ ] **3.5 PostgreSQL profile validation** — → M5
+- [x] **3.6 Post-auth Python script hook** — shipped in M4 (4.1)
+- [ ] **3.7 E2E pass + docs finalization + CI docker job** — → M6
+
+## M4 — Automation & Advanced Access — TARGET `v0.1.0-alpha.6`
+
+- [x] **4.1 Post-auth Python script hook** — `SettingKeys.post_auth_script` (+
+      timeout); `AuthService.verifyVpnLogin` runs the script via `ProcessRunner`
+      after a successful VPN login (env: username, remote_ip, daemon; stderr
+      captured; hook failure must not drop the connection — audit it). Script
+      synced into the shared config volume by `ScriptSync`. Tests:
+      `AuthServiceTest` hook success/failure/timeout cases.
+- [ ] **4.2 Domain-based control via dnsmasq** — `AccessRule` domain target
+      (`dstDomain`, Flyway V11) resolved to IPs by `RuleEngine`; per-domain
+      entries rendered into `/etc/dnsmasq.d/opnl-domains.conf` and the matching
+      iptables rules by `apply-rules.sh`; domain picker on the Access Rules page.
+      Tests: `RuleEngineTest` domain resolution, `ServerConfigGeneratorTest`
+      dnsmasq config rendering.
+- [ ] **4.3 `docs/api.md` generation** — regenerate via `make api-docs` against
+      the live backend and commit; verify in live E2E.
+- [ ] **4.4 Full CRUD API completion** — audit admin/portal namespaces for gaps
+      (daemon management, connection kill, node lifecycle) and fill them.
+- [ ] **4.5 Makefile polish** — complete targets, `api-docs` verification step,
+      `help` refresh.
+- [ ] **4.6 Release** — `v0.1.0-alpha.6` tag + `RELEASE_NOTES.md` entry.
+
+## M5 — Multi-node & Ops — TARGET `v0.1.0-alpha.7`
+
+- [ ] **5.1 `openvpn_nodes` registry** — Flyway V12 entity (name, mgmtHost,
+      mgmtPortBase, adminIp, enabled); `NodeRegistryService` + admin CRUD API.
+- [ ] **5.2 Node-aware status/kill/monitoring routing** — per-node `MgmtClient`
+      (reconnect/backoff), node-scoped `/api/admin/monitor`, `/api/admin/status`,
+      connection-logs reconciliation and `kill <cn>`; node column/picker on the
+      Status page.
+- [ ] **5.3 Backend `agent` Spring profile** — lightweight agent managing its own
+      openvpn container, registering/heartbeating to the central backend via
+      `/internal/node/*` (network-restricted, `OPNL_INTERNAL_TOKEN`).
+      `application-agent.yml`.
+- [ ] **5.4 PostgreSQL profile validation** — end-to-end validation of
+      `docker-compose.postgres.yml` + `application-postgres.yml`; all Flyway
+      migrations V1–V12 apply on Postgres; fix any SQLite-only SQL.
+- [ ] **5.5 Release** — `v0.1.0-alpha.7` tag + `RELEASE_NOTES.md` entry.
+
+## M6 — Release Hardening — TARGET `v0.1.0-beta.1`
+
+- [ ] **6.1 Demo/seed mode** — `make seed-demo` / `OPNL_DEMO_MODE`: sample users,
+      groups, access rules, certs and connection history.
+- [ ] **6.2 CI docker build job** — docker build job in `.github/workflows/ci.yml`
+      (`docker compose build` for backend/frontend/openvpn images).
+- [ ] **6.3 Fresh-install E2E test pass** — `install.sh` clean install → wizard →
+      login → full UI → VPN connect flow; findings into `docs/test-findings.md`.
+- [ ] **6.4 README/docs finalization** — feature matrix, architecture diagram,
+      final `docs/api.md`.
+- [ ] **6.5 Cross-cutting sweep** — env-var-driven config audit, secret scan,
+      English-only verification, Spotless/ESLint clean, mutation test coverage.
+- [ ] **6.6 Release** — `v0.1.0-beta.1` tag + `RELEASE_NOTES.md` entry.
 
 ## Cross-cutting
 

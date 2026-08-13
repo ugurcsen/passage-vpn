@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +41,7 @@ class AuthServiceTest {
   private AuthService service;
   private JwtService jwtService;
   private BCryptPasswordEncoder encoder;
+  private PostAuthHookService postAuthHookService;
 
   @BeforeEach
   void setUp() {
@@ -63,6 +65,7 @@ class AuthServiceTest {
     AuthProviderManager authProviderManager =
         new AuthProviderManager(
             properties, List.of(new LocalAuthProvider(userRepository, encoder)));
+    postAuthHookService = mock(PostAuthHookService.class);
     service =
         new AuthService(
             userRepository,
@@ -72,7 +75,8 @@ class AuthServiceTest {
             new TotpService(),
             settingsService,
             properties,
-            mock(AuditLogService.class));
+            mock(AuditLogService.class),
+            postAuthHookService);
   }
 
   private User user(String username, boolean mfaEnabled, String mfaSecret) {
@@ -349,6 +353,34 @@ class AuthServiceTest {
     var result = service.verifyVpnOtp("carol", "123456", "1.2.3.4");
     assertThat(result.allowed()).isFalse();
     assertThat(result.reason()).isEqualTo("account_locked");
+  }
+
+  @Test
+  void vpnVerifyRunsPostAuthHookOnSuccess() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    when(settingsService.effectiveForUser(anyString())).thenReturn(Map.of());
+    var result = service.verifyVpnLogin("alice", "supersecret1", null, "1.2.3.4");
+    assertThat(result.allowed()).isTrue();
+    verify(postAuthHookService).run("alice", "1.2.3.4");
+  }
+
+  @Test
+  void vpnVerifyDoesNotRunHookOnFailure() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    service.verifyVpnLogin("alice", "wrongpass1", null, "1.2.3.4");
+    verify(postAuthHookService, never()).run(anyString(), anyString());
+  }
+
+  @Test
+  void vpnVerifyOtpRunsPostAuthHookOnSuccess() {
+    String secret = new TotpService().generateSecret();
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", true, secret)));
+    var result = service.verifyVpnOtp("alice", totpCode(secret), "1.2.3.4");
+    assertThat(result.allowed()).isTrue();
+    verify(postAuthHookService).run("alice", "1.2.3.4");
   }
 
   private String totpCode(String secret) {
