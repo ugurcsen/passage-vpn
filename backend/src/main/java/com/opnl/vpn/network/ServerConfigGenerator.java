@@ -187,10 +187,18 @@ public class ServerConfigGenerator {
                 + "# the addresses below, which the per-client firewall rules also match.\n"
                 + "# Do not edit manually — rewritten whenever access rules change.\n");
     for (var entry : domainToIps.entrySet()) {
+      boolean pinned = false;
       for (String ip : entry.getValue()) {
         if (ip != null && !ip.isBlank()) {
           sb.append("address=/").append(entry.getKey()).append("/").append(ip).append("\n");
+          pinned = true;
         }
+      }
+      if (pinned) {
+        // Make dnsmasq authoritative for the domain: A queries are answered from
+        // the pins above while AAAA queries return NODATA, so dual-stack clients
+        // never leave the reach of the IPv4-only firewall rules.
+        sb.append("server=/").append(entry.getKey()).append("/\n");
       }
     }
     return sb.toString();

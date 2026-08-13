@@ -77,7 +77,9 @@ class DnsmasqConfigServiceTest {
     String conf = Files.readString(tempDir.resolve("dnsmasq.d/opnl-domains.conf"));
     assertThat(conf)
         .contains("address=/api.github.com/140.82.112.5")
+        .contains("server=/api.github.com/")
         .contains("address=/www.example.com/93.184.215.14")
+        .contains("server=/www.example.com/")
         .doesNotContain("disabled.example.com");
   }
 

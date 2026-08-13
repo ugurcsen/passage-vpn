@@ -157,7 +157,9 @@ class ServerConfigGeneratorTest {
     assertThat(conf)
         .contains("address=/api.github.com/140.82.112.5")
         .contains("address=/api.github.com/140.82.113.5")
-        .contains("address=/www.example.com/93.184.215.14");
+        .contains("server=/api.github.com/")
+        .contains("address=/www.example.com/93.184.215.14")
+        .contains("server=/www.example.com/");
   }
 
   @Test
@@ -166,6 +168,9 @@ class ServerConfigGeneratorTest {
         generator.renderDnsmasqConfig(
             Map.of("up.example.com", Set.of(), "ok.example.com", Set.of("1.2.3.4")));
 
-    assertThat(conf).doesNotContain("up.example.com").contains("address=/ok.example.com/1.2.3.4");
+    assertThat(conf)
+        .doesNotContain("up.example.com")
+        .contains("address=/ok.example.com/1.2.3.4")
+        .contains("server=/ok.example.com/");
   }
 }
