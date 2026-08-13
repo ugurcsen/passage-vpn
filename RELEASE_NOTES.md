@@ -70,6 +70,38 @@ Tag: `v0.1.0-alpha.8`.
 
 ---
 
+## v0.1.0-alpha.9 — 2026-08-13
+
+Ninth tagged milestone (SemVer pre-release): accessibility hardening of the
+DNS Overrides admin page found during a live Chrome audit. Includes
+everything from `v0.1.0-alpha.8` plus the changes below. Tag:
+`v0.1.0-alpha.9`.
+
+### Phase M4.7 follow-up — DNS Overrides a11y
+- [x] Dialog form fields carry explicit `id`/`name` attributes (`dns-hostname`,
+      `dns-ipv4`, `dns-scope`, `dns-scope-target`, `dns-enabled`), following the
+      login-page pattern from `v0.1.0-alpha.5`
+- [x] The DataGrid per-row enable toggle is labeled with `name="enabled"` and a
+      per-row `aria-label` (`Toggle enabled for <hostname>`) so screen readers
+      can distinguish each row's switch
+- [x] The two scope `TextField select`s pass `id`/`name` through `inputProps` to
+      their hidden native inputs (the visible button already carried the id)
+
+### Verified
+- Frontend suite green (26 files / 123 tests, lint 0 errors); `vite build`
+  passes; `make test` green.
+- Live in Chrome against production `65.21.108.250`: the DNS Overrides page
+  was exercised end-to-end (create → enable toggle → edit → delete with
+  confirmation) and the full lifecycle appeared in the audit trail
+  (`DNS_RECORD_CREATE/DISABLE/ENABLE/UPDATE/DELETE`, CAT_DNS); a malformed
+  IPv4 was rejected with `400 validation_failed`. The Chrome a11y audit dropped
+  from 4 flagged form fields to 1 — the remaining one is the DataGrid's
+  built-in "Rows per page" pagination select (framework internal, present on
+  every DataGrid page, not patched per page). The stack was rebuilt and the
+  frontend container recreated with the fix.
+
+---
+
 ## v0.1.0-alpha.7 — 2026-08-13
 
 Seventh tagged milestone (SemVer pre-release): domain-based access control via
