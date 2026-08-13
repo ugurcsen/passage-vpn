@@ -23,6 +23,7 @@ public class OvpnGenerator {
       data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305
       auth SHA256
       __AUTH_USER_PASS__
+      __IPV6__
       <tls-crypt>
       __TLS_CRYPT__
       </tls-crypt>
@@ -71,11 +72,18 @@ public class OvpnGenerator {
           case GENERIC -> block("ca", caCert);
         };
 
+    // Request an IPv6-capable tunnel and route all IPv6 traffic through it when
+    // the server runs dual-stack. Server pushes alone are ignored by several
+    // clients (notably OpenVPN Connect), so the directives are embedded in the
+    // profile itself.
+    String ipv6 = config.ipv6Enabled() ? "tun-ipv6\nredirect-gateway ipv6" : "";
+
     return CLIENT_PREAMBLE
         .replace("__PROTO__", proto.name())
         .replace("__HOST__", host)
         .replace("__PORT__", String.valueOf(port))
         .replace("__AUTH_USER_PASS__", authUserPass)
+        .replace("__IPV6__", ipv6)
         .replace("__TLS_CRYPT__", taKey.trim())
         .replace("__CERT_BLOCK__", certBlock)
         .replace("\n\n\n", "\n\n");
