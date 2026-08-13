@@ -8,6 +8,63 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.10 — 2026-08-14
+
+Tenth tagged milestone (SemVer pre-release): full IPv6 dual-stack support — the
+VPN tunnels now carry IPv6 alongside IPv4: dual-stack daemon configs (`tun-ipv6`,
+`server-ipv6`, IPv6 route push), static IPv6 for users/groups (CCD
+`ifconfig-ipv6`), a complete ip6tables mirror of the per-client firewall, and
+IPv6 (AAAA) answers for DNS overrides. Includes everything from `v0.1.0-alpha.9`
+plus the changes below. Tag: `v0.1.0-alpha.10`.
+
+### Phase M4.8 — IPv6 dual-stack
+- [x] Flyway V14 — `users.static_ipv6`, `dns_records.ipv6`, and
+      `daemons.ipv6_enabled`/`daemons.ipv6_subnet`; dual-stack is off by default
+      with `fd00:1::/64` as the default IPv6 subnet
+- [x] `ServerConfig` gains `ipv6Enabled`/`ipv6Subnet`; `ServerConfigGenerator`
+      emits `tun-ipv6`, `server-ipv6 <subnet>`, `push "route-ipv6"` and
+      `ifconfig-ipv6-remote` per daemon only when dual-stack is enabled; IPv6
+      `udp6`/`tcp6` protocols supported
+- [x] `RuleEngine` — `IptablesResult` extended with `apply6`/`remove6`;
+      `iptablesFor` renders the ip6tables mirror (default forward ACCEPT, per
+      rule `-d <v6>/128` matches, `scopeDenyIpv6For` for out-of-scope DNS
+      overrides); `AccessRuleService.iptablesFor` threads `ipv6Enabled` +
+      client v6 address through it
+- [x] `InternalController` — `/internal/connect` + `/internal/disconnect`
+      accept `virtualIp6` and return `iptablesApply6`/`iptablesRemove6`;
+      `ConnectionRegistry` registers and indexes the dual-stack virtual address
+- [x] `MgmtStatus` parses the IPv6 virtual address from the status file;
+      monitor, `DashboardAdminService`, `ConnectionLogService` and
+      `TrafficAggregator` carry the v6 address end to end
+- [x] CCD — `CcdService` writes `ifconfig-ipv6` for static IPv6 (conflict
+      detection), group `static_ipv6_pool` auto-allocation
+- [x] DNS — `DnsRecordDto.ipv6` (AAAA); `DnsmasqConfigService` emits the AAAA
+      record for dual-stack overrides; `apply-rules.sh` mirrors the `OPNL_DOMAINS`
+      pins in an `OPNL_DOMAINS6` ip6tables chain when `OPNL_VPN_POOL6` is set
+- [x] openvpn scripts — `client-connect.sh`/`client-disconnect.sh` pass
+      `virtualIp6` (from `ifconfig_pool_remote_ip6`/`ifconfig_ipv6_remote`);
+      `entrypoint.sh` derives the pool from `server-ipv6` for the NAT + dnsmasq
+      IPv6 gateway
+- [x] Frontend — Settings network form IPv6 toggle + subnet; VPN Daemons IPv6
+      column + edit dialog; Users Static IPv6 column + CCD dialog (SET /
+      ALLOCATE IPV6); Groups Static IPv6 pool dialog; DNS Overrides IPv6 column
+      + AAAA field; setup wizard carries the dual-stack flag through
+
+### Verified
+- Backend suite green (370 tests, spotless clean); frontend suite green
+  (26 files / 123 tests, lint 0 errors); `make test` green.
+- Live E2E on production `65.21.108.250`: checkout synced and the stack rebuilt
+  (backend + frontend + openvpn), all containers healthy; Flyway V14 applied
+  (schema at v14). Chrome verification: Settings IPv6 toggle reveals the
+  `fd00:1::/64` subnet; VPN Daemons edit dialog toggles dual-stack; Users grid
+  shows Static IPv6 with CCD SET/ALLOCATE IPV6; Groups Static IPv6 pool dialog;
+  DNS Overrides edit dialog carries the IPv6 (AAAA) field; daemons/users/groups/
+  dns admin APIs return the new v6 fields; config generation verified (no IPv6
+  directives when disabled, `virtualIp6` flowing through the internal connect
+  contract via the container scripts).
+
+---
+
 ## v0.1.0-alpha.8 — 2026-08-13
 
 Eighth tagged milestone (SemVer pre-release): DNS overrides — admin-defined
