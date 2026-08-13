@@ -117,6 +117,14 @@ conf_sig() {
     echo "$sig"
 }
 
+dnsmasq_sig() {
+    local sig="" conf
+    for conf in "$OPNL_CONFIG_DIR"/dnsmasq.d/*.conf; do
+        [ -f "$conf" ] && sig+="$(md5sum "$conf" | cut -d' ' -f1)"
+    done
+    echo "$sig"
+}
+
 restart_all() {
     # SIGTERM running daemons gracefully; configs are re-read on next connect.
     for pidfile in "$OPNL_LOG_DIR"/daemon-*.pid; do
@@ -146,14 +154,24 @@ fi
 
 # Watch the shared config volume: when the backend writes/updates daemon configs
 # (first-run wizard, settings changes), reload the daemons without a restart.
+# The dnsmasq pinning config (opnl-domains.conf) is watched separately so access
+# rule changes refresh the resolver and the OPNL_DOMAINS chain without touching
+# the running VPN daemons.
 (
     last_sig="$boot_sig"
+    last_dnsmasq="$(dnsmasq_sig)"
     while :; do
         cur="$(conf_sig)"
         if [ -n "$cur" ] && [ "$cur" != "$last_sig" ]; then
             echo "[entrypoint] daemon config changed; restarting daemons"
             restart_all
             last_sig="$cur"
+        fi
+        cur_dnsmasq="$(dnsmasq_sig)"
+        if [ -n "$cur_dnsmasq" ] && [ "$cur_dnsmasq" != "$last_dnsmasq" ]; then
+            echo "[entrypoint] dnsmasq config changed; refreshing resolver + firewall"
+            reapply_rules || true
+            last_dnsmasq="$cur_dnsmasq"
         fi
         sleep 2
     done
