@@ -311,4 +311,26 @@ describe("UsersPage", () => {
       expect(post).toBeDefined();
     });
   });
+
+  it("hides the role selector and MFA management from resellers", async () => {
+    const user = userEvent.setup();
+    const reseller = { ...currentUser, id: "res1", username: "reseller", role: "RESELLER" };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url.startsWith("/api/auth/me")) return Promise.resolve(json(reseller));
+        if (url.startsWith("/api/admin/groups")) return Promise.resolve(json(groups));
+        return Promise.resolve(json(users));
+      }),
+    );
+
+    renderPage();
+    await screen.findByText("alice");
+
+    expect(screen.queryByTestId("manage-mfa-alice")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /new user/i }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).queryByLabelText(/role/i)).not.toBeInTheDocument();
+  });
 });

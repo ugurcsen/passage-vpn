@@ -1,12 +1,13 @@
 import { Box, CircularProgress, ThemeProvider } from "@mui/material";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { AuthProvider, useAuth, type Role } from "@/hooks/useAuth";
 import { BrandProvider, useBrand } from "@/hooks/useBrand";
 import { ToastProvider } from "@/hooks/useToast";
 import { queryClient } from "@/lib/queryClient";
 import { buildTheme } from "@/theme";
+import { canAccess, homePathFor } from "@/lib/roles";
 import { AppLayout } from "@/components/AppLayout";
 import { LoginPage } from "@/pages/LoginPage";
 import { MfaLoginPage } from "@/pages/MfaLoginPage";
@@ -80,24 +81,27 @@ function ThemedApp() {
                   <Route path="/setup" element={<SetupWizardPage />} />
                   <Route path="/share/:token" element={<SharePage />} />
                   <Route element={<AppLayout darkMode={darkMode} onToggleDarkMode={toggleDarkMode} />}>
-                    <Route path="/" element={<DashboardPage />} />
-                    <Route path="/users" element={<UsersPage />} />
-                    <Route path="/groups" element={<GroupsPage />} />
+                    <Route path="/" element={<RoleRoute roles={["ADMIN"]}><DashboardPage /></RoleRoute>} />
+                    <Route path="/users" element={<RoleRoute roles={["ADMIN", "RESELLER"]}><UsersPage /></RoleRoute>} />
+                    <Route
+                      path="/groups"
+                      element={<RoleRoute roles={["ADMIN"]}><GroupsPage /></RoleRoute>}
+                    />
                     <Route
                       path="/certs"
-                      element={<CertsPage />}
+                      element={<RoleRoute roles={["ADMIN"]}><CertsPage /></RoleRoute>}
                     />
                     <Route
                       path="/rules"
-                      element={<AccessRulesPage />}
+                      element={<RoleRoute roles={["ADMIN"]}><AccessRulesPage /></RoleRoute>}
                     />
                     <Route
                       path="/profiles"
-                      element={<ProfilesPage />}
+                      element={<RoleRoute roles={["ADMIN"]}><ProfilesPage /></RoleRoute>}
                     />
                     <Route
                       path="/daemons"
-                      element={<DaemonsPage />}
+                      element={<RoleRoute roles={["ADMIN"]}><DaemonsPage /></RoleRoute>}
                     />
                     <Route
                       path="/portal"
@@ -109,34 +113,34 @@ function ThemedApp() {
                     />
                     <Route
                       path="/status"
-                      element={<StatusPage />}
+                      element={<RoleRoute roles={["ADMIN"]}><StatusPage /></RoleRoute>}
                     />
                     <Route
                       path="/settings"
-                      element={<SettingsPage />}
+                      element={<RoleRoute roles={["ADMIN"]}><SettingsPage /></RoleRoute>}
                     />
                     <Route
                       path="/branding"
-                      element={<BrandingPage />}
+                      element={<RoleRoute roles={["ADMIN"]}><BrandingPage /></RoleRoute>}
                     />
                     <Route
                       path="/config-report"
-                      element={<ConfigReportPage />}
+                      element={<RoleRoute roles={["ADMIN"]}><ConfigReportPage /></RoleRoute>}
                     />
                     <Route
                       path="/backups"
-                      element={<BackupsPage />}
+                      element={<RoleRoute roles={["ADMIN"]}><BackupsPage /></RoleRoute>}
                     />
                     <Route
                       path="/audit-logs"
-                      element={<AuditLogsPage />}
+                      element={<RoleRoute roles={["ADMIN"]}><AuditLogsPage /></RoleRoute>}
                     />
                     <Route
                       path="/api-tokens"
-                      element={<ApiTokensPage />}
+                      element={<RoleRoute roles={["ADMIN"]}><ApiTokensPage /></RoleRoute>}
                     />
                   </Route>
-                  <Route path="*" element={<Navigate to="/" replace />} />
+                  <Route path="*" element={<RedirectToHome />} />
                 </Routes>
               </AuthGate>
             </BrowserRouter>
@@ -148,7 +152,7 @@ function ThemedApp() {
 }
 
 /** Redirects between login and the authenticated app based on session state. */
-function AuthGate({ children }: { children: React.ReactNode }) {
+function AuthGate({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -161,7 +165,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (user) {
     if (window.location.pathname === "/login" || window.location.pathname === "/login/mfa") {
-      return <Navigate to="/" replace />;
+      return <Navigate to={homePathFor(user.role)} replace />;
     }
     return <>{children}</>;
   }
@@ -172,6 +176,21 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
   return <Navigate to="/login" replace />;
+}
+
+/** Guards a route by role; redirects unauthorized users to their own home page. */
+function RoleRoute({ roles, children }: { roles: Role[]; children: ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (!canAccess(roles, user.role)) return <Navigate to={homePathFor(user.role)} replace />;
+  return <>{children}</>;
+}
+
+/** Catch-all: logged-in users go to their role home, guests to login. */
+function RedirectToHome() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  return <Navigate to={homePathFor(user.role)} replace />;
 }
 
 /** Suspense fallback for lazy-loaded routes. */

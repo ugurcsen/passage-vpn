@@ -36,28 +36,37 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import PaletteIcon from "@mui/icons-material/Palette";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
 import BackupIcon from "@mui/icons-material/Backup";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, type Role } from "@/hooks/useAuth";
 import { useBrand } from "@/hooks/useBrand";
+import { canAccess } from "@/lib/roles";
 
 const DRAWER_WIDTH = 240;
 
-const NAV_ITEMS = [
-  { label: "Dashboard", path: "/", icon: <DashboardIcon /> },
-  { label: "Users", path: "/users", icon: <PeopleIcon /> },
-  { label: "Groups", path: "/groups", icon: <GroupIcon /> },
-  { label: "Certificates", path: "/certs", icon: <VpnKeyIcon /> },
-  { label: "Access Rules", path: "/rules", icon: <SecurityIcon /> },
-  { label: "Connection Profiles", path: "/profiles", icon: <DownloadIcon /> },
-  { label: "VPN Daemons", path: "/daemons", icon: <DnsIcon /> },
+interface NavItem {
+  label: string;
+  path: string;
+  icon: ReactNode;
+  /** Roles allowed to see the item; undefined means all authenticated roles. */
+  roles?: Role[];
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { label: "Dashboard", path: "/", icon: <DashboardIcon />, roles: ["ADMIN"] },
+  { label: "Users", path: "/users", icon: <PeopleIcon />, roles: ["ADMIN", "RESELLER"] },
+  { label: "Groups", path: "/groups", icon: <GroupIcon />, roles: ["ADMIN"] },
+  { label: "Certificates", path: "/certs", icon: <VpnKeyIcon />, roles: ["ADMIN"] },
+  { label: "Access Rules", path: "/rules", icon: <SecurityIcon />, roles: ["ADMIN"] },
+  { label: "Connection Profiles", path: "/profiles", icon: <DownloadIcon />, roles: ["ADMIN"] },
+  { label: "VPN Daemons", path: "/daemons", icon: <DnsIcon />, roles: ["ADMIN"] },
   { label: "My Profiles", path: "/portal", icon: <PersonIcon /> },
   { label: "My Account", path: "/portal/account", icon: <SecurityIcon /> },
-  { label: "Live Status", path: "/status", icon: <MonitorHeartIcon /> },
-  { label: "Settings", path: "/settings", icon: <SettingsIcon /> },
-  { label: "Branding", path: "/branding", icon: <PaletteIcon />, adminOnly: true },
-  { label: "Config Report", path: "/config-report", icon: <FactCheckIcon />, adminOnly: true },
-  { label: "Backups", path: "/backups", icon: <BackupIcon />, adminOnly: true },
-  { label: "Audit Log", path: "/audit-logs", icon: <HistoryIcon />, adminOnly: true },
-  { label: "API Tokens", path: "/api-tokens", icon: <KeyIcon />, adminOnly: true },
+  { label: "Live Status", path: "/status", icon: <MonitorHeartIcon />, roles: ["ADMIN"] },
+  { label: "Settings", path: "/settings", icon: <SettingsIcon />, roles: ["ADMIN"] },
+  { label: "Branding", path: "/branding", icon: <PaletteIcon />, roles: ["ADMIN"] },
+  { label: "Config Report", path: "/config-report", icon: <FactCheckIcon />, roles: ["ADMIN"] },
+  { label: "Backups", path: "/backups", icon: <BackupIcon />, roles: ["ADMIN"] },
+  { label: "Audit Log", path: "/audit-logs", icon: <HistoryIcon />, roles: ["ADMIN"] },
+  { label: "API Tokens", path: "/api-tokens", icon: <KeyIcon />, roles: ["ADMIN"] },
 ];
 
 interface AppLayoutProps {
@@ -82,7 +91,7 @@ export function AppLayout({ darkMode, onToggleDarkMode }: AppLayoutProps) {
         </Typography>
       </Toolbar>
       <List dense>
-        {NAV_ITEMS.filter((item) => !item.adminOnly || user?.role === "ADMIN").map((item) => (
+        {NAV_ITEMS.filter((item) => canAccess(item.roles, user?.role ?? "USER")).map((item) => (
           <ListItemButton
             key={item.path}
             selected={location.pathname === item.path}

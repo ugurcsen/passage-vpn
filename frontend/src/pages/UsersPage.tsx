@@ -117,6 +117,7 @@ export function UsersPage() {
   const [ccdStaticIp, setCcdStaticIp] = useState("");
 
   const canManageMfa = currentUser?.role === "ADMIN";
+  const isAdmin = currentUser?.role === "ADMIN";
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -632,16 +633,18 @@ export function UsersPage() {
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
-            <TextField
-              select
-              label="Role"
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
-            >
-              <MenuItem value="USER">User</MenuItem>
-              <MenuItem value="RESELLER">Reseller</MenuItem>
-              <MenuItem value="ADMIN">Admin</MenuItem>
-            </TextField>
+            {isAdmin && (
+              <TextField
+                select
+                label="Role"
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
+              >
+                <MenuItem value="USER">User</MenuItem>
+                <MenuItem value="RESELLER">Reseller</MenuItem>
+                <MenuItem value="ADMIN">Admin</MenuItem>
+              </TextField>
+            )}
             <TextField
               select
               label="Groups"
