@@ -8,6 +8,39 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.11 — 2026-08-14
+
+Eleventh tagged milestone (SemVer pre-release): DNS override ⇄ access-rule
+conflict awareness — the admin UI now surfaces when a scoped DNS override
+(GROUP/USER) is reachable by out-of-scope users because an ALLOW access rule
+covers its address. The per-client firewall ordering is unchanged (explicit
+ALLOW wins); this milestone only reports the conflict. Includes everything from
+`v0.1.0-alpha.10.1` plus the changes below. Tag: `v0.1.0-alpha.11`.
+
+### Phase M4.7 follow-up — DNS override ⇄ access-rule conflict warnings
+- [x] `CidrUtil` — IPv4/IPv6 CIDR containment helper (`contains(cidr, ip)`) with
+      family-mismatch/malformed-input protection, shared by the warning logic
+- [x] `GroupHierarchy` — group-chain resolution extracted from `RuleEngine`
+      (`groupChainFor`) so firewall rendering and conflict detection use the
+      same audience logic
+- [x] `DnsScopeConflictService` — for each scoped DNS override, finds ALLOW
+      rules (CIDR/domain) that let out-of-scope users reach its address, and for
+      each ALLOW rule the scoped overrides it exposes; GLOBAL overrides and
+      DENY/disabled rules never warn
+- [x] `DnsRecordDto.warnings` + `AccessRuleDto.warnings` populated by
+      `DnsOverrideService`/`AccessRuleService` on list/create/update/enabled
+- [x] Frontend — "Warnings" column in the DNS Overrides and Access Rules grids:
+      warning icon + count with a tooltip listing the conflicting rule/override
+
+### Verified
+- Backend suite green (391 tests); frontend suite green (125 tests, lint 0
+  errors); spotless clean.
+- Deployed to production `65.21.108.250` and verified in Chrome: creating an
+  ALLOW rule covering the address of a QA-scoped override raised the warning on
+  both the Access Rules and DNS Overrides pages; deleting the rule cleared it.
+
+---
+
 ## v0.1.0-alpha.10.1 — 2026-08-14
 
 Patch release on top of `v0.1.0-alpha.10`: fixes IPv6 routing for connected
