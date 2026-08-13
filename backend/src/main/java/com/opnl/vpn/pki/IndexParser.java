@@ -35,6 +35,7 @@ public class IndexParser {
             new CertIndexEntry(
                 mapStatus(parts[0]),
                 parseExpiry(parts[1]),
+                parseRevokedAt(parts[2]),
                 parts[3],
                 parts[4],
                 commonNameOf(parts[5])));
@@ -46,6 +47,17 @@ public class IndexParser {
       }
     }
     return entries;
+  }
+
+  private Instant parseRevokedAt(String s) {
+    if (s == null || s.isBlank()) {
+      return null;
+    }
+    try {
+      return Instant.from(EXPIRY.parse(s));
+    } catch (RuntimeException e) {
+      return null;
+    }
   }
 
   /** Extracts the common name from an X.500 subject (e.g. {@code /CN=alice}). */

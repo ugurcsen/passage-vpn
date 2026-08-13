@@ -248,4 +248,197 @@ class CertServiceTest {
 
     assertThat(service.expiringSoon()).containsExactly(soon);
   }
+
+  // ---- reconcile ----------------------------------------------------------
+
+  private CertIndexEntry entry(
+      CertIndexEntry.Status status, String cn, String serial, Instant revokedAt) {
+    return new CertIndexEntry(
+        status, Instant.now().plusSeconds(86400), revokedAt, serial, cn + ".crt", cn);
+  }
+
+  @Test
+  void reconcileCreatesRowsForMissingCertificatesAndLinksUsers() {
+    when(easyRsa.index())
+        .thenReturn(
+            List.of(
+                entry(CertIndexEntry.Status.VALID, "alice", "01", null),
+                entry(CertIndexEntry.Status.REVOKED, "bob", "02", Instant.now().minusSeconds(60))));
+    when(certificateRepository.findAll()).thenReturn(List.of());
+    when(easyRsa.hasClientCert("alice")).thenReturn(true);
+    when(easyRsa.hasClientCert("bob")).thenReturn(false);
+    when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user()));
+
+    CertService.ReconcileResult result = service.reconcile();
+
+    assertThat(result).isEqualTo(new CertService.ReconcileResult(2, 0, 0));
+    org.mockito.ArgumentCaptor<List<Certificate>> captor =
+        org.mockito.ArgumentCaptor.forClass(List.class);
+    verify(certificateRepository).saveAll(captor.capture());
+    List<Certificate> rows = captor.getValue();
+    Certificate alice =
+        rows.stream().filter(r -> r.getCommonName().equals("alice")).findFirst().orElseThrow();
+    assertThat(alice.getStatus()).isEqualTo(Status.VALID);
+    assertThat(alice.getSerial()).isEqualTo("01");
+    assertThat(alice.getUserId()).isEqualTo("u1");
+    Certificate bob =
+        rows.stream().filter(r -> r.getCommonName().equals("bob")).findFirst().orElseThrow();
+    assertThat(bob.getStatus()).isEqualTo(Status.REVOKED);
+    assertThat(bob.getRevokedAt()).isNotNull();
+  }
+
+  @Test
+  void reconcileUpdatesExistingRowFromIndex() {
+    Certificate existing =
+        Certificate.builder()
+            .id("c1")
+            .commonName("alice")
+            .userId("u1")
+            .status(Status.REVOKED)
+            .serial("OLD")
+            .revokedAt(Instant.now().minusSeconds(120))
+            .build();
+    when(easyRsa.index())
+        .thenReturn(List.of(entry(CertIndexEntry.Status.VALID, "alice", "NEW", null)));
+    when(certificateRepository.findAll()).thenReturn(List.of(existing));
+
+    CertService.ReconcileResult result = service.reconcile();
+
+    assertThat(result).isEqualTo(new CertService.ReconcileResult(0, 1, 0));
+    assertThat(existing.getStatus()).isEqualTo(Status.VALID);
+    assertThat(existing.getSerial()).isEqualTo("NEW");
+    assertThat(existing.getRevokedAt()).isNull();
+  }
+
+  @Test
+  void reconcileMatchesExistingRowBySerialForRevokedEntry() {
+    Certificate existing =
+        Certificate.builder()
+            .id("c1")
+            .commonName("alice")
+            .userId("u1")
+            .status(Status.VALID)
+            .serial("AB")
+            .build();
+    when(easyRsa.index())
+        .thenReturn(
+            List.of(
+                entry(
+                    CertIndexEntry.Status.REVOKED, "alice", "AB", Instant.now().minusSeconds(60))));
+    when(certificateRepository.findAll()).thenReturn(List.of(existing));
+
+    CertService.ReconcileResult result = service.reconcile();
+
+    assertThat(result).isEqualTo(new CertService.ReconcileResult(0, 1, 0));
+    assertThat(existing.getStatus()).isEqualTo(Status.REVOKED);
+    assertThat(existing.getRevokedAt()).isNotNull();
+  }
+
+  @Test
+  void reconcileSkipsServerAndPhantomEntries() {
+    when(easyRsa.index())
+        .thenReturn(
+            List.of(
+                entry(CertIndexEntry.Status.VALID, "server", "S1", null),
+                entry(CertIndexEntry.Status.VALID, "s7certuser", "S2", null),
+                entry(CertIndexEntry.Status.VALID, "bob", "S3", null)));
+    when(certificateRepository.findAll()).thenReturn(List.of());
+    when(easyRsa.hasClientCert("bob")).thenReturn(true);
+    when(easyRsa.hasClientCert("s7certuser")).thenReturn(false);
+
+    CertService.ReconcileResult result = service.reconcile();
+
+    assertThat(result).isEqualTo(new CertService.ReconcileResult(1, 0, 1));
+    org.mockito.ArgumentCaptor<List<Certificate>> captor =
+        org.mockito.ArgumentCaptor.forClass(List.class);
+    verify(certificateRepository).saveAll(captor.capture());
+    assertThat(captor.getValue()).extracting(Certificate::getCommonName).containsExactly("bob");
+  }
+
+  @Test
+  void reconcilePrefersValidEntryWhenCommonNameRepeats() {
+    when(easyRsa.index())
+        .thenReturn(
+            List.of(
+                entry(
+                    CertIndexEntry.Status.REVOKED, "alice", "OLD", Instant.now().minusSeconds(60)),
+                entry(CertIndexEntry.Status.VALID, "alice", "NEW", null)));
+    when(certificateRepository.findAll()).thenReturn(List.of());
+    when(easyRsa.hasClientCert("alice")).thenReturn(true);
+
+    CertService.ReconcileResult result = service.reconcile();
+
+    assertThat(result).isEqualTo(new CertService.ReconcileResult(1, 0, 0));
+    org.mockito.ArgumentCaptor<List<Certificate>> captor =
+        org.mockito.ArgumentCaptor.forClass(List.class);
+    verify(certificateRepository).saveAll(captor.capture());
+    Certificate row = captor.getValue().get(0);
+    assertThat(row.getSerial()).isEqualTo("NEW");
+    assertThat(row.getStatus()).isEqualTo(Status.VALID);
+  }
+
+  @Test
+  void reconcileIsIdempotentWhenNothingChanged() {
+    Instant expiry = Instant.now().plusSeconds(86400);
+    Certificate existing =
+        Certificate.builder()
+            .id("c1")
+            .commonName("alice")
+            .userId("u1")
+            .status(Status.VALID)
+            .serial("01")
+            .expiresAt(expiry)
+            .build();
+    when(easyRsa.index())
+        .thenReturn(
+            List.of(
+                new CertIndexEntry(
+                    CertIndexEntry.Status.VALID, expiry, null, "01", "alice.crt", "alice")));
+    when(certificateRepository.findAll()).thenReturn(List.of(existing));
+
+    CertService.ReconcileResult result = service.reconcile();
+
+    assertThat(result).isEqualTo(new CertService.ReconcileResult(0, 0, 0));
+    verify(certificateRepository).saveAll(List.of());
+  }
+
+  @Test
+  void purgeForUserRevokesAndDeletesCertificates() {
+    Certificate valid =
+        Certificate.builder()
+            .id("c1")
+            .commonName("alice")
+            .userId("u1")
+            .status(Status.VALID)
+            .serial("01")
+            .build();
+    Certificate revoked =
+        Certificate.builder()
+            .id("c2")
+            .commonName("bob")
+            .userId("u1")
+            .status(Status.REVOKED)
+            .serial("02")
+            .build();
+    when(certificateRepository.findByUserId("u1")).thenReturn(List.of(valid, revoked));
+    when(easyRsa.hasClientCert("alice")).thenReturn(true);
+
+    service.purgeForUser("u1");
+
+    verify(easyRsa).revokeCert("alice");
+    verify(easyRsa, never()).revokeCert("bob");
+    verify(easyRsa).deleteClientCert("alice");
+    verify(easyRsa).deleteClientCert("bob");
+    verify(certificateRepository).delete(valid);
+    verify(certificateRepository).delete(revoked);
+  }
+
+  @Test
+  void purgeForUserIsNoopWhenNoCertificates() {
+    when(certificateRepository.findByUserId("u1")).thenReturn(List.of());
+
+    service.purgeForUser("u1");
+
+    verify(certificateRepository, never()).delete(any());
+  }
 }

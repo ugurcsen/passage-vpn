@@ -4,13 +4,16 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   FormControlLabel,
+  FormGroup,
   IconButton,
   InputAdornment,
   MenuItem,
@@ -63,6 +66,18 @@ interface GroupRow {
   memberCount: number;
 }
 
+interface DeleteOptions {
+  deleteCertificates: boolean;
+  deleteAccessRules: boolean;
+  clearCcd: boolean;
+}
+
+const EMPTY_DELETE_OPTIONS: DeleteOptions = {
+  deleteCertificates: false,
+  deleteAccessRules: false,
+  clearCcd: false,
+};
+
 interface UserForm {
   username: string;
   password: string;
@@ -99,6 +114,11 @@ export function UsersPage() {
     confirmLabel: string;
     action: () => void;
   } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    ids: string[];
+    usernames: string;
+  } | null>(null);
+  const [deleteOptions, setDeleteOptions] = useState<DeleteOptions>(EMPTY_DELETE_OPTIONS);
   const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
   const [resetPassword, setResetPassword] = useState("");
   const [selection, setSelection] = useState<GridRowSelectionModel>([]);
@@ -190,9 +210,11 @@ export function UsersPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api(endpoints.users + `/${id}`, { method: "DELETE" }),
+    mutationFn: ({ id, options }: { id: string; options: DeleteOptions }) =>
+      api(endpoints.users + `/${id}`, { method: "DELETE", body: JSON.stringify(options) }),
     onSuccess: () => {
       toast.success("User deleted");
+      setDeleteTarget(null);
       invalidate();
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Delete failed"),
@@ -368,20 +390,38 @@ export function UsersPage() {
   });
 
   const bulkMutation = useMutation({
-    mutationFn: ({ action, ids }: { action: "ban" | "unban" | "delete"; ids: string[] }) =>
+    mutationFn: ({
+      action,
+      ids,
+      options,
+    }: {
+      action: "ban" | "unban" | "delete";
+      ids: string[];
+      options?: DeleteOptions;
+    }) =>
       api(endpoints.users + "/bulk", {
         method: "POST",
-        body: JSON.stringify({ action: action.toUpperCase(), ids }),
+        body: JSON.stringify({
+          action: action.toUpperCase(),
+          ids,
+          ...(options ? { options } : {}),
+        }),
       }),
     onSuccess: (_data, vars) => {
       toast.success(
         `${vars.ids.length} user${vars.ids.length === 1 ? "" : "s"} ${vars.action === "delete" ? "deleted" : vars.action + "ed"}`,
       );
       setSelection([]);
+      setDeleteTarget(null);
       invalidate();
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Bulk operation failed"),
   });
+
+  const openDeleteDialog = (ids: string[], usernames: string) => {
+    setDeleteOptions(EMPTY_DELETE_OPTIONS);
+    setDeleteTarget({ ids, usernames });
+  };
 
   const confirmBulk = (action: "ban" | "unban" | "delete") => {
     const ids = selection.map(String);
@@ -391,6 +431,10 @@ export function UsersPage() {
       delete: { verb: "Delete", label: "Delete" },
     } as const;
     const { verb, label } = config[action];
+    if (action === "delete") {
+      openDeleteDialog(ids, `${ids.length} selected user${ids.length === 1 ? "" : "s"}`);
+      return;
+    }
     setConfirm({
       title: `Bulk ${label.toLowerCase()}`,
       text: `${verb} ${ids.length} selected user${ids.length === 1 ? "" : "s"}?`,
@@ -542,14 +586,7 @@ export function UsersPage() {
             <Tooltip title="Delete">
               <IconButton
                 size="small"
-                onClick={() =>
-                  setConfirm({
-                    title: "Delete user",
-                    text: `Delete ${row.username}? This cannot be undone.`,
-                    confirmLabel: "Delete",
-                    action: () => deleteMutation.mutate(row.id),
-                  })
-                }
+                onClick={() => openDeleteDialog([row.id], row.username)}
               >
                 <DeleteIcon fontSize="small" color="error" />
               </IconButton>
@@ -1004,6 +1041,81 @@ export function UsersPage() {
             onClick={() => saveCcdSettings.mutate()}
           >
             {saveCcdSettings.isPending ? <CircularProgress size={18} /> : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={!!deleteTarget}
+        onClose={
+          deleteMutation.isPending || bulkMutation.isPending
+            ? undefined
+            : () => setDeleteTarget(null)
+        }
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Delete {deleteTarget?.usernames}</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 1 }}>
+            This cannot be undone. Optionally clean up related resources:
+          </DialogContentText>
+          <FormGroup>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={deleteOptions.deleteCertificates}
+                  onChange={(e) =>
+                    setDeleteOptions((o) => ({ ...o, deleteCertificates: e.target.checked }))
+                  }
+                />
+              }
+              label="Revoke and delete certificates"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={deleteOptions.deleteAccessRules}
+                  onChange={(e) =>
+                    setDeleteOptions((o) => ({ ...o, deleteAccessRules: e.target.checked }))
+                  }
+                />
+              }
+              label="Delete access rules"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={deleteOptions.clearCcd}
+                  onChange={(e) => setDeleteOptions((o) => ({ ...o, clearCcd: e.target.checked }))}
+                />
+              }
+              label="Clear static IP"
+            />
+          </FormGroup>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            disabled={deleteMutation.isPending || bulkMutation.isPending}
+            onClick={() => setDeleteTarget(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={deleteMutation.isPending || bulkMutation.isPending}
+            onClick={() => {
+              if (!deleteTarget) return;
+              const options = deleteOptions;
+              if (deleteTarget.ids.length === 1) {
+                deleteMutation.mutate({ id: deleteTarget.ids[0], options });
+              } else {
+                bulkMutation.mutate({ action: "delete", ids: deleteTarget.ids, options });
+              }
+            }}
+          >
+            {deleteMutation.isPending || bulkMutation.isPending ? "Working..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>

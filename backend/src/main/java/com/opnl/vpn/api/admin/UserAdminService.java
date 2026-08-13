@@ -1,5 +1,6 @@
 package com.opnl.vpn.api.admin;
 
+import com.opnl.vpn.access.AccessRuleService;
 import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.auth.TotpService;
 import com.opnl.vpn.ccd.CcdService;
@@ -8,6 +9,7 @@ import com.opnl.vpn.group.Group;
 import com.opnl.vpn.group.GroupMember;
 import com.opnl.vpn.group.GroupMemberRepository;
 import com.opnl.vpn.group.GroupRepository;
+import com.opnl.vpn.pki.CertService;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.user.User;
@@ -32,6 +34,8 @@ public class UserAdminService {
   private final TotpService totpService;
   private final SettingsService settingsService;
   private final CcdService ccdService;
+  private final CertService certService;
+  private final AccessRuleService accessRuleService;
   private final AuditLogService auditLogService;
 
   public UserAdminService(
@@ -42,6 +46,8 @@ public class UserAdminService {
       TotpService totpService,
       SettingsService settingsService,
       CcdService ccdService,
+      CertService certService,
+      AccessRuleService accessRuleService,
       AuditLogService auditLogService) {
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
@@ -50,6 +56,8 @@ public class UserAdminService {
     this.totpService = totpService;
     this.settingsService = settingsService;
     this.ccdService = ccdService;
+    this.certService = certService;
+    this.accessRuleService = accessRuleService;
     this.auditLogService = auditLogService;
   }
 
@@ -183,6 +191,16 @@ public class UserAdminService {
 
   @Transactional
   public void deleteUser(User actor, String id) {
+    deleteUser(actor, id, DeleteOptions.none());
+  }
+
+  /**
+   * Deletes a user. When {@link DeleteOptions} flags are set, related resources are cleaned up
+   * first: certificates are revoked and purged from the PKI, user-targeted access rules are removed
+   * (with the dnsmasq config refreshed) and the user's static IP/CCD file is cleared.
+   */
+  @Transactional
+  public void deleteUser(User actor, String id, DeleteOptions options) {
     User user = requireUser(id);
     if (user.getId().equals(actor.getId())) {
       throw ApiException.badRequest("cannot_delete_self", "You cannot delete your own account");
@@ -190,18 +208,36 @@ public class UserAdminService {
     if (user.getRole() == User.Role.ADMIN && countAdmins() <= 1) {
       throw ApiException.badRequest("last_admin", "Cannot delete the last admin");
     }
+    if (options.deleteCertificates()) {
+      certService.purgeForUser(id);
+    }
+    if (options.deleteAccessRules()) {
+      accessRuleService.deleteForUser(id);
+    }
+    if (options.clearCcd()) {
+      ccdService.clearStaticIp(id);
+      ccdService.clearStaticIpv6(id);
+    }
     memberRepository.deleteAll(memberRepository.findById_UserId(id));
     settingsService
         .userSettings(id)
         .keySet()
         .forEach(key -> settingsService.deleteUserSetting(id, key));
     userRepository.delete(user);
-    auditLogService.record(
-        "USER_DELETE",
-        AuditLogService.CAT_USER,
-        id,
-        "user",
-        Map.of("username", user.getUsername()));
+    Map<String, Object> detail = new java.util.HashMap<>();
+    detail.put("username", user.getUsername());
+    if (options.deleteCertificates()) detail.put("certificates", true);
+    if (options.deleteAccessRules()) detail.put("accessRules", true);
+    if (options.clearCcd()) detail.put("ccd", true);
+    auditLogService.record("USER_DELETE", AuditLogService.CAT_USER, id, "user", detail);
+  }
+
+  /** Cleanup choices offered when deleting a user; all flags default to off. */
+  public record DeleteOptions(
+      boolean deleteCertificates, boolean deleteAccessRules, boolean clearCcd) {
+    public static DeleteOptions none() {
+      return new DeleteOptions(false, false, false);
+    }
   }
 
   public enum BulkAction {
@@ -216,6 +252,12 @@ public class UserAdminService {
    */
   @Transactional
   public int bulk(User actor, BulkAction action, List<String> ids) {
+    return bulk(actor, action, ids, DeleteOptions.none());
+  }
+
+  /** Same as {@link #bulk(User, BulkAction, List)} but deletes carry the given cleanup options. */
+  @Transactional
+  public int bulk(User actor, BulkAction action, List<String> ids, DeleteOptions options) {
     if (ids == null || ids.isEmpty()) {
       throw ApiException.badRequest("empty_batch", "No user ids provided");
     }
@@ -223,7 +265,7 @@ public class UserAdminService {
       switch (action) {
         case BAN -> setBanned(id, true);
         case UNBAN -> setBanned(id, false);
-        case DELETE -> deleteUser(actor, id);
+        case DELETE -> deleteUser(actor, id, options);
       }
     }
     auditLogService.record(

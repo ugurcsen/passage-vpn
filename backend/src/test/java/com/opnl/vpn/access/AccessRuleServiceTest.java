@@ -170,6 +170,30 @@ class AccessRuleServiceTest {
   }
 
   @Test
+  void deleteForUserRemovesTargetedRulesAndRefreshesDnsmasq() {
+    AccessRule r1 =
+        AccessRule.builder().id("r1").targetType(TargetType.USER).targetId("u1").build();
+    when(ruleRepository.findByTargetTypeAndTargetIdOrderByPriorityAsc(TargetType.USER, "u1"))
+        .thenReturn(List.of(r1));
+
+    service.deleteForUser("u1");
+
+    verify(ruleRepository).deleteAll(List.of(r1));
+    verify(dnsmasqConfigService).refresh();
+  }
+
+  @Test
+  void deleteForUserSkipsRefreshWhenNoRules() {
+    when(ruleRepository.findByTargetTypeAndTargetIdOrderByPriorityAsc(TargetType.USER, "u1"))
+        .thenReturn(List.of());
+
+    service.deleteForUser("u1");
+
+    verify(ruleRepository, never()).deleteAll(any());
+    verify(dnsmasqConfigService, never()).refresh();
+  }
+
+  @Test
   void setEnabledToggles() {
     AccessRule existing =
         AccessRule.builder().id("r1").targetType(TargetType.GLOBAL).enabled(false).build();

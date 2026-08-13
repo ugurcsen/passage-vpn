@@ -334,4 +334,73 @@ describe("UsersPage", () => {
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).queryByLabelText(/role/i)).not.toBeInTheDocument();
   });
+
+  it("deletes a single user with cleanup options", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("alice");
+
+    await user.click(screen.getAllByRole("button", { name: /delete/i })[0]);
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/This cannot be undone/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("checkbox", { name: "Revoke and delete certificates" }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(dialog).getByRole("checkbox", { name: "Revoke and delete certificates" }),
+    );
+    await user.click(within(dialog).getByRole("button", { name: /^delete$/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const del = fetchMock.mock.calls.find(
+        ([url, opts]) => url === "/api/admin/users/u1" && opts?.method === "DELETE",
+      );
+      expect(del).toBeDefined();
+    });
+    const [, opts] = fetchMock.mock.calls.find(
+      ([url, o]) => url === "/api/admin/users/u1" && o?.method === "DELETE",
+    )!;
+    expect(JSON.parse(String(opts!.body))).toEqual({
+      deleteCertificates: true,
+      deleteAccessRules: false,
+      clearCcd: false,
+    });
+  });
+
+  it("bulk deletes selected users with cleanup options", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("alice");
+
+    const rowCheckboxes = screen.getAllByRole("checkbox", { name: /select row/i });
+    await user.click(rowCheckboxes[0]);
+    await user.click(rowCheckboxes[1]);
+
+    const deleteButtons = screen.getAllByRole("button", { name: /^delete$/i });
+    const bulkDelete = deleteButtons.find((b) => b.querySelector(".MuiButton-startIcon"))!;
+    await user.click(bulkDelete);
+
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("checkbox", { name: "Delete access rules" }));
+    await user.click(within(dialog).getByRole("button", { name: /^delete$/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, opts]) => url === "/api/admin/users/bulk" && opts?.method === "POST",
+      );
+      expect(post).toBeDefined();
+    });
+    const [, opts] = fetchMock.mock.calls.find(
+      ([url, o]) => url === "/api/admin/users/bulk" && o?.method === "POST",
+    )!;
+    expect(JSON.parse(String(opts!.body))).toMatchObject({
+      action: "DELETE",
+      ids: ["u1", "u2"],
+      options: { deleteCertificates: false, deleteAccessRules: true, clearCcd: false },
+    });
+  });
 });

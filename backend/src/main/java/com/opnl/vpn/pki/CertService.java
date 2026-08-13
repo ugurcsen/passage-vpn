@@ -6,8 +6,12 @@ import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -114,6 +118,41 @@ public class CertService {
   }
 
   /**
+   * Removes a user's certificates entirely (used when deleting an account with certificate
+   * cleanup): any valid certificate is revoked so the CRL rejects it, the on-disk artifacts are
+   * deleted best-effort, and the bookkeeping rows are removed.
+   */
+  @Transactional
+  public void purgeForUser(String userId) {
+    List<Certificate> certificates = certificateRepository.findByUserId(userId);
+    if (certificates.isEmpty()) {
+      return;
+    }
+    for (Certificate certificate : certificates) {
+      try {
+        if (certificate.getStatus() == Certificate.Status.VALID
+            && easyRsaService.hasClientCert(certificate.getCommonName())) {
+          easyRsaService.revokeCert(certificate.getCommonName());
+        }
+      } catch (ApiException ignored) {
+        // best effort on delete
+      }
+      try {
+        easyRsaService.deleteClientCert(certificate.getCommonName());
+      } catch (ApiException ignored) {
+        // best effort on delete
+      }
+      certificateRepository.delete(certificate);
+    }
+    auditLogService.record(
+        "CERT_PURGE",
+        AuditLogService.CAT_CERT,
+        userId,
+        "user",
+        Map.of("count", certificates.size()));
+  }
+
+  /**
    * Re-verifies a revoked certificate: the PKI index entry is flipped back to valid and the CRL is
    * regenerated so the certificate is accepted by the VPN server again.
    */
@@ -184,6 +223,134 @@ public class CertService {
     certificateRepository.saveAll(expired);
     log.info("Marked {} certificates as expired", expired.size());
   }
+
+  /**
+   * Synchronizes the certificate bookkeeping table with the Easy-RSA index.txt (the source of
+   * truth): rows are created for certificates present in the PKI but missing from the table,
+   * existing rows are updated with the current status/serial/expiry/revoked-at, and no rows are
+   * ever deleted.
+   *
+   * <p>Bookkeeping rows are unique per common name while the index can carry several entries per CN
+   * (an old revoked certificate plus the current valid one); the strongest state wins (VALID &gt;
+   * REVOKED &gt; EXPIRED). The infrastructure {@code server} certificate and phantom VALID entries
+   * that have no on-disk certificate are skipped.
+   */
+  @Transactional
+  public ReconcileResult reconcile() {
+    List<CertIndexEntry> entries =
+        easyRsaService.index().stream()
+            .filter(e -> e.commonName() != null && !"server".equals(e.commonName()))
+            .toList();
+    Map<String, CertIndexEntry> representative = new LinkedHashMap<>();
+    for (CertIndexEntry entry : entries) {
+      CertIndexEntry existing = representative.get(entry.commonName());
+      if (existing == null || stronger(entry, existing) == entry) {
+        representative.put(entry.commonName(), entry);
+      }
+    }
+    Map<String, Certificate> bySerial = new HashMap<>();
+    Map<String, Certificate> byCommonName = new HashMap<>();
+    for (Certificate row : certificateRepository.findAll()) {
+      if (row.getSerial() != null && !row.getSerial().isBlank()) {
+        bySerial.put(row.getSerial(), row);
+      }
+      byCommonName.put(row.getCommonName(), row);
+    }
+    int created = 0;
+    int updated = 0;
+    int skipped = 0;
+    List<Certificate> changed = new ArrayList<>();
+    for (CertIndexEntry entry : representative.values()) {
+      Certificate row = bySerial.get(entry.serial());
+      if (row == null) {
+        row = byCommonName.get(entry.commonName());
+      }
+      if (row == null) {
+        if (entry.status() == CertIndexEntry.Status.VALID
+            && !easyRsaService.hasClientCert(entry.commonName())) {
+          skipped++;
+          continue;
+        }
+        changed.add(
+            Certificate.builder()
+                .id(UUID.randomUUID().toString())
+                .commonName(entry.commonName())
+                .userId(userIdFor(entry.commonName()))
+                .status(mapStatus(entry.status()))
+                .serial(entry.serial())
+                .expiresAt(entry.expiry())
+                .revokedAt(
+                    entry.status() == CertIndexEntry.Status.REVOKED ? entry.revokedAt() : null)
+                .build());
+        created++;
+        continue;
+      }
+      boolean touched = false;
+      if (!Objects.equals(row.getSerial(), entry.serial())) {
+        row.setSerial(entry.serial());
+        touched = true;
+      }
+      if (!Objects.equals(row.getExpiresAt(), entry.expiry())) {
+        row.setExpiresAt(entry.expiry());
+        touched = true;
+      }
+      Certificate.Status status = mapStatus(entry.status());
+      if (row.getStatus() != status) {
+        row.setStatus(status);
+        touched = true;
+      }
+      if (entry.status() == CertIndexEntry.Status.REVOKED) {
+        if (row.getRevokedAt() == null) {
+          row.setRevokedAt(entry.revokedAt() != null ? entry.revokedAt() : Instant.now());
+          touched = true;
+        }
+      } else if (row.getRevokedAt() != null) {
+        row.setRevokedAt(null);
+        touched = true;
+      }
+      if (touched) {
+        changed.add(row);
+        updated++;
+      }
+    }
+    certificateRepository.saveAll(changed);
+    auditLogService.record(
+        "CERT_RECONCILE",
+        AuditLogService.CAT_CERT,
+        null,
+        "certificate",
+        Map.of("created", created, "updated", updated, "skipped", skipped));
+    return new ReconcileResult(created, updated, skipped);
+  }
+
+  private static CertIndexEntry stronger(CertIndexEntry a, CertIndexEntry b) {
+    return strength(a.status()) <= strength(b.status()) ? a : b;
+  }
+
+  private static int strength(CertIndexEntry.Status status) {
+    return switch (status) {
+      case VALID -> 0;
+      case REVOKED -> 1;
+      case EXPIRED -> 2;
+    };
+  }
+
+  private static Certificate.Status mapStatus(CertIndexEntry.Status status) {
+    return switch (status) {
+      case VALID -> Certificate.Status.VALID;
+      case REVOKED -> Certificate.Status.REVOKED;
+      case EXPIRED -> Certificate.Status.EXPIRED;
+    };
+  }
+
+  private String userIdFor(String commonName) {
+    return userRepository.findByUsername(commonName).map(User::getId).orElse(null);
+  }
+
+  /**
+   * Outcome of {@link #reconcile()}: how many bookkeeping rows were created, updated or skipped.
+   */
+  public record ReconcileResult(int created, int updated, int skipped) {}
 
   /** Valid certificates expiring within the next {@value #EXPIRY_WARNING_DAYS} days. */
   @Transactional(readOnly = true)

@@ -45,7 +45,11 @@ public class UserAdminController {
 
   @PostMapping("/bulk")
   public int bulk(Authentication authentication, @Valid @RequestBody BulkRequest request) {
-    return userAdminService.bulk(actor(authentication), request.action(), request.ids());
+    return userAdminService.bulk(
+        actor(authentication),
+        request.action(),
+        request.ids(),
+        request.options() == null ? UserAdminService.DeleteOptions.none() : request.options());
   }
 
   @GetMapping("/{id}")
@@ -68,8 +72,14 @@ public class UserAdminController {
   }
 
   @DeleteMapping("/{id}")
-  public void delete(Authentication authentication, @PathVariable String id) {
-    userAdminService.deleteUser(actor(authentication), id);
+  public void delete(
+      Authentication authentication,
+      @PathVariable String id,
+      @RequestBody(required = false) UserAdminService.DeleteOptions options) {
+    userAdminService.deleteUser(
+        actor(authentication),
+        id,
+        options == null ? UserAdminService.DeleteOptions.none() : options);
   }
 
   @PostMapping("/{id}/reset-password")
@@ -168,7 +178,9 @@ public class UserAdminController {
   public record MfaEnableRequest(@NotBlank String code) {}
 
   public record BulkRequest(
-      @NotNull UserAdminService.BulkAction action, @NotEmpty List<@NotBlank String> ids) {}
+      @NotNull UserAdminService.BulkAction action,
+      @NotEmpty List<@NotBlank String> ids,
+      UserAdminService.DeleteOptions options) {}
 
   public record StaticIpRequest(String staticIp) {}
 

@@ -8,12 +8,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.opnl.vpn.access.AccessRuleService;
 import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.auth.TotpService;
 import com.opnl.vpn.ccd.CcdService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.group.GroupMemberRepository;
 import com.opnl.vpn.group.GroupRepository;
+import com.opnl.vpn.pki.CertService;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
@@ -30,6 +32,9 @@ class UserAdminServiceTest {
   private GroupRepository groupRepository;
   private GroupMemberRepository memberRepository;
   private SettingsService settingsService;
+  private CcdService ccdService;
+  private CertService certService;
+  private AccessRuleService accessRuleService;
   private UserAdminService service;
 
   private User admin() {
@@ -56,6 +61,9 @@ class UserAdminServiceTest {
     groupRepository = mock(GroupRepository.class);
     memberRepository = mock(GroupMemberRepository.class);
     settingsService = mock(SettingsService.class);
+    ccdService = mock(CcdService.class);
+    certService = mock(CertService.class);
+    accessRuleService = mock(AccessRuleService.class);
     service =
         new UserAdminService(
             userRepository,
@@ -64,10 +72,13 @@ class UserAdminServiceTest {
             new BCryptPasswordEncoder(),
             new TotpService(),
             settingsService,
-            mock(CcdService.class),
+            ccdService,
+            certService,
+            accessRuleService,
             mock(AuditLogService.class));
     when(userRepository.countByRole(User.Role.ADMIN)).thenReturn(1L);
     when(memberRepository.findById_UserId(any())).thenReturn(List.of());
+    when(settingsService.userSettings(any())).thenReturn(new java.util.HashMap<>());
   }
 
   @Test
@@ -117,6 +128,66 @@ class UserAdminServiceTest {
     assertThatThrownBy(() -> service.deleteUser(admin(), "admin1"))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("cannot_delete_self"));
+  }
+
+  private User bob() {
+    return User.builder()
+        .id("u2")
+        .username("bob")
+        .role(User.Role.USER)
+        .createdAt(Instant.now())
+        .build();
+  }
+
+  @Test
+  void deleteUserWithCertificateCleanupPurgesCertificates() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+    service.deleteUser(admin(), "u2", new UserAdminService.DeleteOptions(true, false, false));
+    verify(certService).purgeForUser("u2");
+    verify(userRepository).delete(any());
+  }
+
+  @Test
+  void deleteUserWithAccessRuleCleanupDeletesRules() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+    service.deleteUser(admin(), "u2", new UserAdminService.DeleteOptions(false, true, false));
+    verify(accessRuleService).deleteForUser("u2");
+    verify(userRepository).delete(any());
+  }
+
+  @Test
+  void deleteUserWithCcdCleanupClearsStaticIp() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+    service.deleteUser(admin(), "u2", new UserAdminService.DeleteOptions(false, false, true));
+    verify(ccdService).clearStaticIp("u2");
+    verify(ccdService).clearStaticIpv6("u2");
+    verify(userRepository).delete(any());
+  }
+
+  @Test
+  void deleteUserWithoutOptionsSkipsCleanup() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+    service.deleteUser(admin(), "u2");
+    verify(certService, never()).purgeForUser(any());
+    verify(accessRuleService, never()).deleteForUser(any());
+    verify(ccdService, never()).clearStaticIp(any());
+    verify(ccdService, never()).clearStaticIpv6(any());
+    verify(userRepository).delete(any());
+  }
+
+  @Test
+  void bulkDeleteForwardsCleanupOptions() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+    service.bulk(
+        admin(),
+        UserAdminService.BulkAction.DELETE,
+        List.of("u2"),
+        new UserAdminService.DeleteOptions(true, true, true));
+    verify(certService).purgeForUser("u2");
+    verify(accessRuleService).deleteForUser("u2");
+    verify(ccdService).clearStaticIp("u2");
+    verify(ccdService).clearStaticIpv6("u2");
+    verify(userRepository).delete(any());
   }
 
   @Test

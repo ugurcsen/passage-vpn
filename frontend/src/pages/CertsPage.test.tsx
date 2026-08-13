@@ -68,6 +68,7 @@ describe("CertsPage", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation((url: string) => {
+        if (url.includes("/reconcile")) return Promise.resolve(json({ created: 1, updated: 0, skipped: 0 }));
         if (url.startsWith("/api/admin/users")) return Promise.resolve(json(users));
         return Promise.resolve(json(certs));
       }),
@@ -174,5 +175,21 @@ describe("CertsPage", () => {
 
     const badges = screen.getAllByText("Expiring");
     expect(badges.length).toBeGreaterThan(0);
+  });
+
+  it("syncs the certificate list with the PKI on demand", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("old-cert");
+
+    await user.click(screen.getByRole("button", { name: /sync with pki/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, opts]) => url === "/api/admin/certs/reconcile" && opts?.method === "POST",
+      );
+      expect(post).toBeDefined();
+    });
   });
 });

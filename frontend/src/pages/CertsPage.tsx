@@ -20,6 +20,7 @@ import AddIcon from "@mui/icons-material/Add";
 import BlockIcon from "@mui/icons-material/Block";
 import CachedIcon from "@mui/icons-material/Cached";
 import RestoreIcon from "@mui/icons-material/Restore";
+import SyncIcon from "@mui/icons-material/Sync";
 import { api, endpoints } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -117,6 +118,19 @@ export function CertsPage() {
       invalidate();
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Rotate failed"),
+  });
+
+  const sync = useMutation({
+    mutationFn: () =>
+      api<{ created: number; updated: number; skipped: number }>(
+        `${endpoints.certs}/reconcile`,
+        { method: "POST" },
+      ),
+    onSuccess: (res) => {
+      toast.success(`Synchronized with PKI: ${res.created} created, ${res.updated} updated`);
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Sync failed"),
   });
 
   const columns: GridColDef[] = [
@@ -237,9 +251,19 @@ export function CertsPage() {
         <Typography variant="h5" fontWeight={700}>
           Certificates
         </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIssueOpen(true)}>
-          Issue certificate
-        </Button>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<SyncIcon />}
+            disabled={sync.isPending}
+            onClick={() => sync.mutate()}
+          >
+            {sync.isPending ? "Syncing…" : "Sync with PKI"}
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIssueOpen(true)}>
+            Issue certificate
+          </Button>
+        </Box>
       </Box>
       <Paper sx={{ height: 620 }}>
         <DataGrid

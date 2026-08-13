@@ -117,6 +117,25 @@ public class AccessRuleService {
     refreshDnsmasq();
   }
 
+  /** Deletes every access rule targeting the given user (used when deleting an account). */
+  @Transactional
+  public void deleteForUser(String userId) {
+    List<AccessRule> rules =
+        ruleRepository.findByTargetTypeAndTargetIdOrderByPriorityAsc(
+            AccessRule.TargetType.USER, userId);
+    if (rules.isEmpty()) {
+      return;
+    }
+    ruleRepository.deleteAll(rules);
+    auditLogService.record(
+        "RULE_DELETE_FOR_USER",
+        AuditLogService.CAT_RULE,
+        userId,
+        "user",
+        Map.of("count", rules.size()));
+    refreshDnsmasq();
+  }
+
   @Transactional
   public AccessRuleDto setEnabled(String id, boolean enabled) {
     AccessRule rule = requireRule(id);

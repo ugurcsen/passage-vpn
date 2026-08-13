@@ -66,6 +66,11 @@ public class CertAdminController {
     return CertificateDto.from(certificate, usernameFor(certificate.getUserId()));
   }
 
+  @PostMapping("/reconcile")
+  public CertService.ReconcileResult reconcile() {
+    return certService.reconcile();
+  }
+
   @PostMapping("/{id}/revoke")
   public CertificateDto revoke(@PathVariable String id) {
     Certificate certificate = certService.revoke(id);

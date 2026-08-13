@@ -121,6 +121,19 @@ class CertAdminControllerTest {
   }
 
   @Test
+  void reconcileReturnsCounts() throws Exception {
+    when(certService.reconcile()).thenReturn(new CertService.ReconcileResult(2, 3, 1));
+
+    mvc.perform(post("/api/admin/certs/reconcile"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.created").value(2))
+        .andExpect(jsonPath("$.updated").value(3))
+        .andExpect(jsonPath("$.skipped").value(1));
+
+    verify(certService).reconcile();
+  }
+
+  @Test
   void rotateRejectsUnboundCertificate() throws Exception {
     when(certService.get("c1")).thenReturn(cert("c1", "alice", Status.VALID, null));
 
