@@ -270,6 +270,14 @@ plus the changes below. Tag: `v0.1.0-alpha.4`.
 ### Verified
 - Backend suite green (279 tests, spotless clean); frontend suite green (19 files
   / 95 tests, lint 0 errors); `make test` green.
+- Live E2E (production `65.21.108.250`): checkout synced to the milestone commit
+  and stack rebuilt — `/swagger-ui.html` reachable (302 → `/swagger-ui/index.html`,
+  200), `/v3/api-docs` exposes the `bearerAuth` HTTP/Bearer-JWT scheme plus the
+  global security requirement (title from brand, `OpenVPN Panel`), and
+  `/v3/api-docs/swagger-config` reports `persistAuthorization: true` with
+  `tryItOutEnabled: true` so the Authorize button survives reloads; Flyway schema
+  validated at V9; both suites re-run green on the production checkout (279
+  backend / 95 frontend).
 
 ---
 
