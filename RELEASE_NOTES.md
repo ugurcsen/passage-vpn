@@ -37,9 +37,16 @@ changes below. Tag: `v0.1.0-alpha.6`.
 - Backend suite green (spotless clean); frontend suite green (25 files / 116
   tests, lint 0 errors, build passes); `make test` green.
 - Live E2E on production `65.21.108.250`: checkout synced to the milestone
-  commit, stack rebuilt, backend + frontend suites re-run green on the deployed
-  checkout; hook flow verified end-to-end (setting → script synced → audit
-  event on successful VPN login).
+  commit (`5b9bd61`) and the stack rebuilt (backend + frontend images, openvpn
+  healthy); backend suite re-run green on the deployed checkout
+  (`./gradlew test spotlessCheck` → BUILD SUCCESSFUL) and frontend suite re-run
+  green (25 files / 116 tests, lint 0 errors); hook flow verified end-to-end —
+  `post_auth_script=post-auth-hook.py` with timeout 5 set via the admin API, a
+  throwaway user authenticates through `/internal/auth/verify`
+  (`{"allowed":true}`), the hook writes a JSON line to
+  `/var/log/opnl/post-auth.log` (`event: vpn_login` with username/common_name/
+  remote_ip) and a `VPN_POST_AUTH_HOOK` audit event is recorded
+  (`exitCode: 0, success: true`); test user and hook settings purged afterwards.
 
 ---
 
