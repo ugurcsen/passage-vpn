@@ -20,6 +20,7 @@ import { DaemonsPage } from "@/pages/DaemonsPage";
 import { StatusPage } from "@/pages/StatusPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { AuditLogsPage } from "@/pages/AuditLogsPage";
+import { ApiTokensPage } from "@/pages/ApiTokensPage";
 import { PortalPage } from "@/pages/PortalPage";
 import { AccountPage } from "@/pages/AccountPage";
 import { SharePage } from "@/pages/SharePage";
@@ -103,6 +104,10 @@ export default function App() {
                     <Route
                       path="/audit-logs"
                       element={<AuditLogsPage />}
+                    />
+                    <Route
+                      path="/api-tokens"
+                      element={<ApiTokensPage />}
                     />
                   </Route>
                   <Route path="*" element={<Navigate to="/" replace />} />

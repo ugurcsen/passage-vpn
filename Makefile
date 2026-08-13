@@ -78,9 +78,10 @@ backup: ## Produce backup archive (config + PKI + DB dump)
 	@test -d data || { echo "No data dir"; exit 1; }
 	@ts=$$(date +%Y%m%d-%H%M%S); tar -czf backup-opnl-$$ts.tar.gz -C data . && echo "Wrote backup-opnl-$$ts.tar.gz"
 
-api-docs: ## Start swagger UI (when backend runs)
+api-docs: ## Regenerate docs/api.md from a running backend (needs up) + show swagger URL
+	python3 scripts/gen_api_docs.py "http://localhost:8080/v3/api-docs" > docs/api.md
+	@echo "Wrote docs/api.md"
 	@echo "Swagger UI: http://localhost:8080/swagger-ui.html"
-	@echo "OpenAPI JSON: http://localhost:8080/v3/api-docs"
 
 pki-init: ## Re-run PKI init (CA + server cert) via setup API
 	@echo "Use the setup wizard UI at /setup instead."

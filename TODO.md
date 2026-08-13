@@ -107,7 +107,8 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 **P3 — Phase 4: API, ops, deployment**
 - [x] OpenAPI/Swagger UI + bearer-auth testing (shipped in `v0.1.0-alpha.4`)
-- [ ] `docs/api.md` generation; API tokens for automation
+- [x] API tokens for automation (`/api/admin/api-tokens`, `X-API-Token` auth)
+- [ ] `docs/api.md` generation (script + make target ready; regenerate live in E2E)
 - [ ] Brand settings, configuration report, backup/restore flow
 - [ ] Multi-node registry + node-aware status/kill routing
 - [x] `install.sh` full installer + first-run wizard UI

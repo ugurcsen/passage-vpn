@@ -232,6 +232,7 @@ export const endpoints = {
   system: "/admin/system",
   monitor: "/admin/monitor",
   auditLogs: "/admin/audit-logs",
+  apiTokens: "/admin/api-tokens",
 };
 
 export type ProfileType = "USER_LOCKED" | "AUTO_LOGIN" | "SERVER_LOCKED" | "GENERIC";
@@ -388,6 +389,24 @@ export interface MfaSetup {
   secret: string;
   otpAuthUrl: string;
   qrDataUrl: string;
+}
+
+/** Management view of an API token; the raw value is shown only at creation. */
+export interface ApiToken {
+  id: string;
+  label: string;
+  prefix: string;
+  role: "ADMIN" | "RESELLER";
+  expiresAt: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  createdBy: string | null;
+}
+
+/** Creation response carrying the one-time plaintext token. */
+export interface ApiTokenCreated {
+  token: ApiToken;
+  rawToken: string;
 }
 
 /** Triggers a browser download for a backend-generated profile file. */

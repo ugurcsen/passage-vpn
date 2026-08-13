@@ -1,10 +1,12 @@
 package com.opnl.vpn.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opnl.vpn.security.ApiTokenAuthFilter;
 import com.opnl.vpn.security.InternalTokenFilter;
 import com.opnl.vpn.security.JwtAuthFilter;
 import com.opnl.vpn.security.JwtService;
 import com.opnl.vpn.security.RateLimitFilter;
+import com.opnl.vpn.token.ApiTokenService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
 import java.util.List;
@@ -31,17 +33,27 @@ public class SecurityConfig {
   private final OpnlProperties opnlProperties;
   private final JwtService jwtService;
   private final ObjectMapper objectMapper;
+  private final ApiTokenService apiTokenService;
 
   public SecurityConfig(
-      OpnlProperties opnlProperties, JwtService jwtService, ObjectMapper objectMapper) {
+      OpnlProperties opnlProperties,
+      JwtService jwtService,
+      ObjectMapper objectMapper,
+      ApiTokenService apiTokenService) {
     this.opnlProperties = opnlProperties;
     this.jwtService = jwtService;
     this.objectMapper = objectMapper;
+    this.apiTokenService = apiTokenService;
   }
 
   @Bean
   public JwtAuthFilter jwtAuthFilter() {
     return new JwtAuthFilter(jwtService);
+  }
+
+  @Bean
+  public ApiTokenAuthFilter apiTokenAuthFilter() {
+    return new ApiTokenAuthFilter(apiTokenService);
   }
 
   @Bean
@@ -94,6 +106,7 @@ public class SecurityConfig {
                                       "Authentication required")));
                     }))
         .addFilterBefore(jwtAuthFilter(), UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(apiTokenAuthFilter(), UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(rateLimitFilter(), UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(
             new InternalTokenFilter(opnlProperties), UsernamePasswordAuthenticationFilter.class);

@@ -29,6 +29,7 @@ import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import SettingsIcon from "@mui/icons-material/Settings";
 import SecurityIcon from "@mui/icons-material/Security";
 import HistoryIcon from "@mui/icons-material/History";
+import KeyIcon from "@mui/icons-material/Key";
 import PersonIcon from "@mui/icons-material/Person";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -49,6 +50,7 @@ const NAV_ITEMS = [
   { label: "Live Status", path: "/status", icon: <MonitorHeartIcon /> },
   { label: "Settings", path: "/settings", icon: <SettingsIcon /> },
   { label: "Audit Log", path: "/audit-logs", icon: <HistoryIcon />, adminOnly: true },
+  { label: "API Tokens", path: "/api-tokens", icon: <KeyIcon />, adminOnly: true },
 ];
 
 interface AppLayoutProps {
