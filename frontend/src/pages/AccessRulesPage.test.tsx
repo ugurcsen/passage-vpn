@@ -22,6 +22,9 @@ const rules = [
     dstPort: 443,
     enabled: true,
     priority: 1,
+    warnings: [
+      "Scoped DNS override 'db.internal' (10.10.0.6, Group: devs) becomes reachable by out-of-scope users through this rule",
+    ],
   },
   {
     id: "r2",
@@ -198,6 +201,16 @@ describe("AccessRulesPage", () => {
     renderPage();
 
     expect(await screen.findByText("Group: devs")).toBeInTheDocument();
+  });
+
+  it("shows a scoped DNS override warning for an ALLOW rule", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findAllByText("All users");
+
+    const icon = (await screen.findAllByLabelText("Scoped DNS override warnings"))[0];
+    await user.hover(icon);
+    expect(await screen.findByText(/becomes reachable by out-of-scope users/i)).toBeInTheDocument();
   });
 
   it("renders a destination domain column", async () => {

@@ -34,24 +34,30 @@ public class DnsOverrideService {
   private final GroupRepository groupRepository;
   private final AuditLogService auditLogService;
   private final DnsmasqConfigService dnsmasqConfigService;
+  private final DnsScopeConflictService conflictService;
 
   public DnsOverrideService(
       DnsRecordRepository recordRepository,
       UserRepository userRepository,
       GroupRepository groupRepository,
       AuditLogService auditLogService,
-      DnsmasqConfigService dnsmasqConfigService) {
+      DnsmasqConfigService dnsmasqConfigService,
+      DnsScopeConflictService conflictService) {
     this.recordRepository = recordRepository;
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
     this.auditLogService = auditLogService;
     this.dnsmasqConfigService = dnsmasqConfigService;
+    this.conflictService = conflictService;
   }
 
   @Transactional(readOnly = true)
   public List<DnsRecordDto> list() {
     return recordRepository.findAll().stream()
-        .map(record -> DnsRecordDto.from(record, scopeName(record)))
+        .map(
+            record ->
+                DnsRecordDto.from(
+                    record, scopeName(record), conflictService.warningsForRecord(record)))
         .sorted(java.util.Comparator.comparing(DnsRecordDto::hostname))
         .toList();
   }
@@ -77,7 +83,7 @@ public class DnsOverrideService {
             "scope",
             saved.getScope().name()));
     refreshDnsmasq();
-    return DnsRecordDto.from(saved, scopeName(saved));
+    return DnsRecordDto.from(saved, scopeName(saved), conflictService.warningsForRecord(saved));
   }
 
   @Transactional
@@ -88,7 +94,7 @@ public class DnsOverrideService {
     DnsRecord saved = recordRepository.save(record);
     auditLogService.record("DNS_RECORD_UPDATE", AuditLogService.CAT_DNS, id, "dns_record", null);
     refreshDnsmasq();
-    return DnsRecordDto.from(saved, scopeName(saved));
+    return DnsRecordDto.from(saved, scopeName(saved), conflictService.warningsForRecord(saved));
   }
 
   @Transactional
@@ -110,7 +116,10 @@ public class DnsOverrideService {
         "dns_record",
         null);
     refreshDnsmasq();
-    return DnsRecordDto.from(recordRepository.save(record), scopeName(record));
+    return DnsRecordDto.from(
+        recordRepository.save(record),
+        scopeName(record),
+        conflictService.warningsForRecord(record));
   }
 
   /**

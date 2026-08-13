@@ -14,6 +14,7 @@ import com.opnl.vpn.access.AccessRule.TargetType;
 import com.opnl.vpn.access.AccessRuleDto;
 import com.opnl.vpn.access.AccessRuleService;
 import com.opnl.vpn.common.GlobalExceptionHandler;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,7 +73,8 @@ class AccessRuleAdminControllerTest {
             null,
             443,
             true,
-            null);
+            null,
+            List.of());
     when(ruleService.create(any())).thenReturn(returned);
     mvc.perform(
             post("/api/admin/rules")
@@ -138,7 +140,8 @@ class AccessRuleAdminControllerTest {
             "api.github.com",
             443,
             true,
-            null);
+            null,
+            List.of());
     when(ruleService.create(any())).thenReturn(returned);
     mvc.perform(
             post("/api/admin/rules")

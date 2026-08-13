@@ -55,7 +55,8 @@ class DnsRecordAdminControllerTest {
                     null,
                     null,
                     true,
-                    null)));
+                    null,
+                    List.of())));
     mvc.perform(get("/api/admin/dns-overrides"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].hostname").value("git.internal"))
@@ -111,7 +112,16 @@ class DnsRecordAdminControllerTest {
   void createAcceptsValidGlobalRecord() throws Exception {
     DnsRecordDto returned =
         new DnsRecordDto(
-            "d1", "git.internal", "10.10.0.5", null, Scope.GLOBAL, null, null, true, null);
+            "d1",
+            "git.internal",
+            "10.10.0.5",
+            null,
+            Scope.GLOBAL,
+            null,
+            null,
+            true,
+            null,
+            List.of());
     when(dnsOverrideService.create(any())).thenReturn(returned);
     mvc.perform(
             post("/api/admin/dns-overrides")
@@ -130,7 +140,16 @@ class DnsRecordAdminControllerTest {
   void updateCallsServiceWithId() throws Exception {
     DnsRecordDto returned =
         new DnsRecordDto(
-            "d1", "git.internal", "10.10.0.6", null, Scope.GLOBAL, null, null, true, null);
+            "d1",
+            "git.internal",
+            "10.10.0.6",
+            null,
+            Scope.GLOBAL,
+            null,
+            null,
+            true,
+            null,
+            List.of());
     when(dnsOverrideService.update(eq("d1"), any())).thenReturn(returned);
     mvc.perform(
             put("/api/admin/dns-overrides/d1")
@@ -154,7 +173,16 @@ class DnsRecordAdminControllerTest {
   void setEnabledDelegatesToService() throws Exception {
     DnsRecordDto returned =
         new DnsRecordDto(
-            "d1", "git.internal", "10.10.0.5", null, Scope.GLOBAL, null, null, false, null);
+            "d1",
+            "git.internal",
+            "10.10.0.5",
+            null,
+            Scope.GLOBAL,
+            null,
+            null,
+            false,
+            null,
+            List.of());
     when(dnsOverrideService.setEnabled("d1", false)).thenReturn(returned);
     mvc.perform(
             post("/api/admin/dns-overrides/d1/enabled")

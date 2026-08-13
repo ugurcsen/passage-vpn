@@ -13,6 +13,7 @@ import com.opnl.vpn.access.AccessRule.Protocol;
 import com.opnl.vpn.access.AccessRule.TargetType;
 import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
+import com.opnl.vpn.dns.DnsScopeConflictService;
 import com.opnl.vpn.group.Group;
 import com.opnl.vpn.group.GroupRepository;
 import com.opnl.vpn.network.DnsmasqConfigService;
@@ -49,7 +50,8 @@ class AccessRuleServiceTest {
             groupRepository,
             ruleEngine,
             mock(AuditLogService.class),
-            dnsmasqConfigService);
+            dnsmasqConfigService,
+            mock(DnsScopeConflictService.class));
     when(ruleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
   }
 
@@ -67,6 +69,7 @@ class AccessRuleServiceTest {
         null,
         443,
         true,
+        null,
         null);
   }
 
@@ -240,7 +243,8 @@ class AccessRuleServiceTest {
             null,
             null,
             true,
-            null);
+            null,
+            List.of());
     AccessRuleDto created = service.create(dto);
 
     assertThat(created.dstGroupId()).isEqualTo("g2");
@@ -266,7 +270,8 @@ class AccessRuleServiceTest {
                         null,
                         null,
                         true,
-                        null)))
+                        null,
+                        List.of())))
         .isInstanceOf(ApiException.class)
         .hasFieldOrPropertyWithValue("code", "dst_group_not_found");
   }
@@ -295,7 +300,8 @@ class AccessRuleServiceTest {
                 null,
                 null,
                 true,
-                null));
+                null,
+                List.of()));
 
     assertThat(updated.dstGroupId()).isEqualTo("g2");
     assertThat(existing.getDstGroupId()).isEqualTo("g2");
@@ -341,7 +347,8 @@ class AccessRuleServiceTest {
                 "api.github.com",
                 443,
                 true,
-                null));
+                null,
+                List.of()));
 
     assertThat(created.dstDomain()).isEqualTo("api.github.com");
   }
@@ -368,7 +375,8 @@ class AccessRuleServiceTest {
                 "blocked.example.com",
                 null,
                 true,
-                null));
+                null,
+                List.of()));
 
     assertThat(updated.dstDomain()).isEqualTo("blocked.example.com");
     assertThat(existing.getDstDomain()).isEqualTo("blocked.example.com");

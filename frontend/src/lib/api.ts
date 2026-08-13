@@ -434,6 +434,8 @@ export interface DnsRecordDto {
   scopeName: string | null;
   enabled: boolean;
   createdAt: string;
+  /** ALLOW rules that let out-of-scope users reach this address despite its scope. */
+  warnings: string[];
 }
 
 /** Snapshot of the running configuration for support/auditing. */

@@ -29,6 +29,9 @@ const records = [
     scopeName: "devs",
     enabled: true,
     createdAt: "2026-08-13T00:00:00Z",
+    warnings: [
+      "ALLOW rule 'All users 10.0.0.0/8' applies to users outside this scope, so they can reach 10.10.0.6 despite the restriction",
+    ],
   },
 ];
 
@@ -85,6 +88,16 @@ describe("DnsOverridesPage", () => {
     renderPage();
 
     expect(await screen.findByText("Group: devs")).toBeInTheDocument();
+  });
+
+  it("shows an access-rule conflict warning for a scoped override", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findAllByText("All users");
+
+    const icon = await screen.findByLabelText("Access rule conflict warnings for db.internal");
+    await user.hover(icon);
+    expect(await screen.findByText(/users outside this scope/i)).toBeInTheDocument();
   });
 
   it("creates a global override", async () => {

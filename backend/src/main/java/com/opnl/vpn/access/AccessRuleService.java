@@ -2,6 +2,7 @@ package com.opnl.vpn.access;
 
 import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
+import com.opnl.vpn.dns.DnsScopeConflictService;
 import com.opnl.vpn.group.Group;
 import com.opnl.vpn.group.GroupRepository;
 import com.opnl.vpn.network.DnsmasqConfigService;
@@ -24,6 +25,7 @@ public class AccessRuleService {
   private final RuleEngine ruleEngine;
   private final AuditLogService auditLogService;
   private final DnsmasqConfigService dnsmasqConfigService;
+  private final DnsScopeConflictService conflictService;
 
   public AccessRuleService(
       AccessRuleRepository ruleRepository,
@@ -31,13 +33,15 @@ public class AccessRuleService {
       GroupRepository groupRepository,
       RuleEngine ruleEngine,
       AuditLogService auditLogService,
-      DnsmasqConfigService dnsmasqConfigService) {
+      DnsmasqConfigService dnsmasqConfigService,
+      DnsScopeConflictService conflictService) {
     this.ruleRepository = ruleRepository;
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
     this.ruleEngine = ruleEngine;
     this.auditLogService = auditLogService;
     this.dnsmasqConfigService = dnsmasqConfigService;
+    this.conflictService = conflictService;
   }
 
   @Transactional(readOnly = true)
@@ -54,7 +58,8 @@ public class AccessRuleService {
                     rule,
                     targets.get(
                         rule.getTargetType().name().toLowerCase() + ":" + rule.getTargetId()),
-                    dstGroupName(rule.getDstGroupId())))
+                    dstGroupName(rule.getDstGroupId()),
+                    conflictService.warningsForRule(rule)))
         .toList();
   }
 
@@ -82,7 +87,10 @@ public class AccessRuleService {
             destinationLabel(dto)));
     refreshDnsmasq();
     return AccessRuleDto.from(
-        saved, targetName(dto.targetType(), dto.targetId()), dstGroupName(dto.dstGroupId()));
+        saved,
+        targetName(dto.targetType(), dto.targetId()),
+        dstGroupName(dto.dstGroupId()),
+        conflictService.warningsForRule(saved));
   }
 
   @Transactional
@@ -95,7 +103,10 @@ public class AccessRuleService {
     auditLogService.record("RULE_UPDATE", AuditLogService.CAT_RULE, id, "rule", null);
     refreshDnsmasq();
     return AccessRuleDto.from(
-        saved, targetName(dto.targetType(), dto.targetId()), dstGroupName(dto.dstGroupId()));
+        saved,
+        targetName(dto.targetType(), dto.targetId()),
+        dstGroupName(dto.dstGroupId()),
+        conflictService.warningsForRule(saved));
   }
 
   @Transactional
@@ -116,7 +127,8 @@ public class AccessRuleService {
     return AccessRuleDto.from(
         ruleRepository.save(rule),
         targetName(rule.getTargetType(), rule.getTargetId()),
-        dstGroupName(rule.getDstGroupId()));
+        dstGroupName(rule.getDstGroupId()),
+        conflictService.warningsForRule(rule));
   }
 
   /**

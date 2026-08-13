@@ -5,6 +5,7 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 
 /** Admin-facing DNS override representation. */
 public record DnsRecordDto(
@@ -35,7 +36,8 @@ public record DnsRecordDto(
     String scopeId,
     String scopeName,
     Boolean enabled,
-    String createdAt) {
+    String createdAt,
+    List<String> warnings) {
 
   /** A scope target is required for GROUP/USER records and forbidden for GLOBAL records. */
   @AssertTrue(message = "scopeId is required for GROUP/USER scope and forbidden for GLOBAL")
@@ -49,6 +51,10 @@ public record DnsRecordDto(
   }
 
   public static DnsRecordDto from(DnsRecord record, String scopeName) {
+    return from(record, scopeName, List.of());
+  }
+
+  public static DnsRecordDto from(DnsRecord record, String scopeName, List<String> warnings) {
     return new DnsRecordDto(
         record.getId(),
         record.getHostname(),
@@ -58,6 +64,7 @@ public record DnsRecordDto(
         record.getScopeId(),
         scopeName,
         record.isEnabled(),
-        record.getCreatedAt() == null ? null : record.getCreatedAt().toString());
+        record.getCreatedAt() == null ? null : record.getCreatedAt().toString(),
+        warnings == null ? List.of() : warnings);
   }
 }

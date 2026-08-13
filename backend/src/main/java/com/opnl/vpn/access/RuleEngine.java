@@ -385,23 +385,6 @@ public class RuleEngine {
   }
 
   private List<String> groupChainFor(String userId) {
-    List<String> chain = new ArrayList<>();
-    List<String> visited = new ArrayList<>();
-    for (var member : memberRepository.findById_UserId(userId)) {
-      collectAncestors(member.getId().getGroupId(), chain, visited);
-    }
-    return chain;
-  }
-
-  private void collectAncestors(String groupId, List<String> chain, List<String> visited) {
-    if (groupId == null || visited.contains(groupId)) {
-      return;
-    }
-    visited.add(groupId);
-    chain.add(groupId);
-    groupRepository
-        .findById(groupId)
-        .map(com.opnl.vpn.group.Group::getParentId)
-        .ifPresent(parent -> collectAncestors(parent, chain, visited));
+    return GroupHierarchy.chainFor(userId, memberRepository, groupRepository);
   }
 }

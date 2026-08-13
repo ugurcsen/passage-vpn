@@ -22,6 +22,7 @@ import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { api, endpoints } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -44,6 +45,8 @@ interface RuleRow {
   dstPort: number | null;
   enabled: boolean;
   priority: number;
+  /** Scoped DNS overrides this rule exposes to out-of-scope users. */
+  warnings: string[];
 }
 
 interface UserRow {
@@ -206,6 +209,36 @@ export function AccessRulesPage() {
       headerName: "Protocol",
       width: 100,
       valueGetter: (_, row) => (row as RuleRow).protocol ?? "any",
+    },
+    {
+      field: "warnings",
+      headerName: "Warnings",
+      width: 110,
+      sortable: false,
+      renderCell: (params) => {
+        const row = params.row as RuleRow;
+        if (!row.warnings || row.warnings.length === 0) {
+          return (
+            <Typography variant="body2" color="text.secondary">
+              —
+            </Typography>
+          );
+        }
+        return (
+          <Tooltip title={row.warnings.join("\n")} placement="left">
+            <Box display="flex" alignItems="center" gap={0.5}>
+              <WarningAmberIcon
+                color="warning"
+                fontSize="small"
+                aria-label="Scoped DNS override warnings"
+              />
+              <Typography variant="body2" color="warning.main">
+                {row.warnings.length}
+              </Typography>
+            </Box>
+          </Tooltip>
+        );
+      },
     },
     {
       field: "destination",

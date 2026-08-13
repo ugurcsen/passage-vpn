@@ -44,12 +44,13 @@ class DnsOverrideServiceTest {
             userRepository,
             groupRepository,
             mock(AuditLogService.class),
-            dnsmasqConfigService);
+            dnsmasqConfigService,
+            mock(DnsScopeConflictService.class));
     when(recordRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
   }
 
   private DnsRecordDto dto(String hostname, String ipv4, Scope scope, String scopeId) {
-    return new DnsRecordDto(null, hostname, ipv4, null, scope, scopeId, null, true, null);
+    return new DnsRecordDto(null, hostname, ipv4, null, scope, scopeId, null, true, null, null);
   }
 
   @Test

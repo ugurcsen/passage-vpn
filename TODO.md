@@ -112,6 +112,10 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] DNS overrides: admin-defined hostname→IPv4 records served by dnsmasq with
       GLOBAL/GROUP/USER scope (Flyway V12, `/api/admin/dns-overrides`, DNS
       Overrides page; out-of-scope users get a per-client firewall deny)
+- [x] DNS override ⇄ access-rule conflict warnings: server-side detection when a
+      scoped override is reachable by out-of-scope users via an ALLOW rule
+      (ALLOW-wins ordering unchanged), surfaced as tooltip warnings in the DNS
+      Overrides and Access Rules grids
 - [ ] `docs/api.md` generation (script + make target ready; regenerate live in E2E)
 - [ ] Full CRUD API completion (Phase 4.4)
 - [ ] Makefile polish (Phase 4.7)

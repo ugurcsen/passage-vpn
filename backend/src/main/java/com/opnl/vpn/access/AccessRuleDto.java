@@ -7,6 +7,7 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 
 /** Admin-facing access rule representation. */
 public record AccessRuleDto(
@@ -32,7 +33,8 @@ public record AccessRuleDto(
         String dstDomain,
     Integer dstPort,
     Boolean enabled,
-    Integer priority) {
+    Integer priority,
+    List<String> warnings) {
 
   /** A destination must be a CIDR, a group or a domain — never more than one. */
   @AssertTrue(message = "dstCidr, dstGroupId and dstDomain are mutually exclusive")
@@ -42,6 +44,11 @@ public record AccessRuleDto(
   }
 
   public static AccessRuleDto from(AccessRule rule, String targetName, String dstGroupName) {
+    return from(rule, targetName, dstGroupName, List.of());
+  }
+
+  public static AccessRuleDto from(
+      AccessRule rule, String targetName, String dstGroupName, List<String> warnings) {
     return new AccessRuleDto(
         rule.getId(),
         rule.getTargetType(),
@@ -55,6 +62,7 @@ public record AccessRuleDto(
         rule.getDstDomain(),
         rule.getDstPort(),
         rule.isEnabled(),
-        rule.getPriority());
+        rule.getPriority(),
+        warnings == null ? List.of() : warnings);
   }
 }
