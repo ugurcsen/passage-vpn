@@ -150,6 +150,21 @@ dnsmasq_sig() {
     echo "$sig"
 }
 
+# Called when the pinning config (opnl-domains.conf) changes: refreshes the
+# OPNL_DOMAINS chain then RESTARTS dnsmasq. A plain SIGHUP would re-read the
+# config but keep the stale cache, so clients could keep resolving a domain to
+# an old address that no longer matches the firewall.
+refresh_dnsmasq_d() {
+    local pid
+    reapply_rules || true
+    pid="$(cat /var/run/dnsmasq.pid 2>/dev/null || true)"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        kill -TERM "$pid" 2>/dev/null || true
+        sleep 1
+    fi
+    start_dnsmasq || true
+}
+
 restart_all() {
     # SIGTERM running daemons gracefully; configs are re-read on next connect.
     for pidfile in "$OPNL_LOG_DIR"/daemon-*.pid; do
@@ -195,7 +210,7 @@ fi
         cur_dnsmasq="$(dnsmasq_sig)"
         if [ -n "$cur_dnsmasq" ] && [ "$cur_dnsmasq" != "$last_dnsmasq" ]; then
             echo "[entrypoint] dnsmasq config changed; refreshing resolver + firewall"
-            reapply_rules || true
+            refresh_dnsmasq_d
             last_dnsmasq="$cur_dnsmasq"
         fi
         sleep 2
