@@ -171,7 +171,7 @@ export function DnsOverridesPage() {
       width: 90,
       renderCell: (params) => {
         const row = params.row as DnsRecordDto;
-        return <Switch size="small" checked={row.enabled} onChange={() => toggleEnabled.mutate(row)} inputProps={{ "aria-label": `Toggle enabled for ${row.hostname}` }} />;
+        return <Switch size="small" checked={row.enabled} onChange={() => toggleEnabled.mutate(row)} inputProps={{ name: "enabled", "aria-label": `Toggle enabled for ${row.hostname}` }} />;
       },
     },
     {
