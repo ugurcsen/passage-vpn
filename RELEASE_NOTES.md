@@ -8,6 +8,51 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.5 — 2026-08-13
+
+Fifth tagged milestone (SemVer pre-release): admin branding, configuration
+report and backup/restore, plus API error-mapping hardening found during live
+verification. Includes everything from `v0.1.0-alpha.4` plus the changes below.
+Tag: `v0.1.0-alpha.5`.
+
+### Phase 4 — Branding, configuration report & backup/restore
+- [x] Brand settings — `brand_name`, `brand_primary_color`, `brand_footer` and
+      `brand_logo_url` (`SettingKeys`), read/written via `BrandService` with a
+      public `GET /api/public/brand` endpoint; frontend `useBrand` hook applies
+      the name/logo/colors to the theme, login page and sidebar
+- [x] Configuration report — `ConfigReportService` + `GET /api/admin/config-report`
+      (ADMIN-only) producing a server-wide summary; Config Report page UI
+- [x] Backup/restore — `BackupService` + `/api/admin/backups` (ADMIN-only):
+      create, download as ZIP and restore with full DB + config volume
+      replacement; `BACKUP_CREATE` / `BACKUP_RESTORE` audit events; restore
+      purges stale SQLite WAL sidecars so the restored database opens cleanly
+      (regression-covered in `BackupServiceTest`)
+- [x] Backups page UI — create, download and restore with confirmation toasts
+      (restore requires a backend restart)
+
+### Error-mapping hardening
+- [x] `MethodArgumentTypeMismatchException` (e.g. a `user-locked` value bound to
+      a `ProfileType` path variable) now maps to `400 invalid_parameter` instead
+      of a `500 internal_error`
+- [x] Method-security denials (`AuthorizationDeniedException` /
+      `AccessDeniedException`) now map to `403 forbidden` instead of `500`, so
+      USER-role clients get a proper 403 on ADMIN-only endpoints
+
+### Verified
+- Backend suite green (spotless clean); frontend suite green (23 files / 107
+  tests, lint 0 errors); `make test` green.
+- Live E2E (production `65.21.108.250`): branding round-trip — name/colors
+  applied to the login page and theme, reset to defaults and re-verified; config
+  report renders the full server summary; backup create → download → restore →
+  rollback verified, with stale WAL sidecars purged on restore; audit trail
+  records `SETTING_SET`, `BACKUP_CREATE` and `BACKUP_RESTORE`. Portal profile
+  downloads verified end-to-end (admin route, portal QR and share-token routes
+  all return valid `.ovpn`); `/api/portal/profiles/user-locked/download` →
+  `400 invalid_parameter` (was 500); `/api/admin/dashboard` and
+  `/api/admin/users` as a USER → `403 forbidden` (was 500).
+
+---
+
 ## v0.1.0-alpha.2 — 2026-08-12
 
 Second tagged milestone (SemVer pre-release). Includes everything from
