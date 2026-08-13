@@ -8,6 +8,30 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.10.1 — 2026-08-14
+
+Patch release on top of `v0.1.0-alpha.10`: fixes IPv6 routing for connected
+clients. The server already pushed `redirect-gateway ipv6`, but several clients
+(notably OpenVPN Connect) ignore server pushes for the default IPv6 route, so a
+connected client kept routing IPv6 off-tunnel despite holding a `fd00:1::`
+address. Tag: `v0.1.0-alpha.10.1`.
+
+### Phase M4.8 follow-up — Client-profile IPv6 routing
+- [x] `OvpnGenerator` embeds `tun-ipv6` and `redirect-gateway ipv6` directly in
+      the generated `.ovpn` when the daemon is dual-stack, so the client applies
+      the IPv6 default route through the tunnel even when it ignores server
+      pushes
+- [x] Unit tests added for both dual-stack (directives present) and IPv4-only
+      (directives absent) profile rendering
+
+### Verified
+- Backend suite green (370 tests); spotless clean.
+- Deployed to production `65.21.108.250`: backend rebuilt and recreated; the
+  downloaded `USER_LOCKED` profile now carries `tun-ipv6` + `redirect-gateway
+  ipv6`.
+
+---
+
 ## v0.1.0-alpha.10 — 2026-08-14
 
 Tenth tagged milestone (SemVer pre-release): full IPv6 dual-stack support — the
