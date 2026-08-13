@@ -39,6 +39,12 @@ export const darkTheme = createTheme({
     MuiDataGrid: {
       styleOverrides: {
         root: { border: "1px solid #223049" },
+        // Cells default to a block layout whose line-height centering only
+        // works for single-line text; chips, stacks and icon buttons then sit
+        // flush against the top while text is centered, so every row looks
+        // vertically misaligned. Force a flex layout so all cell content is
+        // centered consistently.
+        cell: { display: "flex", alignItems: "center" },
         columnHeader: {
           backgroundColor: "#141d2e",
           // Hidden sort/column-menu icons otherwise inflate the grid's scroll
@@ -65,6 +71,8 @@ export const lightTheme = createTheme({
     MuiDataGrid: {
       styleOverrides: {
         root: { border: "1px solid #e0e6ef" },
+        // Same vertical-centering fix as the dark theme.
+        cell: { display: "flex", alignItems: "center" },
         columnHeader: {
           // Hidden sort/column-menu icons otherwise inflate the grid's scroll
           // width and show a useless horizontal scrollbar on every data grid.
