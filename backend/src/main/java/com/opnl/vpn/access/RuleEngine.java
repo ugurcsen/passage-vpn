@@ -1,5 +1,7 @@
 package com.opnl.vpn.access;
 
+import com.opnl.vpn.dns.DnsOverrideService;
+import com.opnl.vpn.dns.DnsRecord;
 import com.opnl.vpn.group.Group;
 import com.opnl.vpn.group.GroupMember;
 import com.opnl.vpn.group.GroupMemberRepository;
@@ -13,13 +15,16 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
  * Pure rule-evaluation logic: resolves a user's effective access rules and renders them into
  * per-client iptables commands. A dedicated chain per client (named from the common name) is
- * created only when the user has rules; otherwise the default FORWARD policy applies.
+ * created only when the user has rules or scope-denied DNS-override addresses; otherwise the
+ * default FORWARD policy applies.
  */
 @Component
 public class RuleEngine {
@@ -30,6 +35,7 @@ public class RuleEngine {
   private final SettingsService settingsService;
   private final UserRepository userRepository;
   private final DomainResolver domainResolver;
+  private final DnsOverrideService dnsOverrideService;
 
   public RuleEngine(
       AccessRuleRepository ruleRepository,
@@ -37,13 +43,15 @@ public class RuleEngine {
       GroupRepository groupRepository,
       SettingsService settingsService,
       UserRepository userRepository,
-      DomainResolver domainResolver) {
+      DomainResolver domainResolver,
+      DnsOverrideService dnsOverrideService) {
     this.ruleRepository = ruleRepository;
     this.memberRepository = memberRepository;
     this.groupRepository = groupRepository;
     this.settingsService = settingsService;
     this.userRepository = userRepository;
     this.domainResolver = domainResolver;
+    this.dnsOverrideService = dnsOverrideService;
   }
 
   /** All enabled rules that apply to a user: global, then group (child-first), then user-level. */
@@ -67,11 +75,24 @@ public class RuleEngine {
 
   /** Builds the iptables argv lists to install and later tear down a client's rules. */
   public IptablesResult iptablesFor(String commonName, String virtualIp, List<AccessRule> rules) {
+    return iptablesFor(commonName, virtualIp, rules, Set.of());
+  }
+
+  /**
+   * Builds the iptables argv lists to install and later tear down a client's rules, additionally
+   * dropping traffic to the given DNS-override addresses (scope denies). The terminal rule is DROP
+   * when real access rules exist (default deny) and ACCEPT when only scope denies are present, so
+   * otherwise-unrestricted clients are not locked down beyond their deny list.
+   */
+  public IptablesResult iptablesFor(
+      String commonName, String virtualIp, List<AccessRule> rules, Set<String> deniedIps) {
     String chain = chainName(commonName);
     List<String> apply = new ArrayList<>();
     List<String> remove = new ArrayList<>();
 
-    if (rules.isEmpty()) {
+    boolean hasRules = !rules.isEmpty();
+    boolean hasDenies = deniedIps != null && !deniedIps.isEmpty();
+    if (!hasRules && !hasDenies) {
       return new IptablesResult(apply, remove);
     }
 
@@ -93,14 +114,41 @@ public class RuleEngine {
                 + target(rule.getAction()));
       }
     }
-    // Default deny for clients with any rule.
-    apply.add("iptables -A " + chain + " -j DROP");
+    for (String ip : deniedIps) {
+      apply.add("iptables -A " + chain + " " + src + "-d " + ip + "/32 -j DROP");
+    }
+    // Default deny for clients with any access rule; scope-only chains stay open.
+    apply.add("iptables -A " + chain + " -j " + (hasRules ? "DROP" : "ACCEPT"));
     apply.add("iptables -I FORWARD " + src + "-j " + chain);
 
     remove.add("iptables -D FORWARD " + src + "-j " + chain);
     remove.add("iptables -F " + chain);
     remove.add("iptables -X " + chain);
     return new IptablesResult(apply, remove);
+  }
+
+  /**
+   * The IPv4 addresses of enabled non-GLOBAL DNS overrides the user may not reach: records whose
+   * scope target (exact user, or group chain membership) does not include the user. GLOBAL records
+   * never deny. Used by the connect path so scoped internal hostnames resolve for everyone but only
+   * authorized clients can actually reach them.
+   */
+  public Set<String> scopeDenyIpsFor(String userId) {
+    Set<String> denied = new LinkedHashSet<>();
+    for (DnsRecord record : dnsOverrideService.nonGlobalEnabled()) {
+      if (!scopeIncludes(record, userId)) {
+        denied.add(record.getIpv4());
+      }
+    }
+    return denied;
+  }
+
+  private boolean scopeIncludes(DnsRecord record, String userId) {
+    return switch (record.getScope()) {
+      case USER -> userId.equals(record.getScopeId());
+      case GROUP -> groupChainFor(userId).contains(record.getScopeId());
+      case GLOBAL -> true;
+    };
   }
 
   /**
@@ -124,6 +172,12 @@ public class RuleEngine {
   }
 
   private List<String> domainDestinationSpecs(String domain) {
+    // DNS overrides win: an internal hostname resolves to the authoritative override
+    // address, keeping the dnsmasq answer and the firewall rules in agreement.
+    Set<String> overrideIps = dnsOverrideService.resolveDomain(domain);
+    if (!overrideIps.isEmpty()) {
+      return overrideIps.stream().map(ip -> "-d " + ip + "/32 ").toList();
+    }
     return domainResolver.resolve(domain).stream().map(ip -> "-d " + ip + "/32 ").toList();
   }
 

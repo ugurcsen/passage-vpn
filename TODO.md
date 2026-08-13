@@ -25,6 +25,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] `CertService` restore/rotate + expiry-warning scheduler
 - [x] Multi-daemon (`daemons` entity) + DCO detection display
 - [x] Domain-based control via dnsmasq (advanced) — → M4 (4.2)
+- [x] DNS overrides (internal hostnames served by dnsmasq, global + per-user/group scope) — → M4 (4.7)
 
 **P0.5 — Bugfix sweep (live E2E findings, `docs/test-findings.md`)**
 - [x] 2.1 CRIT — drop removed `client-cert-not-required` from config generator; GENERIC daemons use `verify-client-cert none`
@@ -108,6 +109,9 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 **M4 — v0.1.0-alpha.6 — Automation & Advanced Access** (detail: `docs/ROADMAP.md` M4)
 - [x] Post-auth Python script hook support (Phase 2.4/3.6)
 - [x] Domain-based control via dnsmasq (Phase 3.2, advanced)
+- [x] DNS overrides: admin-defined hostname→IPv4 records served by dnsmasq with
+      GLOBAL/GROUP/USER scope (Flyway V12, `/api/admin/dns-overrides`, DNS
+      Overrides page; out-of-scope users get a per-client firewall deny)
 - [ ] `docs/api.md` generation (script + make target ready; regenerate live in E2E)
 - [ ] Full CRUD API completion (Phase 4.4)
 - [ ] Makefile polish (Phase 4.7)

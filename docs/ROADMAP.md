@@ -109,12 +109,29 @@ Work started under M3 has been split: completed items shipped in
       (daemon management, connection kill, node lifecycle) and fill them.
 - [ ] **4.5 Makefile polish** — complete targets, `api-docs` verification step,
       `help` refresh.
-- [ ] **4.6 Release** — `v0.1.0-alpha.6` tag + `RELEASE_NOTES.md` entry.
+- [x] **4.7 DNS overrides** — admin-defined internal hostname → IPv4 records
+      served authoritatively by the shared dnsmasq (`Flyway V12`, entity
+      `DnsRecord`, `DnsOverrideService`, `/api/admin/dns-overrides`). GLOBAL
+      records apply to all clients; GROUP/USER-scoped records resolve for
+      everyone but only the target scope may reach the address (per-client
+      scope-DENY lines from `RuleEngine.scopeDenyIpsFor`; chain terminal stays
+      ACCEPT when only scope denials exist, DROP otherwise). Overrides also win
+      over public DNS when an access-rule domain matches. Written to
+      `/etc/dnsmasq.d/opnl-dns-overrides.conf` by `DnsmasqConfigService`.
+      Tests: `DnsOverrideServiceTest`, `DnsRecordAdminControllerTest`,
+      `RuleEngineTest`/`ServerConfigGeneratorTest`/`DnsmasqConfigServiceTest`
+      extensions, `DnsOverridesPage` (+ frontend tests). Live E2E on production
+      (2026-08-13): GLOBAL `git.internal→10.8.0.1` resolved in-VPN (AAAA NODATA),
+      NXDOMAIN on public DNS; USER (alice)/GROUP (DevOps) overrides → per-client
+      DROP only for out-of-scope IPs, none after adding alice to DevOps; config
+      regenerated and dnsmasq reloaded per change.
+- [ ] **4.8 Release** — `v0.1.0-alpha.6` tag + `RELEASE_NOTES.md` entry.
 
 ## M5 — Multi-node & Ops — TARGET `v0.1.0-alpha.7`
 
-- [ ] **5.1 `openvpn_nodes` registry** — Flyway V12 entity (name, mgmtHost,
+- [ ] **5.1 `openvpn_nodes` registry** — Flyway V13 entity (name, mgmtHost,
       mgmtPortBase, adminIp, enabled); `NodeRegistryService` + admin CRUD API.
+      (V12 is taken by `dns_records` in 4.7.)
 - [ ] **5.2 Node-aware status/kill/monitoring routing** — per-node `MgmtClient`
       (reconnect/backoff), node-scoped `/api/admin/monitor`, `/api/admin/status`,
       connection-logs reconciliation and `kill <cn>`; node column/picker on the
@@ -125,7 +142,7 @@ Work started under M3 has been split: completed items shipped in
       `application-agent.yml`.
 - [ ] **5.4 PostgreSQL profile validation** — end-to-end validation of
       `docker-compose.postgres.yml` + `application-postgres.yml`; all Flyway
-      migrations V1–V12 apply on Postgres; fix any SQLite-only SQL.
+      migrations V1–V13 apply on Postgres; fix any SQLite-only SQL.
 - [ ] **5.5 Release** — `v0.1.0-alpha.7` tag + `RELEASE_NOTES.md` entry.
 
 ## M6 — Release Hardening — TARGET `v0.1.0-beta.1`

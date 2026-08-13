@@ -21,6 +21,7 @@ import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -181,12 +182,14 @@ class AccessRuleServiceTest {
     RuleEngine.IptablesResult expected =
         new RuleEngine.IptablesResult(List.of("apply"), List.of("remove"));
     when(ruleEngine.effectiveFor("u1")).thenReturn(List.of());
-    when(ruleEngine.iptablesFor("alice", "10.8.0.5", List.of())).thenReturn(expected);
+    when(ruleEngine.scopeDenyIpsFor("u1")).thenReturn(Set.of());
+    when(ruleEngine.iptablesFor("alice", "10.8.0.5", List.of(), Set.of())).thenReturn(expected);
 
     RuleEngine.IptablesResult result = service.iptablesFor("alice", "10.8.0.5", "u1");
 
     assertThat(result.apply()).containsExactly("apply");
     verify(ruleEngine).effectiveFor("u1");
+    verify(ruleEngine).scopeDenyIpsFor("u1");
   }
 
   @Test

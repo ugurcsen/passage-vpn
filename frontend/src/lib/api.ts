@@ -217,6 +217,7 @@ export const endpoints = {
   groups: "/admin/groups",
   certs: "/admin/certs",
   rules: "/admin/rules",
+  dnsOverrides: "/admin/dns-overrides",
   daemons: "/admin/daemons",
   profileTokens: "/admin/profile-tokens",
   portalProfiles: "/portal/profiles",
@@ -418,6 +419,18 @@ export interface Brand {
   primaryColor: string;
   footer: string;
   logoUrl: string | null;
+}
+
+/** DNS override: an internal hostname answered authoritatively by the VPN resolver. */
+export interface DnsRecordDto {
+  id: string;
+  hostname: string;
+  ipv4: string;
+  scope: "GLOBAL" | "GROUP" | "USER";
+  scopeId: string | null;
+  scopeName: string | null;
+  enabled: boolean;
+  createdAt: string;
 }
 
 /** Snapshot of the running configuration for support/auditing. */

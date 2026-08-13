@@ -2,11 +2,14 @@ package com.opnl.vpn.access;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.access.AccessRule.Action;
 import com.opnl.vpn.access.AccessRule.TargetType;
+import com.opnl.vpn.dns.DnsOverrideService;
+import com.opnl.vpn.dns.DnsRecord;
 import com.opnl.vpn.group.Group;
 import com.opnl.vpn.group.GroupMember;
 import com.opnl.vpn.group.GroupMemberRepository;
@@ -44,7 +47,8 @@ class RuleEngineTest {
         groups,
         mock(SettingsService.class),
         mock(UserRepository.class),
-        mock(DomainResolver.class));
+        mock(DomainResolver.class),
+        mock(DnsOverrideService.class));
   }
 
   private RuleEngine engineWithResolver(DomainResolver resolver) {
@@ -54,7 +58,8 @@ class RuleEngineTest {
         mock(GroupRepository.class),
         mock(SettingsService.class),
         mock(UserRepository.class),
-        resolver);
+        resolver,
+        mock(DnsOverrideService.class));
   }
 
   @Test
@@ -207,7 +212,8 @@ class RuleEngineTest {
             mock(GroupRepository.class),
             settings,
             users,
-            mock(DomainResolver.class));
+            mock(DomainResolver.class),
+            mock(DnsOverrideService.class));
 
     AccessRule rule = rule(TargetType.GLOBAL, null, Action.ALLOW, 0, true);
     rule.setDstGroupId("g2");
@@ -234,7 +240,8 @@ class RuleEngineTest {
             groups,
             settings,
             mock(UserRepository.class),
-            mock(DomainResolver.class));
+            mock(DomainResolver.class),
+            mock(DnsOverrideService.class));
 
     AccessRule rule = rule(TargetType.GLOBAL, null, Action.ALLOW, 0, true);
     rule.setDstGroupId("g2");
@@ -267,7 +274,8 @@ class RuleEngineTest {
             mock(GroupRepository.class),
             settings,
             users,
-            mock(DomainResolver.class));
+            mock(DomainResolver.class),
+            mock(DnsOverrideService.class));
 
     AccessRule rule = rule(TargetType.GLOBAL, null, Action.DENY, 0, true);
     rule.setDstGroupId("g2");
@@ -294,7 +302,8 @@ class RuleEngineTest {
             mock(GroupRepository.class),
             settings,
             users,
-            mock(DomainResolver.class));
+            mock(DomainResolver.class),
+            mock(DnsOverrideService.class));
 
     AccessRule rule = rule(TargetType.GLOBAL, null, Action.DENY, 0, true);
     rule.setDstGroupId("g2");
@@ -381,5 +390,120 @@ class RuleEngineTest {
         .anyMatch(cmd -> cmd.contains("-d 1.2.3.4/32"))
         .noneMatch(cmd -> cmd.contains("-d 10.0.0.0/8"));
     verify(resolver).resolve("x.example.com");
+  }
+
+  @Test
+  void dstDomainUsesOverrideIpBeforeResolver() {
+    DomainResolver resolver = mock(DomainResolver.class);
+    DnsOverrideService overrides = mock(DnsOverrideService.class);
+    when(overrides.resolveDomain("git.internal")).thenReturn(Set.of("10.10.0.5"));
+    RuleEngine engine =
+        new RuleEngine(
+            mock(AccessRuleRepository.class),
+            mock(GroupMemberRepository.class),
+            mock(GroupRepository.class),
+            mock(SettingsService.class),
+            mock(UserRepository.class),
+            resolver,
+            overrides);
+
+    AccessRule rule = rule(TargetType.GLOBAL, null, Action.ALLOW, 0, true);
+    rule.setDstDomain("git.internal");
+
+    RuleEngine.IptablesResult result = engine.iptablesFor("alice", "10.8.0.5", List.of(rule));
+
+    assertThat(result.apply())
+        .anyMatch(cmd -> cmd.contains("-d 10.10.0.5/32"))
+        .anyMatch(cmd -> cmd.contains("-j ACCEPT"));
+    verify(resolver, never()).resolve("git.internal");
+  }
+
+  @Test
+  void scopeDenyIpsForDeniesOutOfScopeRecordsOnly() {
+    GroupMemberRepository members = mock(GroupMemberRepository.class);
+    when(members.findById_UserId("u1")).thenReturn(List.of(new GroupMember("g1", "u1")));
+    GroupRepository groups = mock(GroupRepository.class);
+    when(groups.findById("g1"))
+        .thenReturn(Optional.of(Group.builder().id("g1").name("g1").build()));
+    DnsOverrideService overrides = mock(DnsOverrideService.class);
+    when(overrides.nonGlobalEnabled())
+        .thenReturn(
+            List.of(
+                dnsRecord("d1", "git.internal", "10.10.0.5", DnsRecord.Scope.USER, "u2"),
+                dnsRecord("d2", "db.internal", "10.10.0.6", DnsRecord.Scope.GROUP, "g1"),
+                dnsRecord("d3", "mon.internal", "10.10.0.7", DnsRecord.Scope.GROUP, "g2")));
+    RuleEngine engine =
+        new RuleEngine(
+            mock(AccessRuleRepository.class),
+            members,
+            groups,
+            mock(SettingsService.class),
+            mock(UserRepository.class),
+            mock(DomainResolver.class),
+            overrides);
+
+    Set<String> denied = engine.scopeDenyIpsFor("u1");
+
+    assertThat(denied).containsExactly("10.10.0.5", "10.10.0.7");
+  }
+
+  @Test
+  void scopeDeniesOnlyCreatesChainWithOpenTerminal() {
+    RuleEngine engine =
+        new RuleEngine(
+            mock(AccessRuleRepository.class),
+            mock(GroupMemberRepository.class),
+            mock(GroupRepository.class),
+            mock(SettingsService.class),
+            mock(UserRepository.class),
+            mock(DomainResolver.class),
+            mock(DnsOverrideService.class));
+
+    RuleEngine.IptablesResult result =
+        engine.iptablesFor("alice", "10.8.0.5", List.of(), Set.of("10.10.0.5"));
+
+    String chain = engine.chainName("alice");
+    assertThat(result.apply())
+        .anyMatch(cmd -> cmd.contains("iptables -N " + chain))
+        .anyMatch(cmd -> cmd.contains("-s 10.8.0.5 -d 10.10.0.5/32 -j DROP"))
+        .anyMatch(cmd -> cmd.equals("iptables -A " + chain + " -j ACCEPT"))
+        .noneMatch(cmd -> cmd.equals("iptables -A " + chain + " -j DROP"));
+  }
+
+  @Test
+  void scopeDeniesWithAccessRulesKeepDefaultDeny() {
+    AccessRule allow = rule(TargetType.GLOBAL, null, Action.ALLOW, 0, true);
+    allow.setDstCidr("10.0.0.0/8");
+    RuleEngine engine =
+        new RuleEngine(
+            mock(AccessRuleRepository.class),
+            mock(GroupMemberRepository.class),
+            mock(GroupRepository.class),
+            mock(SettingsService.class),
+            mock(UserRepository.class),
+            mock(DomainResolver.class),
+            mock(DnsOverrideService.class));
+
+    RuleEngine.IptablesResult result =
+        engine.iptablesFor("alice", "10.8.0.5", List.of(allow), Set.of("10.10.0.5"));
+
+    String chain = engine.chainName("alice");
+    assertThat(result.apply())
+        .anyMatch(cmd -> cmd.contains("-d 10.10.0.5/32 -j DROP"))
+        .anyMatch(cmd -> cmd.equals("iptables -A " + chain + " -j DROP"))
+        .noneMatch(cmd -> cmd.equals("iptables -A " + chain + " -j ACCEPT"));
+  }
+
+  private DnsRecord dnsRecord(
+      String id, String hostname, String ipv4, DnsRecord.Scope scope, String scopeId) {
+    return DnsRecord.builder()
+        .id(id)
+        .hostname(hostname)
+        .ipv4(ipv4)
+        .scope(scope)
+        .scopeId(scopeId)
+        .enabled(true)
+        .createdAt(Instant.now())
+        .build();
   }
 }

@@ -25,6 +25,7 @@ import GroupIcon from "@mui/icons-material/Group";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import DownloadIcon from "@mui/icons-material/Download";
 import DnsIcon from "@mui/icons-material/Dns";
+import LanguageIcon from "@mui/icons-material/Language";
 import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import SettingsIcon from "@mui/icons-material/Settings";
 import SecurityIcon from "@mui/icons-material/Security";
@@ -56,6 +57,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Groups", path: "/groups", icon: <GroupIcon />, roles: ["ADMIN"] },
   { label: "Certificates", path: "/certs", icon: <VpnKeyIcon />, roles: ["ADMIN"] },
   { label: "Access Rules", path: "/rules", icon: <SecurityIcon />, roles: ["ADMIN"] },
+  { label: "DNS Overrides", path: "/dns", icon: <LanguageIcon />, roles: ["ADMIN"] },
   { label: "Connection Profiles", path: "/profiles", icon: <DownloadIcon />, roles: ["ADMIN"] },
   { label: "VPN Daemons", path: "/daemons", icon: <DnsIcon />, roles: ["ADMIN"] },
   { label: "My Profiles", path: "/portal", icon: <PersonIcon /> },

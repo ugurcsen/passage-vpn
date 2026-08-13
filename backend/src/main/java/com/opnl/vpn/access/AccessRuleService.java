@@ -122,7 +122,8 @@ public class AccessRuleService {
   /** Renders the per-client iptables commands for an active connection. */
   @Transactional(readOnly = true)
   public RuleEngine.IptablesResult iptablesFor(String commonName, String virtualIp, String userId) {
-    return ruleEngine.iptablesFor(commonName, virtualIp, ruleEngine.effectiveFor(userId));
+    return ruleEngine.iptablesFor(
+        commonName, virtualIp, ruleEngine.effectiveFor(userId), ruleEngine.scopeDenyIpsFor(userId));
   }
 
   private void apply(AccessRule rule, AccessRuleDto dto) {
