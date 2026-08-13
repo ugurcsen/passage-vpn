@@ -28,6 +28,7 @@ import DnsIcon from "@mui/icons-material/Dns";
 import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import SettingsIcon from "@mui/icons-material/Settings";
 import SecurityIcon from "@mui/icons-material/Security";
+import HistoryIcon from "@mui/icons-material/History";
 import PersonIcon from "@mui/icons-material/Person";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -47,6 +48,7 @@ const NAV_ITEMS = [
   { label: "My Account", path: "/portal/account", icon: <SecurityIcon /> },
   { label: "Live Status", path: "/status", icon: <MonitorHeartIcon /> },
   { label: "Settings", path: "/settings", icon: <SettingsIcon /> },
+  { label: "Audit Log", path: "/audit-logs", icon: <HistoryIcon />, adminOnly: true },
 ];
 
 interface AppLayoutProps {
@@ -70,7 +72,7 @@ export function AppLayout({ darkMode, onToggleDarkMode }: AppLayoutProps) {
         </Typography>
       </Toolbar>
       <List dense>
-        {NAV_ITEMS.map((item) => (
+        {NAV_ITEMS.filter((item) => !item.adminOnly || user?.role === "ADMIN").map((item) => (
           <ListItemButton
             key={item.path}
             selected={location.pathname === item.path}

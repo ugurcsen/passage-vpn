@@ -49,6 +49,7 @@ services:
       OPNL_OPENVPN_MGMT_PORT: 7505
       OPNL_INTERNAL_BASE_URL: http://backend:8080
       OPNL_INTERNAL_TOKEN: ${OPNL_INTERNAL_TOKEN:-change-me-internal-token}
+      OPNL_TRUSTED_PROXIES: ${OPNL_TRUSTED_PROXIES:-172.16.0.0/12}
     volumes:
       - opnl-data:/var/lib/opnl
       - opnl-pki:/etc/opnl/pki

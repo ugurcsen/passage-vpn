@@ -1,5 +1,6 @@
 package com.opnl.vpn.api.admin;
 
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.ccd.CcdService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.group.Group;
@@ -25,18 +26,21 @@ public class GroupAdminService {
   private final UserRepository userRepository;
   private final SettingsService settingsService;
   private final CcdService ccdService;
+  private final AuditLogService auditLogService;
 
   public GroupAdminService(
       GroupRepository groupRepository,
       GroupMemberRepository memberRepository,
       UserRepository userRepository,
       SettingsService settingsService,
-      CcdService ccdService) {
+      CcdService ccdService,
+      AuditLogService auditLogService) {
     this.groupRepository = groupRepository;
     this.memberRepository = memberRepository;
     this.userRepository = userRepository;
     this.settingsService = settingsService;
     this.ccdService = ccdService;
+    this.auditLogService = auditLogService;
   }
 
   @Transactional(readOnly = true)
@@ -64,6 +68,12 @@ public class GroupAdminService {
             .createdAt(Instant.now())
             .build();
     groupRepository.save(group);
+    auditLogService.record(
+        "GROUP_CREATE",
+        AuditLogService.CAT_GROUP,
+        group.getId(),
+        "group",
+        Map.of("name", group.getName()));
     return toDto(group);
   }
 
@@ -82,18 +92,26 @@ public class GroupAdminService {
       group.setDescription(request.description());
     }
     groupRepository.save(group);
+    auditLogService.record(
+        "GROUP_UPDATE",
+        AuditLogService.CAT_GROUP,
+        group.getId(),
+        "group",
+        Map.of("name", group.getName()));
     return toDto(group);
   }
 
   @Transactional
   public void deleteGroup(String id) {
-    requireGroup(id);
+    Group group = requireGroup(id);
     memberRepository.deleteById_GroupId(id);
     settingsService
         .groupSettings(id)
         .keySet()
         .forEach(key -> settingsService.deleteGroupSetting(id, key));
     groupRepository.deleteById(id);
+    auditLogService.record(
+        "GROUP_DELETE", AuditLogService.CAT_GROUP, id, "group", Map.of("name", group.getName()));
   }
 
   @Transactional
@@ -106,6 +124,12 @@ public class GroupAdminService {
           .orElseThrow(() -> ApiException.notFound("user_not_found", "User not found: " + userId));
       memberRepository.save(new GroupMember(id, userId));
     }
+    auditLogService.record(
+        "GROUP_MEMBERS_SET",
+        AuditLogService.CAT_GROUP,
+        id,
+        "group",
+        Map.of("memberCount", userIds.size()));
     return toDto(requireGroup(id));
   }
 
@@ -125,6 +149,8 @@ public class GroupAdminService {
   public Map<String, Object> setGroupSetting(String id, String key, Object value) {
     requireGroup(id);
     settingsService.setGroupSetting(id, key, value);
+    auditLogService.record(
+        "GROUP_SETTING_SET", AuditLogService.CAT_GROUP, id, "group", Map.of("key", key));
     return settingsService.groupSettings(id);
   }
 
@@ -144,6 +170,8 @@ public class GroupAdminService {
     } else {
       settingsService.setGroupSetting(id, SettingKeys.STATIC_IP_POOL, pool.trim());
     }
+    auditLogService.record(
+        "GROUP_STATIC_IP_POOL_SET", AuditLogService.CAT_GROUP, id, "group", Map.of("pool", pool));
     return staticIpPool(id);
   }
 
@@ -151,6 +179,8 @@ public class GroupAdminService {
   public Map<String, Object> deleteGroupSetting(String id, String key) {
     requireGroup(id);
     settingsService.deleteGroupSetting(id, key);
+    auditLogService.record(
+        "GROUP_SETTING_DELETE", AuditLogService.CAT_GROUP, id, "group", Map.of("key", key));
     return settingsService.groupSettings(id);
   }
 

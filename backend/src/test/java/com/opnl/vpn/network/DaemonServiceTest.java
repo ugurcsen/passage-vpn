@@ -69,7 +69,8 @@ class DaemonServiceTest {
             settingRepository,
             new ServerConfigGenerator(new ObjectMapper()),
             configWriter,
-            mock(OpnlProperties.class));
+            mock(OpnlProperties.class),
+            mock(com.opnl.vpn.audit.AuditLogService.class));
   }
 
   @Test

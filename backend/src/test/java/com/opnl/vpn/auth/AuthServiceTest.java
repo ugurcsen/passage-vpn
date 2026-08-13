@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.auth.spi.AuthProviderManager;
 import com.opnl.vpn.auth.spi.LocalAuthProvider;
 import com.opnl.vpn.common.ApiException;
@@ -70,7 +71,8 @@ class AuthServiceTest {
             jwtService,
             new TotpService(),
             settingsService,
-            properties);
+            properties,
+            mock(AuditLogService.class));
   }
 
   private User user(String username, boolean mfaEnabled, String mfaSecret) {

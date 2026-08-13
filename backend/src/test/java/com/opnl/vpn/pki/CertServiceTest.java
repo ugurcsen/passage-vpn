@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.pki.Certificate.Status;
 import com.opnl.vpn.user.User;
@@ -35,7 +36,9 @@ class CertServiceTest {
     easyRsa = mock(EasyRsaService.class);
     certificateRepository = mock(CertificateRepository.class);
     userRepository = mock(UserRepository.class);
-    service = new CertService(easyRsa, certificateRepository, userRepository);
+    service =
+        new CertService(
+            easyRsa, certificateRepository, userRepository, mock(AuditLogService.class));
   }
 
   @Test

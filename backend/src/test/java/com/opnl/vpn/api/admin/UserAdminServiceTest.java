@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.auth.TotpService;
 import com.opnl.vpn.ccd.CcdService;
 import com.opnl.vpn.common.ApiException;
@@ -63,7 +64,8 @@ class UserAdminServiceTest {
             new BCryptPasswordEncoder(),
             new TotpService(),
             settingsService,
-            mock(CcdService.class));
+            mock(CcdService.class),
+            mock(AuditLogService.class));
     when(userRepository.countByRole(User.Role.ADMIN)).thenReturn(1L);
     when(memberRepository.findById_UserId(any())).thenReturn(List.of());
   }

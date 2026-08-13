@@ -1,11 +1,13 @@
 package com.opnl.vpn.pki;
 
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,14 +29,17 @@ public class CertService {
   private final EasyRsaService easyRsaService;
   private final CertificateRepository certificateRepository;
   private final UserRepository userRepository;
+  private final AuditLogService auditLogService;
 
   public CertService(
       EasyRsaService easyRsaService,
       CertificateRepository certificateRepository,
-      UserRepository userRepository) {
+      UserRepository userRepository,
+      AuditLogService auditLogService) {
     this.easyRsaService = easyRsaService;
     this.certificateRepository = certificateRepository;
     this.userRepository = userRepository;
+    this.auditLogService = auditLogService;
   }
 
   /** Returns the user's current valid certificate, issuing one when missing. */
@@ -63,6 +68,12 @@ public class CertService {
             .issuedAt(Instant.now())
             .expiresAt(expiryFor(cn))
             .build();
+    auditLogService.record(
+        "CERT_ISSUE",
+        AuditLogService.CAT_CERT,
+        certificate.getId(),
+        "certificate",
+        Map.of("commonName", cn));
     return certificateRepository.save(certificate);
   }
 
@@ -80,6 +91,12 @@ public class CertService {
     easyRsaService.revokeCert(certificate.getCommonName());
     certificate.setStatus(Certificate.Status.REVOKED);
     certificate.setRevokedAt(Instant.now());
+    auditLogService.record(
+        "CERT_REVOKE",
+        AuditLogService.CAT_CERT,
+        certificate.getId(),
+        "certificate",
+        Map.of("commonName", certificate.getCommonName()));
     return certificateRepository.save(certificate);
   }
 
@@ -109,6 +126,12 @@ public class CertService {
     easyRsaService.unrevokeCert(certificate.getSerial(), certificate.getCommonName());
     certificate.setStatus(Certificate.Status.VALID);
     certificate.setRevokedAt(null);
+    auditLogService.record(
+        "CERT_RESTORE",
+        AuditLogService.CAT_CERT,
+        certificate.getId(),
+        "certificate",
+        Map.of("commonName", certificate.getCommonName()));
     return certificateRepository.save(certificate);
   }
 
@@ -138,6 +161,12 @@ public class CertService {
     certificate.setIssuedAt(Instant.now());
     certificate.setSerial(serialFor(user.getUsername()));
     certificate.setExpiresAt(expiryFor(user.getUsername()));
+    auditLogService.record(
+        "CERT_ROTATE",
+        AuditLogService.CAT_CERT,
+        certificate.getId(),
+        "certificate",
+        Map.of("commonName", certificate.getCommonName(), "userId", userId));
     return certificateRepository.save(certificate);
   }
 

@@ -231,6 +231,7 @@ export const endpoints = {
   connectionLogs: "/admin/connection-logs",
   system: "/admin/system",
   monitor: "/admin/monitor",
+  auditLogs: "/admin/audit-logs",
 };
 
 export type ProfileType = "USER_LOCKED" | "AUTO_LOGIN" | "SERVER_LOCKED" | "GENERIC";
@@ -357,6 +358,29 @@ export interface ConnectionLog {
 /** Server-level settings store: arbitrary JSON values keyed by string. */
 export interface ServerSettings {
   [key: string]: unknown;
+}
+
+/** Generic paginated response wrapper used by the audit log API. */
+export interface PageDto<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+/** A single admin/auth audit trail entry. */
+export interface AuditLogEntry {
+  id: string;
+  actorId: string | null;
+  actorName: string | null;
+  action: string;
+  category: string;
+  targetId: string | null;
+  targetType: string | null;
+  detail: string | null;
+  ip: string | null;
+  createdAt: string;
 }
 
 /** TOTP provisioning payload: fresh secret plus QR/otpauth for the authenticator app. */

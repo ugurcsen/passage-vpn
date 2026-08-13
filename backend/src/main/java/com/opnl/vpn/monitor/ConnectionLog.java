@@ -20,7 +20,8 @@ import lombok.NoArgsConstructor;
     name = "connection_logs",
     indexes = {
       @Index(name = "idx_connection_logs_connected_at", columnList = "connected_at"),
-      @Index(name = "idx_connection_logs_username", columnList = "username")
+      @Index(name = "idx_connection_logs_username", columnList = "username"),
+      @Index(name = "idx_connection_logs_disconnected_at", columnList = "disconnected_at")
     })
 @Data
 @Builder

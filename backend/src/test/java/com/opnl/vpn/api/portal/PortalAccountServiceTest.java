@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.api.admin.UserDto;
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.auth.TotpService;
 import com.opnl.vpn.auth.spi.AuthProviderManager;
 import com.opnl.vpn.auth.spi.LocalAuthProvider;
@@ -66,7 +67,8 @@ class PortalAccountServiceTest {
             encoder,
             new TotpService(),
             settingsService,
-            authProviderManager);
+            authProviderManager,
+            mock(AuditLogService.class));
     when(userRepository.findById("u1")).thenReturn(Optional.of(alice()));
     when(userRepository.findByUsername("alice")).thenReturn(Optional.of(alice()));
   }

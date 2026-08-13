@@ -102,7 +102,8 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Online users list, session duration, connection history persisted
       (`connection_logs`, Flyway V6, `/api/admin/connection-logs`)
 - [x] Dashboard: MUI X Charts traffic, system info (oshi), DCO badge
-- [ ] Audit log entity + UI; syslog integration; `connection_logs` retention
+- [x] Audit log entity + UI; syslog integration; `connection_logs` retention
+  (Flyway V8/V9, `/api/admin/audit-logs` with pagination + filters)
 
 **P3 — Phase 4: API, ops, deployment**
 - [ ] OpenAPI/Swagger UI + `docs/api.md`; API tokens for automation
@@ -249,9 +250,9 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] System info: CPU/mem/disk (oshi), OpenVPN version, DCO
 
 ### 4.3 Logging & audit
-- [ ] Audit log entity (admin actions) + UI
-- [ ] Syslog integration (audit + auth events)
-- [ ] `connection_logs` retention policy
+- [x] Audit log entity (admin actions) + UI
+- [x] Syslog integration (audit + auth events)
+- [x] `connection_logs` retention policy
 
 ### 4.4 REST API
 - [ ] Full CRUD API for all resources (admin + portal namespaces)

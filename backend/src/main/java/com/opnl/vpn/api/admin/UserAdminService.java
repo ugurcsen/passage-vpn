@@ -1,5 +1,6 @@
 package com.opnl.vpn.api.admin;
 
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.auth.TotpService;
 import com.opnl.vpn.ccd.CcdService;
 import com.opnl.vpn.common.ApiException;
@@ -31,6 +32,7 @@ public class UserAdminService {
   private final TotpService totpService;
   private final SettingsService settingsService;
   private final CcdService ccdService;
+  private final AuditLogService auditLogService;
 
   public UserAdminService(
       UserRepository userRepository,
@@ -39,7 +41,8 @@ public class UserAdminService {
       PasswordEncoder passwordEncoder,
       TotpService totpService,
       SettingsService settingsService,
-      CcdService ccdService) {
+      CcdService ccdService,
+      AuditLogService auditLogService) {
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
     this.memberRepository = memberRepository;
@@ -47,6 +50,7 @@ public class UserAdminService {
     this.totpService = totpService;
     this.settingsService = settingsService;
     this.ccdService = ccdService;
+    this.auditLogService = auditLogService;
   }
 
   @Transactional(readOnly = true)
@@ -133,6 +137,12 @@ public class UserAdminService {
     if (role == User.Role.RESELLER) {
       settingsService.setUserSetting(user.getId(), SettingKeys.ACCOUNT_DISABLED, false);
     }
+    auditLogService.record(
+        "USER_CREATE",
+        AuditLogService.CAT_USER,
+        user.getId(),
+        "user",
+        Map.of("username", user.getUsername(), "role", role.name()));
     return getUser(user.getId());
   }
 
@@ -162,6 +172,12 @@ public class UserAdminService {
       setMemberships(user.getId(), request.groupIds());
     }
     userRepository.save(user);
+    auditLogService.record(
+        "USER_UPDATE",
+        AuditLogService.CAT_USER,
+        user.getId(),
+        "user",
+        Map.of("username", user.getUsername()));
     return getUser(user.getId());
   }
 
@@ -180,6 +196,12 @@ public class UserAdminService {
         .keySet()
         .forEach(key -> settingsService.deleteUserSetting(id, key));
     userRepository.delete(user);
+    auditLogService.record(
+        "USER_DELETE",
+        AuditLogService.CAT_USER,
+        id,
+        "user",
+        Map.of("username", user.getUsername()));
   }
 
   public enum BulkAction {
@@ -204,6 +226,12 @@ public class UserAdminService {
         case DELETE -> deleteUser(actor, id);
       }
     }
+    auditLogService.record(
+        "USER_BULK",
+        AuditLogService.CAT_USER,
+        null,
+        "user",
+        Map.of("action", action.name(), "count", ids.size()));
     return ids.size();
   }
 
@@ -214,6 +242,12 @@ public class UserAdminService {
     user.setFailedAttempts(0);
     user.setLockedUntil(null);
     userRepository.save(user);
+    auditLogService.record(
+        "USER_PASSWORD_RESET",
+        AuditLogService.CAT_USER,
+        id,
+        "user",
+        Map.of("username", user.getUsername()));
   }
 
   @Transactional
@@ -224,6 +258,12 @@ public class UserAdminService {
     }
     user.setBanned(banned);
     userRepository.save(user);
+    auditLogService.record(
+        banned ? "USER_BAN" : "USER_UNBAN",
+        AuditLogService.CAT_USER,
+        id,
+        "user",
+        Map.of("username", user.getUsername()));
     return getUser(id);
   }
 
@@ -231,6 +271,8 @@ public class UserAdminService {
   public UserDto setStaticIp(String id, String staticIp) {
     requireUser(id);
     ccdService.setStaticIp(id, staticIp);
+    auditLogService.record(
+        "USER_STATIC_IP_SET", AuditLogService.CAT_USER, id, "user", Map.of("staticIp", staticIp));
     return getUser(id);
   }
 
@@ -239,6 +281,7 @@ public class UserAdminService {
   public UserDto allocateStaticIp(String id) {
     requireUser(id);
     ccdService.allocateFromGroupPool(id);
+    auditLogService.record("USER_STATIC_IP_ALLOCATE", AuditLogService.CAT_USER, id, "user", null);
     return getUser(id);
   }
 
@@ -246,6 +289,7 @@ public class UserAdminService {
   public UserDto clearStaticIp(String id) {
     requireUser(id);
     ccdService.clearStaticIp(id);
+    auditLogService.record("USER_STATIC_IP_CLEAR", AuditLogService.CAT_USER, id, "user", null);
     return getUser(id);
   }
 
@@ -259,6 +303,12 @@ public class UserAdminService {
     user.setMfaSecret(secret);
     user.setMfaEnabled(false);
     userRepository.save(user);
+    auditLogService.record(
+        "USER_MFA_SETUP",
+        AuditLogService.CAT_USER,
+        id,
+        "user",
+        Map.of("username", user.getUsername()));
     String uri = totpService.otpAuthUri(secret, user.getUsername());
     return new MfaSetup(secret, uri, totpService.qrPngDataUrl(secret, user.getUsername()));
   }
@@ -272,6 +322,12 @@ public class UserAdminService {
     }
     user.setMfaEnabled(true);
     userRepository.save(user);
+    auditLogService.record(
+        "USER_MFA_ENABLE",
+        AuditLogService.CAT_USER,
+        id,
+        "user",
+        Map.of("username", user.getUsername()));
     return getUser(id);
   }
 
@@ -281,6 +337,12 @@ public class UserAdminService {
     user.setMfaEnabled(false);
     user.setMfaSecret(null);
     userRepository.save(user);
+    auditLogService.record(
+        "USER_MFA_DISABLE",
+        AuditLogService.CAT_USER,
+        id,
+        "user",
+        Map.of("username", user.getUsername()));
     return getUser(id);
   }
 
@@ -302,6 +364,8 @@ public class UserAdminService {
   public Map<String, Object> setUserSetting(String id, String key, Object value) {
     requireUser(id);
     settingsService.setUserSetting(id, key, value);
+    auditLogService.record(
+        "USER_SETTING_SET", AuditLogService.CAT_USER, id, "user", Map.of("key", key));
     return settingsService.userSettings(id);
   }
 
@@ -309,6 +373,8 @@ public class UserAdminService {
   public Map<String, Object> deleteUserSetting(String id, String key) {
     requireUser(id);
     settingsService.deleteUserSetting(id, key);
+    auditLogService.record(
+        "USER_SETTING_DELETE", AuditLogService.CAT_USER, id, "user", Map.of("key", key));
     return settingsService.userSettings(id);
   }
 

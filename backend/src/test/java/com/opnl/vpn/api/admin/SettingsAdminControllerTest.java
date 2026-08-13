@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.GlobalExceptionHandler;
 import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.setting.SettingsService;
@@ -36,7 +37,9 @@ class SettingsAdminControllerTest {
     daemonService = mock(DaemonService.class);
     objectMapper = new ObjectMapper();
     mvc =
-        MockMvcBuilders.standaloneSetup(new SettingsAdminController(settingsService, daemonService))
+        MockMvcBuilders.standaloneSetup(
+                new SettingsAdminController(
+                    settingsService, daemonService, mock(AuditLogService.class)))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }

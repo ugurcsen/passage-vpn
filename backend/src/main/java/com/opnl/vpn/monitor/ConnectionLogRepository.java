@@ -18,6 +18,7 @@ public interface ConnectionLogRepository extends JpaRepository<ConnectionLog, St
   List<ConnectionLog> findTop20ByOrderByConnectedAtDesc();
 
   @Modifying
-  @Query("delete from ConnectionLog c where c.connectedAt < :cutoff")
-  int deleteOlderThan(Instant cutoff);
+  @Query(
+      "delete from ConnectionLog c where c.disconnectedAt is not null and c.disconnectedAt < :cutoff")
+  int deleteClosedBefore(Instant cutoff);
 }

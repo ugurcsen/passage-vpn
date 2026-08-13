@@ -1,5 +1,6 @@
 package com.opnl.vpn.auth;
 
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.auth.spi.AuthProvider;
 import com.opnl.vpn.auth.spi.AuthProviderManager;
 import com.opnl.vpn.common.ApiException;
@@ -32,6 +33,7 @@ public class AuthService {
   private final TotpService totpService;
   private final SettingsService settingsService;
   private final OpnlProperties properties;
+  private final AuditLogService auditLogService;
 
   /** Redeemed MFA challenge ids (jti) → redemption epoch-second, for single-use enforcement. */
   private final Map<String, Long> redeemedChallenges = new ConcurrentHashMap<>();
@@ -43,7 +45,8 @@ public class AuthService {
       JwtService jwtService,
       TotpService totpService,
       SettingsService settingsService,
-      OpnlProperties properties) {
+      OpnlProperties properties,
+      AuditLogService auditLogService) {
     this.userRepository = userRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.authProvider = authProviderManager.active();
@@ -51,6 +54,7 @@ public class AuthService {
     this.totpService = totpService;
     this.settingsService = settingsService;
     this.properties = properties;
+    this.auditLogService = auditLogService;
   }
 
   public record TokenResponse(String accessToken, String refreshToken) {}
@@ -72,6 +76,8 @@ public class AuthService {
     assertAccountUsable(user, Instant.now());
     if (!authProvider.verifyCredentials(username, password)) {
       recordFailure(user);
+      auditLogService.record(
+          "LOGIN_FAILED", AuditLogService.CAT_AUTH, user.getId(), "user", auditCtx(user));
       throw ApiException.unauthorized("invalid_credentials", "Invalid username or password");
     }
     user.setFailedAttempts(0);
@@ -79,9 +85,13 @@ public class AuthService {
     user.setLastLoginAt(Instant.now());
     userRepository.save(user);
     if (user.isMfaEnabled()) {
+      auditLogService.record(
+          "LOGIN_MFA_REQUIRED", AuditLogService.CAT_AUTH, user.getId(), "user", auditCtx(user));
       return new MfaChallengeResponse(true, jwtService.issueMfaChallenge(user.getId()), null, null);
     }
     TokenResponse tokens = issueTokens(user);
+    auditLogService.record(
+        "LOGIN_SUCCESS", AuditLogService.CAT_AUTH, user.getId(), "user", auditCtx(user));
     return new MfaChallengeResponse(false, null, tokens.accessToken(), tokens.refreshToken());
   }
 
@@ -111,6 +121,8 @@ public class AuthService {
     }
     user.setLastLoginAt(Instant.now());
     userRepository.save(user);
+    auditLogService.record(
+        "LOGIN_SUCCESS", AuditLogService.CAT_AUTH, user.getId(), "user", auditCtx(user));
     return issueTokens(user);
   }
 
@@ -131,6 +143,12 @@ public class AuthService {
     }
     stored.setRevoked(true);
     refreshTokenRepository.save(stored);
+    auditLogService.record(
+        "REFRESH_TOKEN",
+        AuditLogService.CAT_AUTH,
+        stored.getUserId(),
+        "user",
+        Map.of("username", String.valueOf(user.getUsername())));
     return issueTokens(user);
   }
 
@@ -277,5 +295,24 @@ public class AuthService {
 
   private Object effective(User user, String key) {
     return settingsService.effectiveForUser(user.getId()).getOrDefault(key, Boolean.FALSE);
+  }
+
+  private String currentRemoteIp() {
+    var attrs = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+    if (attrs instanceof org.springframework.web.context.request.ServletRequestAttributes sra) {
+      var req = sra.getRequest();
+      return req.getRemoteAddr();
+    }
+    return null;
+  }
+
+  private Map<String, Object> auditCtx(User user) {
+    Map<String, Object> ctx = new java.util.HashMap<>();
+    ctx.put("username", user.getUsername());
+    String ip = currentRemoteIp();
+    if (ip != null) {
+      ctx.put("remoteIp", ip);
+    }
+    return ctx;
   }
 }

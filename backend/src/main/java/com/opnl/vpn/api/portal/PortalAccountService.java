@@ -1,6 +1,7 @@
 package com.opnl.vpn.api.portal;
 
 import com.opnl.vpn.api.admin.UserDto;
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.auth.TotpService;
 import com.opnl.vpn.auth.spi.AuthProvider;
 import com.opnl.vpn.auth.spi.AuthProviderManager;
@@ -11,6 +12,7 @@ import com.opnl.vpn.user.RefreshToken;
 import com.opnl.vpn.user.RefreshTokenRepository;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
+import java.util.Map;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,7 @@ public class PortalAccountService {
   private final TotpService totpService;
   private final SettingsService settingsService;
   private final AuthProvider authProvider;
+  private final AuditLogService auditLogService;
 
   public PortalAccountService(
       UserRepository userRepository,
@@ -38,13 +41,15 @@ public class PortalAccountService {
       PasswordEncoder passwordEncoder,
       TotpService totpService,
       SettingsService settingsService,
-      AuthProviderManager authProviderManager) {
+      AuthProviderManager authProviderManager,
+      AuditLogService auditLogService) {
     this.userRepository = userRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.passwordEncoder = passwordEncoder;
     this.totpService = totpService;
     this.settingsService = settingsService;
     this.authProvider = authProviderManager.active();
+    this.auditLogService = auditLogService;
   }
 
   /** Starts TOTP provisioning; the user must confirm with {@link #enableMfa}. */
@@ -69,6 +74,12 @@ public class PortalAccountService {
     }
     user.setMfaEnabled(true);
     userRepository.save(user);
+    auditLogService.record(
+        "MFA_ENABLE",
+        AuditLogService.CAT_USER,
+        user.getId(),
+        "user",
+        Map.of("username", user.getUsername()));
     return UserDto.from(user, false);
   }
 
@@ -80,6 +91,12 @@ public class PortalAccountService {
     user.setMfaEnabled(false);
     user.setMfaSecret(null);
     userRepository.save(user);
+    auditLogService.record(
+        "MFA_DISABLE",
+        AuditLogService.CAT_USER,
+        user.getId(),
+        "user",
+        Map.of("username", user.getUsername()));
     return UserDto.from(user, false);
   }
 
@@ -98,6 +115,12 @@ public class PortalAccountService {
     userRepository.save(user);
     refreshTokenRepository.findByUserId(userId).forEach(this::revoke);
     settingsService.setUserSetting(userId, SettingKeys.MUST_CHANGE_PASSWORD, false);
+    auditLogService.record(
+        "PASSWORD_CHANGE",
+        AuditLogService.CAT_USER,
+        user.getId(),
+        "user",
+        Map.of("username", user.getUsername()));
   }
 
   private void revoke(RefreshToken token) {

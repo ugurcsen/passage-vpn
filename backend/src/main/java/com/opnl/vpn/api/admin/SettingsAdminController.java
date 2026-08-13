@@ -1,5 +1,6 @@
 package com.opnl.vpn.api.admin;
 
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.setting.SettingKeys;
@@ -29,10 +30,15 @@ public class SettingsAdminController {
 
   private final SettingsService settingsService;
   private final DaemonService daemonService;
+  private final AuditLogService auditLogService;
 
-  public SettingsAdminController(SettingsService settingsService, DaemonService daemonService) {
+  public SettingsAdminController(
+      SettingsService settingsService,
+      DaemonService daemonService,
+      AuditLogService auditLogService) {
     this.settingsService = settingsService;
     this.daemonService = daemonService;
+    this.auditLogService = auditLogService;
   }
 
   @GetMapping
@@ -47,15 +53,14 @@ public class SettingsAdminController {
       throw ApiException.badRequest(
           "invalid_setting_key", "Setting key must be 1-64 chars of [a-zA-Z0-9_.-]");
     }
-    if (SettingKeys.NETWORK_MODE.equals(key) && !isValidNetworkMode(request.value())) {
-      throw ApiException.badRequest(
-          "invalid_network_mode", "network_mode must be \"nat\" or \"routed\"");
-    }
+    validateKnownKey(key, request.value());
     settingsService.setServerSetting(key, request.value());
     // The daemon configs surface network_mode; rewrite them so the firewall updates.
     if (SettingKeys.NETWORK_MODE.equals(key)) {
       daemonService.writeAll();
     }
+    auditLogService.record(
+        "SETTING_SET", AuditLogService.CAT_SETTING, key, "setting", Map.of("key", key));
     return settingsService.serverSettings();
   }
 
@@ -67,10 +72,43 @@ public class SettingsAdminController {
     if (SettingKeys.NETWORK_MODE.equals(key)) {
       daemonService.writeAll();
     }
+    auditLogService.record(
+        "SETTING_DELETE", AuditLogService.CAT_SETTING, key, "setting", Map.of("key", key));
   }
 
-  private static boolean isValidNetworkMode(Object value) {
-    return value instanceof String s && (s.equals("nat") || s.equals("routed"));
+  /** Validates values for well-known keys that need range/format checks. */
+  private static void validateKnownKey(String key, Object value) {
+    if (SettingKeys.NETWORK_MODE.equals(key)) {
+      if (!(value instanceof String s) || (!s.equals("nat") && !s.equals("routed"))) {
+        throw ApiException.badRequest(
+            "invalid_network_mode", "network_mode must be \"nat\" or \"routed\"");
+      }
+      return;
+    }
+    if (SettingKeys.CONNECTION_LOGS_RETENTION_DAYS.equals(key)
+        || SettingKeys.AUDIT_LOGS_RETENTION_DAYS.equals(key)) {
+      if (!isIntInRange(value, 1, 3650)) {
+        throw ApiException.badRequest(
+            "invalid_retention_days", "Retention days must be an integer between 1 and 3650");
+      }
+      return;
+    }
+    if (SettingKeys.SYSLOG_PORT.equals(key)) {
+      if (!isIntInRange(value, 1, 65535)) {
+        throw ApiException.badRequest(
+            "invalid_syslog_port", "syslog_port must be an integer between 1 and 65535");
+      }
+      return;
+    }
+    if (SettingKeys.SYSLOG_FACILITY.equals(key)
+        && (!(value instanceof String s) || (!s.equals("user") && !s.matches("local[0-7]")))) {
+      throw ApiException.badRequest(
+          "invalid_syslog_facility", "syslog_facility must be user or local0..local7");
+    }
+  }
+
+  private static boolean isIntInRange(Object value, int min, int max) {
+    return value instanceof Number n && n.longValue() >= min && n.longValue() <= max;
   }
 
   /** Update payload: the JSON value to store under the key. */

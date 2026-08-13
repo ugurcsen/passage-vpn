@@ -245,8 +245,49 @@ Second tagged milestone (SemVer pre-release). Includes everything from
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group
   connectivity rules, NAT-vs-routing mode, dnsmasq domain control, static IP/CCD
   editor UI
-- Phase 4 — logging & audit, Swagger, branding, backup, multi-node, installer
-  polish, PostgreSQL profile validation
+- Phase 4 — Swagger, branding, backup, multi-node, installer polish, PostgreSQL
+  profile validation
+
+---
+
+## v0.1.0-alpha.3 — 2026-08-13
+
+Third tagged milestone (SemVer pre-release): admin & auth audit trail with real
+client-IP capture, syslog shipping and connection-log retention. Includes
+everything from `v0.1.0-alpha.2` plus the changes below.
+
+### Phase 4 — Logging & audit
+- [x] `audit_logs` entity + `AuditLogService` — every mutating admin/auth flow
+      records actor, action, category, target, JSON detail and client IP
+      (Flyway V8)
+- [x] `GET /api/admin/audit-logs` — paginated, newest-first trail with `action`,
+      `actor` and `from`/`to` (ISO instant or `yyyy-MM-dd`) filters, ADMIN-only
+- [x] Audit wiring across services: user/group/access-rule/cert/daemon admin ops,
+      server-settings changes, portal MFA + password change, login/logout
+- [x] Frontend Audit Log page (`/audit-logs`, admin-only nav) — DataGrid with
+      server-side pagination and filter bar; covered by component tests
+- [x] Syslog shipping — `SyslogService` emits RFC3164 UDP messages for audit/auth
+      events, configured via server settings (`syslog_enabled`, `syslog_host`,
+      `syslog_port`, `syslog_facility`)
+- [x] Retention — `audit_logs_retention_days` and `connection_logs_retention_days`
+      server settings; the daily purge now targets only closed connection rows
+      (V9 index on `disconnected_at`)
+- [x] Client-IP capture — backend honors `X-Forwarded-For` from trusted reverse
+      proxies only (Tomcat RemoteIpValve; `OPNL_TRUSTED_PROXIES`, default
+      `172.16.0.0/12` covering Docker bridge subnets), so audit/auth entries
+      record the real client IP instead of the proxy container IP
+- [x] `GROUP_CREATE` audit coverage gap closed (`GroupAdminService.createGroup`),
+      verified by the new `GroupAdminServiceTest`
+
+### Verified
+- Backend suite green (277 tests, spotless clean); frontend suite green (19 files
+  / 95 tests, lint 0 errors).
+- Live E2E (production `65.21.108.250`): setup wizard → admin login → user, group
+  (create + membership) and certificate issue flows produce `LOGIN_SUCCESS`,
+  `USER_CREATE`, `GROUP_CREATE`, `GROUP_MEMBERS_SET` and `CERT_ISSUE` entries in
+  the Audit Log page; Action filter (e.g. `GROUP`) returns matching rows; fresh
+  entries show the real client public IP while historical entries keep the proxy
+  IP.
 
 ---
 

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.opnl.vpn.access.AccessRule.Action;
 import com.opnl.vpn.access.AccessRule.Protocol;
 import com.opnl.vpn.access.AccessRule.TargetType;
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.group.Group;
 import com.opnl.vpn.group.GroupRepository;
@@ -37,7 +38,13 @@ class AccessRuleServiceTest {
     userRepository = mock(UserRepository.class);
     groupRepository = mock(GroupRepository.class);
     ruleEngine = mock(RuleEngine.class);
-    service = new AccessRuleService(ruleRepository, userRepository, groupRepository, ruleEngine);
+    service =
+        new AccessRuleService(
+            ruleRepository,
+            userRepository,
+            groupRepository,
+            ruleEngine,
+            mock(AuditLogService.class));
     when(ruleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
   }
 

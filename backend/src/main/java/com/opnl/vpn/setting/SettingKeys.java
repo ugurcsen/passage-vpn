@@ -40,4 +40,22 @@ public final class SettingKeys {
 
   /** Require TOTP code at VPN connect time even when user auth is enabled. */
   public static final String REQUIRE_MFA_ON_CONNECT = "require_mfa_on_connect";
+
+  /** Days of closed VPN session history kept before the periodic purge. */
+  public static final String CONNECTION_LOGS_RETENTION_DAYS = "connection_logs_retention_days";
+
+  /** Days of audit log entries kept before the periodic purge. */
+  public static final String AUDIT_LOGS_RETENTION_DAYS = "audit_logs_retention_days";
+
+  /** True when audit/auth events are shipped to a syslog server over UDP (RFC3164). */
+  public static final String SYSLOG_ENABLED = "syslog_enabled";
+
+  /** Syslog server host (IP or name). */
+  public static final String SYSLOG_HOST = "syslog_host";
+
+  /** Syslog server UDP port. */
+  public static final String SYSLOG_PORT = "syslog_port";
+
+  /** Syslog facility used in the RFC3164 header, e.g. "local0" or "user". */
+  public static final String SYSLOG_FACILITY = "syslog_facility";
 }

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.api.admin.ConnectionLogDto;
 import com.opnl.vpn.monitor.MgmtStatus.MgmtClientStatus;
+import com.opnl.vpn.setting.SettingsService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -22,13 +23,15 @@ class ConnectionLogServiceTest {
 
   private ConnectionLogRepository repository;
   private TrafficAggregator aggregator;
+  private SettingsService settingsService;
   private ConnectionLogService service;
 
   @BeforeEach
   void setUp() {
     repository = mock(ConnectionLogRepository.class);
     aggregator = new TrafficAggregator();
-    service = new ConnectionLogService(repository, aggregator);
+    settingsService = mock(SettingsService.class);
+    service = new ConnectionLogService(repository, aggregator, settingsService);
   }
 
   @Test
@@ -109,9 +112,9 @@ class ConnectionLogServiceTest {
 
   @Test
   void purgeOldDeletesBeforeCutoff() {
-    when(repository.deleteOlderThan(any())).thenReturn(3);
+    when(repository.deleteClosedBefore(any())).thenReturn(3);
     service.purgeOld();
-    verify(repository).deleteOlderThan(any(Instant.class));
+    verify(repository).deleteClosedBefore(any(Instant.class));
   }
 
   @Test

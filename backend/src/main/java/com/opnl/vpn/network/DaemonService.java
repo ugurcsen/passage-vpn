@@ -1,5 +1,6 @@
 package com.opnl.vpn.network;
 
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.network.ServerConfig.Protocol;
@@ -11,6 +12,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,18 +44,21 @@ public class DaemonService {
   private final ServerConfigGenerator generator;
   private final ConfigWriter configWriter;
   private final OpnlProperties properties;
+  private final AuditLogService auditLogService;
 
   public DaemonService(
       DaemonRepository repository,
       ServerSettingRepository settingRepository,
       ServerConfigGenerator generator,
       ConfigWriter configWriter,
-      OpnlProperties properties) {
+      OpnlProperties properties,
+      AuditLogService auditLogService) {
     this.repository = repository;
     this.settingRepository = settingRepository;
     this.generator = generator;
     this.configWriter = configWriter;
     this.properties = properties;
+    this.auditLogService = auditLogService;
   }
 
   /**
@@ -115,6 +120,12 @@ public class DaemonService {
     Daemon saved = repository.save(daemon);
     writeAll();
     log.info("Created daemon {} '{}'", saved.getDaemonIndex(), saved.getName());
+    auditLogService.record(
+        "DAEMON_CREATE",
+        AuditLogService.CAT_DAEMON,
+        saved.getId(),
+        "daemon",
+        Map.of("index", saved.getDaemonIndex(), "name", String.valueOf(saved.getName())));
     return saved;
   }
 
@@ -139,6 +150,12 @@ public class DaemonService {
     Daemon saved = repository.save(daemon);
     writeAll();
     log.info("Updated daemon {} '{}'", saved.getDaemonIndex(), saved.getName());
+    auditLogService.record(
+        "DAEMON_UPDATE",
+        AuditLogService.CAT_DAEMON,
+        saved.getId(),
+        "daemon",
+        Map.of("index", saved.getDaemonIndex(), "name", String.valueOf(saved.getName())));
     return saved;
   }
 
@@ -152,6 +169,12 @@ public class DaemonService {
     repository.delete(daemon);
     configWriter.removeDaemon(daemon.getDaemonIndex());
     log.info("Deleted daemon {} '{}'", daemon.getDaemonIndex(), daemon.getName());
+    auditLogService.record(
+        "DAEMON_DELETE",
+        AuditLogService.CAT_DAEMON,
+        daemon.getId(),
+        "daemon",
+        Map.of("index", daemon.getDaemonIndex(), "name", String.valueOf(daemon.getName())));
   }
 
   @Transactional
@@ -160,6 +183,12 @@ public class DaemonService {
     daemon.setEnabled(enabled);
     Daemon saved = repository.save(daemon);
     writeAll();
+    auditLogService.record(
+        enabled ? "DAEMON_ENABLE" : "DAEMON_DISABLE",
+        AuditLogService.CAT_DAEMON,
+        saved.getId(),
+        "daemon",
+        Map.of("index", saved.getDaemonIndex(), "name", String.valueOf(saved.getName())));
     return saved;
   }
 

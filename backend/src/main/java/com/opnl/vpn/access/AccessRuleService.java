@@ -1,5 +1,6 @@
 package com.opnl.vpn.access;
 
+import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.group.Group;
 import com.opnl.vpn.group.GroupRepository;
@@ -20,16 +21,19 @@ public class AccessRuleService {
   private final UserRepository userRepository;
   private final GroupRepository groupRepository;
   private final RuleEngine ruleEngine;
+  private final AuditLogService auditLogService;
 
   public AccessRuleService(
       AccessRuleRepository ruleRepository,
       UserRepository userRepository,
       GroupRepository groupRepository,
-      RuleEngine ruleEngine) {
+      RuleEngine ruleEngine,
+      AuditLogService auditLogService) {
     this.ruleRepository = ruleRepository;
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
     this.ruleEngine = ruleEngine;
+    this.auditLogService = auditLogService;
   }
 
   @Transactional(readOnly = true)
@@ -59,10 +63,19 @@ public class AccessRuleService {
     rule.setCreatedAt(java.time.Instant.now());
     apply(rule, dto);
     rule.setPriority(nextPriority());
+    AccessRule saved = ruleRepository.save(rule);
+    auditLogService.record(
+        "RULE_CREATE",
+        AuditLogService.CAT_RULE,
+        saved.getId(),
+        "rule",
+        Map.of(
+            "target",
+            dto.targetType().name().toLowerCase() + ":" + dto.targetId(),
+            "action",
+            dto.action().name()));
     return AccessRuleDto.from(
-        ruleRepository.save(rule),
-        targetName(dto.targetType(), dto.targetId()),
-        dstGroupName(dto.dstGroupId()));
+        saved, targetName(dto.targetType(), dto.targetId()), dstGroupName(dto.dstGroupId()));
   }
 
   @Transactional
@@ -71,22 +84,25 @@ public class AccessRuleService {
     validateTarget(dto.targetType(), dto.targetId());
     validateDestination(dto.dstGroupId());
     apply(rule, dto);
+    AccessRule saved = ruleRepository.save(rule);
+    auditLogService.record("RULE_UPDATE", AuditLogService.CAT_RULE, id, "rule", null);
     return AccessRuleDto.from(
-        ruleRepository.save(rule),
-        targetName(dto.targetType(), dto.targetId()),
-        dstGroupName(dto.dstGroupId()));
+        saved, targetName(dto.targetType(), dto.targetId()), dstGroupName(dto.dstGroupId()));
   }
 
   @Transactional
   public void delete(String id) {
     requireRule(id);
     ruleRepository.deleteById(id);
+    auditLogService.record("RULE_DELETE", AuditLogService.CAT_RULE, id, "rule", null);
   }
 
   @Transactional
   public AccessRuleDto setEnabled(String id, boolean enabled) {
     AccessRule rule = requireRule(id);
     rule.setEnabled(enabled);
+    auditLogService.record(
+        enabled ? "RULE_ENABLE" : "RULE_DISABLE", AuditLogService.CAT_RULE, id, "rule", null);
     return AccessRuleDto.from(
         ruleRepository.save(rule),
         targetName(rule.getTargetType(), rule.getTargetId()),

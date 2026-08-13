@@ -1,6 +1,8 @@
 package com.opnl.vpn.monitor;
 
 import com.opnl.vpn.api.admin.ConnectionLogDto;
+import com.opnl.vpn.setting.SettingKeys;
+import com.opnl.vpn.setting.SettingsService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -15,7 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Records VPN session history from the internal connect/disconnect callbacks. Session end rows are
  * finalized with the byte counters last seen by the {@link TrafficAggregator}. A daily scheduled
- * job prunes rows older than the retention window (30 days).
+ * job prunes closed rows older than the retention window (30 days by default, configurable via the
+ * {@code connection_logs_retention_days} server setting).
  *
  * <p>All persistence is best-effort: history failures must never break the VPN connect flow.
  */
@@ -23,14 +26,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ConnectionLogService {
 
-  private static final int RETENTION_DAYS = 30;
+  private static final int DEFAULT_RETENTION_DAYS = 30;
 
   private final ConnectionLogRepository repository;
   private final TrafficAggregator aggregator;
+  private final SettingsService settingsService;
 
-  public ConnectionLogService(ConnectionLogRepository repository, TrafficAggregator aggregator) {
+  public ConnectionLogService(
+      ConnectionLogRepository repository,
+      TrafficAggregator aggregator,
+      SettingsService settingsService) {
     this.repository = repository;
     this.aggregator = aggregator;
+    this.settingsService = settingsService;
   }
 
   /** Opens a history row when a client connects. */
@@ -117,18 +125,30 @@ public class ConnectionLogService {
         .toList();
   }
 
-  /** Deletes rows older than the retention window; runs daily. */
+  /** Deletes closed rows older than the retention window; runs daily. */
   @Scheduled(cron = "0 15 3 * * *")
   @Transactional
   public void purgeOld() {
     try {
-      Instant cutoff = Instant.now().minus(RETENTION_DAYS, ChronoUnit.DAYS);
-      int removed = repository.deleteOlderThan(cutoff);
+      Instant cutoff = Instant.now().minus(retentionDays(), ChronoUnit.DAYS);
+      int removed = repository.deleteClosedBefore(cutoff);
       if (removed > 0) {
-        log.info("Purged {} connection log rows older than {} days", removed, RETENTION_DAYS);
+        log.info("Purged {} connection log rows older than {} days", removed, retentionDays());
       }
     } catch (Exception e) {
       log.warn("Connection log purge failed: {}", e.getMessage());
     }
+  }
+
+  /** Retention window from the server setting, clamped to 1-3650 days, defaulting to 30. */
+  private long retentionDays() {
+    Object raw = settingsService.serverSettings().get(SettingKeys.CONNECTION_LOGS_RETENTION_DAYS);
+    if (raw instanceof Number n) {
+      long days = n.longValue();
+      if (days >= 1 && days <= 3650) {
+        return days;
+      }
+    }
+    return DEFAULT_RETENTION_DAYS;
   }
 }
