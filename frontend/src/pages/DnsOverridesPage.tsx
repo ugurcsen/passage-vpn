@@ -240,6 +240,8 @@ export function DnsOverridesPage() {
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
+              id="dns-hostname"
+              name="hostname"
               label="Hostname"
               value={form.hostname}
               onChange={(e) => setForm({ ...form, hostname: e.target.value })}
@@ -248,6 +250,8 @@ export function DnsOverridesPage() {
               required
             />
             <TextField
+              id="dns-ipv4"
+              name="ipv4"
               label="IPv4 address"
               value={form.ipv4}
               onChange={(e) => setForm({ ...form, ipv4: e.target.value })}
@@ -256,6 +260,8 @@ export function DnsOverridesPage() {
               required
             />
             <TextField
+              id="dns-scope"
+              name="scope"
               select
               label="Scope"
               value={form.scope}
@@ -267,6 +273,8 @@ export function DnsOverridesPage() {
             </TextField>
             {form.scope !== "GLOBAL" && (
               <TextField
+                id="dns-scope-target"
+                name="scopeId"
                 select
                 label={form.scope === "USER" ? "User" : "Group"}
                 value={form.scopeId}
@@ -283,7 +291,12 @@ export function DnsOverridesPage() {
             )}
             <FormControlLabel
               control={
-                <Switch checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
+                <Switch
+                  id="dns-enabled"
+                  name="enabled"
+                  checked={form.enabled}
+                  onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
+                />
               }
               label="Enabled"
             />
