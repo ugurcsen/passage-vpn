@@ -2,6 +2,7 @@ package com.opnl.vpn.api.admin;
 
 import com.opnl.vpn.access.AccessRuleDto;
 import com.opnl.vpn.access.AccessRuleService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/rules")
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(
+    name = "Admin - Access Rules",
+    description = "Per-network access rules for users and groups (admin-only)")
 public class AccessRuleAdminController {
 
   private final AccessRuleService ruleService;

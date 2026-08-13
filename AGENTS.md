@@ -93,6 +93,11 @@ npm run test
 - All REST endpoints under `/api/**` (admin) and `/api/portal/**` (self-service).
   Script-facing endpoints under `/internal/**` (network-restricted).
 - Every controller/service method that mutates state is covered by a unit test.
+- API docs via springdoc (`/swagger-ui.html`, `/v3/api-docs`): `config/OpenApiConfig`
+  defines the global `bearerAuth` HTTP/Bearer-JWT security scheme + security requirement
+  so Swagger UI shows an "Authorize" button for testing (token from `/api/auth/login` or
+  `/api/auth/mfa`). Keep it in sync with the auth model; new controllers should carry
+  `@Tag`/`@Operation` summaries.
 
 ### Frontend
 

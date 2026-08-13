@@ -4,6 +4,7 @@ import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.profile.ProfileService;
 import com.opnl.vpn.profile.ProfileService.OvpnFile;
 import com.opnl.vpn.profile.ProfileType;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Arrays;
 import java.util.List;
 import org.springframework.security.core.Authentication;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 /** Client self-service portal: list and download own connection profiles. */
 @RestController
 @RequestMapping("/api/portal/profiles")
+@Tag(name = "Portal - Profiles", description = "Self-service profile downloads")
 public class PortalProfileController {
 
   private final ProfileService profileService;

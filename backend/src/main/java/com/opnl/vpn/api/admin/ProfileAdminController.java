@@ -6,6 +6,7 @@ import com.opnl.vpn.profile.ProfileToken;
 import com.opnl.vpn.profile.ProfileTokenRepository;
 import com.opnl.vpn.profile.ProfileType;
 import com.opnl.vpn.user.UserRepository;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin")
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Admin - Profiles", description = "Profile downloads and sharing tokens (admin-only)")
 public class ProfileAdminController {
 
   private final ProfileService profileService;

@@ -5,6 +5,7 @@ import com.opnl.vpn.network.Daemon;
 import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.network.DaemonService.DaemonRequest;
 import com.opnl.vpn.profile.ProfileType;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/daemons")
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Admin - Daemons", description = "OpenVPN daemon management (admin-only)")
 public class DaemonAdminController {
 
   private final DaemonService daemonService;

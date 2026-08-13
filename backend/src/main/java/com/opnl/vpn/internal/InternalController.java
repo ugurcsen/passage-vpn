@@ -12,6 +12,7 @@ import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.setup.SetupService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,9 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequestMapping("/internal")
+@Tag(
+    name = "Internal",
+    description = "Script-facing endpoints (restricted network, not for client use)")
 public class InternalController {
 
   private final UserRepository userRepository;

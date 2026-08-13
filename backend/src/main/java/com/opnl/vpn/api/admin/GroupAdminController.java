@@ -1,5 +1,6 @@
 package com.opnl.vpn.api.admin;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/groups")
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Admin - Groups", description = "Group management (admin-only)")
 public class GroupAdminController {
 
   private final GroupAdminService groupAdminService;

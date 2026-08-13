@@ -2,6 +2,7 @@ package com.opnl.vpn.api.portal;
 
 import com.opnl.vpn.api.admin.UserDto;
 import com.opnl.vpn.common.ApiException;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/portal/account")
+@Tag(name = "Portal - Account", description = "Self-service account management (TOTP, password)")
 public class PortalAccountController {
 
   private final PortalAccountService accountService;

@@ -245,8 +245,31 @@ Second tagged milestone (SemVer pre-release). Includes everything from
 - Phase 3 — group subnet allocation, per-user full/split tunnel, inter-group
   connectivity rules, NAT-vs-routing mode, dnsmasq domain control, static IP/CCD
   editor UI
-- Phase 4 — Swagger, branding, backup, multi-node, installer polish, PostgreSQL
+- Phase 4 — branding, backup, multi-node, installer polish, PostgreSQL
   profile validation
+
+---
+
+## v0.1.0-alpha.4 — unreleased
+
+Fourth milestone (SemVer pre-release): interactive Swagger/OpenAPI documentation
+with bearer-token testing support. Includes everything from `v0.1.0-alpha.3`
+plus the changes below.
+
+### Phase 4 — API documentation
+- [x] `OpenApiConfig` — global `bearerAuth` HTTP/Bearer-JWT security scheme +
+      global security requirement, so Swagger UI shows an "Authorize" button for
+      authenticated endpoint testing (token obtained from `/api/auth/login` or
+      `/api/auth/mfa`)
+- [x] Swagger UI `persist-authorization: true` — pasted token survives reloads
+- [x] `@Tag` groupings and `@Operation` summaries across admin/portal/auth
+      controllers; the Authentication login/MFA/refresh flow is documented end to end
+- [x] `OpenApiConfigTest` — verifies the generated `/v3/api-docs` spec exposes
+      `bearerAuth` and the global security requirement
+
+### Verified
+- Backend suite green (279 tests, spotless clean); frontend suite green (19 files
+  / 95 tests, lint 0 errors); `make test` green.
 
 ---
 

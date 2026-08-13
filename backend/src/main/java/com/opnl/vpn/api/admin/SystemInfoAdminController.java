@@ -1,6 +1,7 @@
 package com.opnl.vpn.api.admin;
 
 import com.opnl.vpn.monitor.SystemInfoService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/system")
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Admin - System", description = "Host system metrics (admin-only)")
 public class SystemInfoAdminController {
 
   private final SystemInfoService systemInfoService;

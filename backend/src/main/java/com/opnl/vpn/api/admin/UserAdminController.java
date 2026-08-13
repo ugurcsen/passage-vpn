@@ -3,6 +3,7 @@ package com.opnl.vpn.api.admin;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/users")
 @PreAuthorize("hasAnyRole('ADMIN', 'RESELLER')")
+@Tag(name = "Admin - Users", description = "User lifecycle and settings (ADMIN/RESELLER)")
 public class UserAdminController {
 
   private final UserAdminService userAdminService;

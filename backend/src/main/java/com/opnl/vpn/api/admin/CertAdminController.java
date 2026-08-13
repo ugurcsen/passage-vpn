@@ -6,6 +6,7 @@ import com.opnl.vpn.pki.Certificate;
 import com.opnl.vpn.pki.CertificateRepository;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/certs")
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Admin - Certificates", description = "Certificate lifecycle management (admin-only)")
 public class CertAdminController {
 
   private final CertService certService;

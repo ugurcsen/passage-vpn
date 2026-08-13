@@ -2,6 +2,7 @@ package com.opnl.vpn.api.admin;
 
 import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/audit-logs")
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Admin - Audit Logs", description = "Filterable audit trail (admin-only)")
 public class AuditLogAdminController {
 
   private final AuditLogService auditLogService;

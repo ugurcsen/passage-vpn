@@ -5,6 +5,7 @@ import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/settings")
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Admin - Settings", description = "Server-level settings (admin-only)")
 public class SettingsAdminController {
 
   private static final Pattern SETTING_KEY = Pattern.compile("^[a-zA-Z0-9_.-]{1,64}$");

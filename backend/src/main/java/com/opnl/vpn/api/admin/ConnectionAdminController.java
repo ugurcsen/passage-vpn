@@ -3,6 +3,7 @@ package com.opnl.vpn.api.admin;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.monitor.MgmtClientManager;
 import com.opnl.vpn.network.ConnectionRegistry;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/connections")
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(
+    name = "Admin - Connections",
+    description = "Live VPN connections and session control (admin-only)")
 public class ConnectionAdminController {
 
   private final ConnectionRegistry connectionRegistry;
