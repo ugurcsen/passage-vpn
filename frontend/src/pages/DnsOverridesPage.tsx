@@ -171,7 +171,7 @@ export function DnsOverridesPage() {
       width: 90,
       renderCell: (params) => {
         const row = params.row as DnsRecordDto;
-        return <Switch size="small" checked={row.enabled} onChange={() => toggleEnabled.mutate(row)} />;
+        return <Switch size="small" checked={row.enabled} onChange={() => toggleEnabled.mutate(row)} inputProps={{ "aria-label": `Toggle enabled for ${row.hostname}` }} />;
       },
     },
     {
@@ -262,6 +262,7 @@ export function DnsOverridesPage() {
             <TextField
               id="dns-scope"
               name="scope"
+              inputProps={{ id: "dns-scope", name: "scope" }}
               select
               label="Scope"
               value={form.scope}
@@ -275,6 +276,7 @@ export function DnsOverridesPage() {
               <TextField
                 id="dns-scope-target"
                 name="scopeId"
+                inputProps={{ id: "dns-scope-target", name: "scopeId" }}
                 select
                 label={form.scope === "USER" ? "User" : "Group"}
                 value={form.scopeId}
