@@ -127,6 +127,8 @@ describe("SetupWizardPage", () => {
         clientCertNotRequired: false,
         authUserPass: true,
         adminHost: "vpn.example.com",
+        ipv6Enabled: false,
+        ipv6Subnet: null,
       },
     });
 

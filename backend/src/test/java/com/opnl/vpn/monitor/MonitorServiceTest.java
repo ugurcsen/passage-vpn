@@ -100,11 +100,12 @@ class MonitorServiceTest {
 
   @Test
   void currentSnapshotMergesRegistryConnectionsWithTraffic() {
-    registry.register("alice", "alice", "10.8.0.2", "203.0.113.5", "daemon-0");
+    registry.register("alice", "alice", "10.8.0.2", null, "203.0.113.5", "daemon-0");
     Instant t0 = Instant.parse("2026-01-01T00:00:00Z");
     TrafficAggregator aggregator = new TrafficAggregator();
     aggregator.update(
-        List.of(new MgmtClientStatus("alice", "203.0.113.5", "10.8.0.2", 4096, 2048, t0, 1)), t0);
+        List.of(new MgmtClientStatus("alice", "203.0.113.5", "10.8.0.2", null, 4096, 2048, t0, 1)),
+        t0);
 
     MonitorService withTraffic =
         new MonitorService(
@@ -156,7 +157,7 @@ class MonitorServiceTest {
                 1,
                 List.of(
                     new MgmtClientStatus(
-                        "alice", "203.0.113.5", "10.8.0.2", 1, 1, Instant.now(), 1)),
+                        "alice", "203.0.113.5", "10.8.0.2", null, 1, 1, Instant.now(), 1)),
                 false));
     when(clientManager.status(1))
         .thenReturn(
@@ -165,7 +166,8 @@ class MonitorServiceTest {
                 "OpenVPN 2.6.20",
                 1,
                 List.of(
-                    new MgmtClientStatus("bob", "203.0.113.9", "10.8.0.3", 1, 1, Instant.now(), 2)),
+                    new MgmtClientStatus(
+                        "bob", "203.0.113.9", "10.8.0.3", null, 1, 1, Instant.now(), 2)),
                 false));
 
     service.poll();
@@ -197,7 +199,7 @@ class MonitorServiceTest {
                 1,
                 List.of(
                     new MgmtClientStatus(
-                        "alice", "203.0.113.5", "10.8.0.2", 1, 1, Instant.now(), 1)),
+                        "alice", "203.0.113.5", "10.8.0.2", null, 1, 1, Instant.now(), 1)),
                 false));
 
     service.poll();
@@ -207,8 +209,8 @@ class MonitorServiceTest {
 
   @Test
   void pollDropsStaleRegistrySessionsNotInLiveView() {
-    registry.register("alice", "alice", "10.8.0.2", "203.0.113.5", "daemon-0");
-    registry.register("carol", "carol", "10.8.0.4", "203.0.113.7", "daemon-1");
+    registry.register("alice", "alice", "10.8.0.2", null, "203.0.113.5", "daemon-0");
+    registry.register("carol", "carol", "10.8.0.4", null, "203.0.113.7", "daemon-1");
     when(clientManager.status(0))
         .thenReturn(
             new MgmtStatus(
@@ -217,7 +219,7 @@ class MonitorServiceTest {
                 1,
                 List.of(
                     new MgmtClientStatus(
-                        "alice", "203.0.113.5", "10.8.0.2", 1, 1, Instant.now(), 1)),
+                        "alice", "203.0.113.5", "10.8.0.2", null, 1, 1, Instant.now(), 1)),
                 false));
     when(clientManager.status(1))
         .thenReturn(new MgmtStatus(Instant.now(), "OpenVPN 2.6.20", 0, List.of(), false));

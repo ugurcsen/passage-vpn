@@ -49,7 +49,7 @@ class DnsOverrideServiceTest {
   }
 
   private DnsRecordDto dto(String hostname, String ipv4, Scope scope, String scopeId) {
-    return new DnsRecordDto(null, hostname, ipv4, scope, scopeId, null, true, null);
+    return new DnsRecordDto(null, hostname, ipv4, null, scope, scopeId, null, true, null);
   }
 
   @Test

@@ -26,6 +26,14 @@ extract_pool() {
     [[ -n "$net" && -n "$mask" ]] && echo "$net/$(mask_to_prefix "$mask")"
 }
 
+# The IPv6 client subnet of a dual-stack daemon config (`server-ipv6 fd00:1::/64`),
+# or nothing for IPv4-only daemons.
+extract_pool6() {
+    local conf="$1" v6
+    v6="$(grep -m1 '^server-ipv6 ' "$conf" | awk '{print $2}')"
+    [[ -n "$v6" ]] && echo "$v6"
+}
+
 extract_mode() {
     local conf="$1" mode
     mode="$(grep -m1 '^# network-mode ' "$conf" 2>/dev/null | awk '{print $3}')"
@@ -47,13 +55,81 @@ server_ip_of() {
     }'
 }
 
+# OpenVPN's `server-ipv6 cidr` assigns the network + 1 (e.g. fd00:1::/64 ->
+# fd00:1::1) to the server-side tun device; dnsmasq listens there so dual-stack
+# clients reach the resolver over IPv6. Runs as an embedded awk program (no
+# python dependency in the container).
+server_ip6_of() {
+    local cidr="$1"
+    [[ -z "$cidr" ]] && return 1
+    awk -v cidr="$cidr" '
+        function compress(hex,   i, g, best, beststart, cur, curstart, out) {
+            for (i = 1; i <= 8; i++) g[i] = substr(hex, (i - 1) * 4 + 1, 4)
+            cur = 0; curstart = 0; best = 0; beststart = 0
+            for (i = 1; i <= 8; i++) {
+                if (g[i] == "0000") {
+                    if (cur == 0) curstart = i
+                    cur++
+                    if (cur > best) { best = cur; beststart = curstart }
+                } else { cur = 0 }
+            }
+            if (best < 2) best = 0
+            out = ""
+            for (i = 1; i <= 8; i++) {
+                if (best >= 2 && i == beststart) { out = out "::"; i += best - 1; continue }
+                while (length(g[i]) > 1 && substr(g[i], 1, 1) == "0") g[i] = substr(g[i], 2)
+                if (out ~ /::$/) out = out g[i]
+                else if (out == "") out = g[i]
+                else out = out ":" g[i]
+            }
+            return out
+        }
+        function next_addr(cidr,   parts, n, net, prefix, g, i, j, expo, miss, full, hb, carry, d, out) {
+            n = split(cidr, parts, "/")
+            net = parts[1]
+            prefix = n > 1 ? parts[2] : 128
+            n = split(net, g, ":")
+            expo = 0
+            for (i = 1; i <= n; i++) if (g[i] != "") expo++
+            miss = 8 - expo
+            full = ""
+            for (i = 1; i <= n; i++) {
+                if (g[i] == "") {
+                    for (j = 1; j <= miss; j++) full = full "0000"
+                    miss = 0
+                } else {
+                    full = full sprintf("%04s", g[i])
+                }
+            }
+            while (length(full) < 32) full = full "0000"
+            if (prefix < 128) {
+                hb = int((128 - prefix) / 4)
+                full = substr(full, 1, 32 - hb)
+                for (i = 1; i <= hb; i++) full = full "0"
+            }
+            carry = 1
+            out = ""
+            for (i = 32; i >= 1; i--) {
+                d = index("0123456789abcdef", tolower(substr(full, i, 1))) - 1 + carry
+                if (d >= 16) { d -= 16; carry = 1 } else { carry = 0 }
+                out = substr("0123456789abcdef", d + 1, 1) out
+            }
+            return compress(out)
+        }
+        BEGIN { print next_addr(cidr) }
+    '
+}
+
 # Lists the tun server IP (pool network + 1) of every daemon config. dnsmasq
 # listens on all of them so clients of any daemon reach the resolver via their
-# own tun gateway (each daemon's config pushes the matching address).
+# own tun gateway (each daemon's config pushes the matching address). IPv6 tun
+# addresses (dual-stack daemons) are included the same way.
 tun_ips_of() {
     local conf ip
     for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do
         ip="$(server_ip_of "$conf" 2>/dev/null || true)"
+        [ -n "$ip" ] && echo "$ip"
+        ip="$(server_ip6_of "$(extract_pool6 "$conf" 2>/dev/null || true)" 2>/dev/null || true)"
         [ -n "$ip" ] && echo "$ip"
     done | sort -u
 }
@@ -107,13 +183,14 @@ start_dnsmasq() {
 # are up so routed mode can install its tun return route; re-run on config
 # reloads so pool/mode changes refresh NAT or return routes.
 reapply_rules() {
-    local conf pool mode
+    local conf pool pool6 mode
     conf="$(ls "$OPNL_CONFIG_DIR"/daemon-*.conf 2>/dev/null | head -1 || true)"
     [[ -z "$conf" ]] && return 0
     pool="$(extract_pool "$conf" 2>/dev/null || true)"
     [[ -z "$pool" ]] && return 0
+    pool6="$(extract_pool6 "$conf" 2>/dev/null || true)"
     mode="$(extract_mode "$conf" 2>/dev/null || true)"
-    OPNL_VPN_POOL="$pool" OPNL_NETWORK_MODE="$mode" /etc/openvpn/scripts/apply-rules.sh || true
+    OPNL_VPN_POOL="$pool" OPNL_VPN_POOL6="$pool6" OPNL_NETWORK_MODE="$mode" /etc/openvpn/scripts/apply-rules.sh || true
     start_dnsmasq || true
 }
 

@@ -119,11 +119,22 @@ public class AccessRuleService {
         dstGroupName(rule.getDstGroupId()));
   }
 
-  /** Renders the per-client iptables commands for an active connection. */
+  /**
+   * Renders the per-client iptables and, when the serving daemon is dual-stack, ip6tables commands
+   * for an active connection. {@code virtualIp6} is the client's tunnel IPv6 address (blank for
+   * IPv4-only clients); it scopes the IPv6 chain to the client and is skipped when absent.
+   */
   @Transactional(readOnly = true)
-  public RuleEngine.IptablesResult iptablesFor(String commonName, String virtualIp, String userId) {
+  public RuleEngine.IptablesResult iptablesFor(
+      String commonName, String virtualIp, String virtualIp6, String userId, boolean ipv6Enabled) {
     return ruleEngine.iptablesFor(
-        commonName, virtualIp, ruleEngine.effectiveFor(userId), ruleEngine.scopeDenyIpsFor(userId));
+        commonName,
+        virtualIp,
+        virtualIp6,
+        ruleEngine.effectiveFor(userId),
+        ruleEngine.scopeDenyIpsFor(userId),
+        ruleEngine.scopeDenyIpv6For(userId),
+        ipv6Enabled);
   }
 
   private void apply(AccessRule rule, AccessRuleDto dto) {

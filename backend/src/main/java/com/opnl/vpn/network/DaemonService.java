@@ -114,6 +114,8 @@ public class DaemonService {
             .clientCertNotRequired(request.clientCertNotRequired())
             .authUserPass(request.authUserPass())
             .adminHost(blankToNull(request.adminHost()))
+            .ipv6Enabled(request.ipv6Enabled())
+            .ipv6Subnet(blankToNull(request.ipv6Subnet()))
             .enabled(request.enabled())
             .createdAt(Instant.now())
             .build();
@@ -146,6 +148,8 @@ public class DaemonService {
     daemon.setClientCertNotRequired(request.clientCertNotRequired());
     daemon.setAuthUserPass(request.authUserPass());
     daemon.setAdminHost(blankToNull(request.adminHost()));
+    daemon.setIpv6Enabled(request.ipv6Enabled());
+    daemon.setIpv6Subnet(blankToNull(request.ipv6Subnet()));
     daemon.setEnabled(request.enabled());
     Daemon saved = repository.save(daemon);
     writeAll();
@@ -198,6 +202,18 @@ public class DaemonService {
     return toServerConfig(entityForProfile(type));
   }
 
+  /** Whether the given daemon runs a dual-stack tunnel. */
+  @Transactional(readOnly = true)
+  public boolean ipv6Enabled(int daemonIndex) {
+    return repository.findByDaemonIndex(daemonIndex).map(Daemon::isIpv6Enabled).orElse(false);
+  }
+
+  /** Whether the primary daemon runs a dual-stack tunnel (default for panel-wide features). */
+  @Transactional(readOnly = true)
+  public boolean primaryIpv6Enabled() {
+    return ipv6Enabled(0);
+  }
+
   /** Returns the daemon entity serving the given profile type, falling back to the primary. */
   @Transactional
   public Daemon entityForProfile(ProfileType type) {
@@ -232,7 +248,9 @@ public class DaemonService {
         daemon.isFullTunnel(),
         daemon.isClientCertNotRequired(),
         daemon.isAuthUserPass(),
-        daemon.getAdminHost());
+        daemon.getAdminHost(),
+        daemon.isIpv6Enabled(),
+        daemon.getIpv6Subnet());
   }
 
   private Daemon firstMatching(java.util.function.Predicate<Daemon> predicate) {
@@ -327,6 +345,8 @@ public class DaemonService {
         .clientCertNotRequired(config.clientCertNotRequired())
         .authUserPass(config.authUserPass())
         .adminHost(config.adminHost())
+        .ipv6Enabled(config.ipv6Enabled())
+        .ipv6Subnet(config.ipv6Subnet())
         .enabled(true)
         .createdAt(Instant.now())
         .build();
@@ -351,5 +371,7 @@ public class DaemonService {
       boolean clientCertNotRequired,
       boolean authUserPass,
       String adminHost,
+      boolean ipv6Enabled,
+      String ipv6Subnet,
       boolean enabled) {}
 }

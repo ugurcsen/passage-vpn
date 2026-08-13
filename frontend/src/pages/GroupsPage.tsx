@@ -54,6 +54,8 @@ export function GroupsPage() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [poolFor, setPoolFor] = useState<GroupRow | null>(null);
   const [poolInput, setPoolInput] = useState("");
+  const [poolIpv6For, setPoolIpv6For] = useState<GroupRow | null>(null);
+  const [poolIpv6Input, setPoolIpv6Input] = useState("");
   const [confirm, setConfirm] = useState<GroupRow | null>(null);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin-groups"] });
@@ -171,6 +173,30 @@ export function GroupsPage() {
     }
   };
 
+  const poolIpv6Mutation = useMutation({
+    mutationFn: () =>
+      api(endpoints.groups + `/${poolIpv6For?.id}/static-ipv6-pool`, {
+        method: "PUT",
+        body: JSON.stringify({ pool: poolIpv6Input.trim() }),
+      }),
+    onSuccess: () => {
+      toast.success("Static IPv6 pool updated");
+      setPoolIpv6For(null);
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Update failed"),
+  });
+
+  const openPoolIpv6 = async (row: GroupRow) => {
+    setPoolIpv6For(row);
+    try {
+      const pool = await api<string | null>(endpoints.groups + `/${row.id}/static-ipv6-pool`);
+      setPoolIpv6Input(pool ?? "");
+    } catch {
+      setPoolIpv6Input("");
+    }
+  };
+
   const columns: GridColDef[] = [
     { field: "name", headerName: "Name", flex: 1, minWidth: 140 },
     { field: "description", headerName: "Description", flex: 1.4 },
@@ -193,6 +219,11 @@ export function GroupsPage() {
             </Tooltip>
             <Tooltip title="Static IP pool">
               <IconButton size="small" onClick={() => openPool(row)} data-testid={`edit-pool-${row.name}`}>
+                <TuneIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Static IPv6 pool">
+              <IconButton size="small" onClick={() => openPoolIpv6(row)} data-testid={`edit-pool6-${row.name}`}>
                 <TuneIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -333,6 +364,27 @@ export function GroupsPage() {
         <DialogActions>
           <Button onClick={() => setPoolFor(null)}>Cancel</Button>
           <Button variant="contained" disabled={poolMutation.isPending} onClick={() => poolMutation.mutate()}>
+            Save pool
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!poolIpv6For} onClose={() => setPoolIpv6For(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Static IPv6 pool — {poolIpv6For?.name}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="IPv6 range"
+              value={poolIpv6Input}
+              onChange={(e) => setPoolIpv6Input(e.target.value)}
+              placeholder="e.g. fd00:1::100-fd00:1::1ff"
+              helperText="Single IPv6 range (e.g. fd00:1::100-fd00:1::1ff). Empty clears the pool. Members can be auto-allocated from here."
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPoolIpv6For(null)}>Cancel</Button>
+          <Button variant="contained" disabled={poolIpv6Mutation.isPending} onClick={() => poolIpv6Mutation.mutate()}>
             Save pool
           </Button>
         </DialogActions>

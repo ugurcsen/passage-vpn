@@ -1,5 +1,6 @@
 package com.opnl.vpn.access;
 
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.LinkedHashSet;
@@ -14,10 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * Resolves a domain name to its current IPv4 addresses. Used by the access-rule engine at connect
- * time and by the dnsmasq config renderer, so the firewall matches exactly the addresses clients
- * get from the pinned DNS. Resolution runs on a short timeout so a slow or failing DNS lookup never
- * stalls a VPN connect.
+ * Resolves a domain name to its current IPv4 and IPv6 addresses. Used by the access-rule engine at
+ * connect time and by the dnsmasq config renderer, so the firewall matches exactly the addresses
+ * clients get from the pinned DNS. Resolution runs on a short timeout so a slow or failing DNS
+ * lookup never stalls a VPN connect.
  */
 @Slf4j
 @Component
@@ -29,14 +30,27 @@ public class DomainResolver {
 
   /**
    * Returns the domain's IPv4 addresses, or an empty set when the name cannot be resolved (the
-   * caller then skips the rule). IPv6 literals are excluded because the per-client iptables rules
-   * are IPv4-only.
+   * caller then skips the rule). IPv6 literals are excluded because the caller only builds IPv4
+   * iptables rules.
    */
   public Set<String> resolve(String domain) {
+    return lookup(domain, false);
+  }
+
+  /**
+   * Returns the domain's IPv6 addresses (global unicast only; link-local, unspecified and
+   * documentation addresses are ignored), or an empty set when the name has no usable IPv6 record.
+   * Used for the per-client ip6tables rules and dnsmasq AAAA pins when dual-stack is enabled.
+   */
+  public Set<String> resolveIpv6(String domain) {
+    return lookup(domain, true);
+  }
+
+  private Set<String> lookup(String domain, boolean ipv6) {
     if (domain == null || domain.isBlank()) {
       return Set.of();
     }
-    Future<Set<String>> future = executor.submit(() -> lookup(domain));
+    Future<Set<String>> future = executor.submit(() -> lookupNow(domain, ipv6));
     try {
       return future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
     } catch (TimeoutException e) {
@@ -52,18 +66,40 @@ public class DomainResolver {
     }
   }
 
-  private Set<String> lookup(String domain) throws UnknownHostException {
+  private Set<String> lookupNow(String domain, boolean ipv6) throws UnknownHostException {
     Set<String> ips = new LinkedHashSet<>();
     for (InetAddress address : InetAddress.getAllByName(domain)) {
-      String host = address.getHostAddress();
-      if (host != null && !host.contains(":")) {
-        ips.add(host);
+      if (ipv6 != (address instanceof Inet6Address)) {
+        continue;
       }
+      String host = address.getHostAddress();
+      if (host == null || host.contains("%")) {
+        continue;
+      }
+      if (ipv6 && unusableIpv6(address, host)) {
+        continue;
+      }
+      ips.add(host);
     }
     if (ips.isEmpty()) {
-      log.debug("No IPv4 addresses for domain {}", domain);
+      log.debug("No {} addresses for domain {}", ipv6 ? "IPv6" : "IPv4", domain);
     }
     return ips;
+  }
+
+  private boolean unusableIpv6(InetAddress address, String host) {
+    if (address.isLinkLocalAddress() || address.isSiteLocalAddress()) {
+      return true;
+    }
+    if (address.isAnyLocalAddress()
+        || address.isLoopbackAddress()
+        || address.isMulticastAddress()) {
+      return true;
+    }
+    return host.equalsIgnoreCase("::")
+        || host.regionMatches(true, 0, "2001:db8", 0, 9)
+        || host.regionMatches(true, 0, "fd", 0, 2)
+        || host.regionMatches(true, 0, "fe80", 0, 4);
   }
 
   /** Resolves several domains in one call, keeping order; unresolvable names map to empty sets. */

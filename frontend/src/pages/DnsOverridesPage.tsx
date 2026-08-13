@@ -41,6 +41,7 @@ interface GroupRow {
 interface DnsForm {
   hostname: string;
   ipv4: string;
+  ipv6: string;
   scope: Scope;
   scopeId: string;
   enabled: boolean;
@@ -49,6 +50,7 @@ interface DnsForm {
 const EMPTY_FORM: DnsForm = {
   hostname: "",
   ipv4: "",
+  ipv6: "",
   scope: "GLOBAL",
   scopeId: "",
   enabled: true,
@@ -84,6 +86,7 @@ export function DnsOverridesPage() {
       const payload = {
         hostname: form.hostname.trim().toLowerCase(),
         ipv4: form.ipv4.trim(),
+        ipv6: form.ipv6.trim() || null,
         scope: form.scope,
         scopeId: form.scope === "GLOBAL" ? null : form.scopeId,
         enabled: form.enabled,
@@ -134,6 +137,7 @@ export function DnsOverridesPage() {
     setForm({
       hostname: row.hostname,
       ipv4: row.ipv4,
+      ipv6: row.ipv6 ?? "",
       scope: row.scope,
       scopeId: row.scopeId ?? "",
       enabled: row.enabled,
@@ -148,7 +152,21 @@ export function DnsOverridesPage() {
 
   const columns: GridColDef[] = [
     { field: "hostname", headerName: "Hostname", flex: 1.4, minWidth: 160 },
-    { field: "ipv4", headerName: "Address", width: 140 },
+    { field: "ipv4", headerName: "IPv4", width: 130 },
+    {
+      field: "ipv6",
+      headerName: "IPv6",
+      width: 190,
+      valueGetter: (_, row) => (row as DnsRecordDto).ipv6 ?? "",
+      renderCell: (params) =>
+        params.value ? (
+          <Chip label={params.value as string} size="small" variant="outlined" color="secondary" />
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            —
+          </Typography>
+        ),
+    },
     {
       field: "scope",
       headerName: "Scope",
@@ -258,6 +276,15 @@ export function DnsOverridesPage() {
               placeholder="e.g. 10.10.0.5"
               helperText="The address dnsmasq returns for the hostname."
               required
+            />
+            <TextField
+              id="dns-ipv6"
+              name="ipv6"
+              label="IPv6 address (optional)"
+              value={form.ipv6}
+              onChange={(e) => setForm({ ...form, ipv6: e.target.value })}
+              placeholder="e.g. fd00:1::5"
+              helperText="AAAA record returned when dual-stack is enabled. Leave empty for IPv4-only."
             />
             <TextField
               id="dns-scope"

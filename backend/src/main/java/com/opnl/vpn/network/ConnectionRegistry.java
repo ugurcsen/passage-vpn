@@ -21,6 +21,7 @@ public class ConnectionRegistry {
       String username,
       String commonName,
       String virtualIp,
+      String virtualIpv6,
       String remoteIp,
       String daemonName,
       Instant connectedAt) {}
@@ -30,15 +31,24 @@ public class ConnectionRegistry {
 
   /** Registers or refreshes a session after client-connect. */
   public void register(
-      String username, String commonName, String virtualIp, String remoteIp, String daemonName) {
+      String username,
+      String commonName,
+      String virtualIp,
+      String virtualIpv6,
+      String remoteIp,
+      String daemonName) {
     if (commonName == null || commonName.isBlank()) {
       return;
     }
     VpnSession session =
-        new VpnSession(username, commonName, virtualIp, remoteIp, daemonName, Instant.now());
+        new VpnSession(
+            username, commonName, virtualIp, virtualIpv6, remoteIp, daemonName, Instant.now());
     byCommonName.put(commonName, session);
     if (virtualIp != null && !virtualIp.isBlank()) {
       byVirtualIp.put(virtualIp, session);
+    }
+    if (virtualIpv6 != null && !virtualIpv6.isBlank()) {
+      byVirtualIp.put(virtualIpv6, session);
     }
   }
 
@@ -61,7 +71,7 @@ public class ConnectionRegistry {
     VpnSession session =
         existing != null
             ? existing
-            : new VpnSession(commonName, commonName, address, null, null, Instant.now());
+            : new VpnSession(commonName, commonName, address, null, null, null, Instant.now());
     byVirtualIp.put(address, session);
     if (commonName != null && !commonName.isBlank()) {
       byCommonName.put(commonName, session);
@@ -74,8 +84,8 @@ public class ConnectionRegistry {
       return;
     }
     VpnSession removed = byCommonName.remove(commonName);
-    if (removed != null && removed.virtualIp() != null) {
-      byVirtualIp.remove(removed.virtualIp(), removed);
+    if (removed != null) {
+      byVirtualIp.entrySet().removeIf(entry -> commonName.equals(entry.getValue().commonName()));
     }
   }
 

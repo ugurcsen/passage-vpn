@@ -8,7 +8,6 @@ import com.opnl.vpn.group.GroupMemberRepository;
 import com.opnl.vpn.group.GroupRepository;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
-import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -71,11 +70,12 @@ public class RuleEngine {
     return rules;
   }
 
-  public record IptablesResult(List<String> apply, List<String> remove) {}
+  public record IptablesResult(
+      List<String> apply, List<String> remove, List<String> apply6, List<String> remove6) {}
 
   /** Builds the iptables argv lists to install and later tear down a client's rules. */
   public IptablesResult iptablesFor(String commonName, String virtualIp, List<AccessRule> rules) {
-    return iptablesFor(commonName, virtualIp, rules, Set.of());
+    return iptablesFor(commonName, virtualIp, null, rules, Set.of(), Set.of(), false);
   }
 
   /**
@@ -86,16 +86,56 @@ public class RuleEngine {
    */
   public IptablesResult iptablesFor(
       String commonName, String virtualIp, List<AccessRule> rules, Set<String> deniedIps) {
+    return iptablesFor(commonName, virtualIp, null, rules, deniedIps, Set.of(), false);
+  }
+
+  /**
+   * Builds the per-client iptables and, when dual-stack is enabled, ip6tables argv lists. The IPv6
+   * chain mirrors the IPv4 one: same terminal policy and per-rule destinations, keyed on the
+   * client's virtual IPv6 address. Rules whose destination has no resolvable address in the family
+   * are skipped for that table.
+   *
+   * @param virtualIp6 the client's tunnel IPv6 address; when blank the IPv6 chain is not emitted
+   *     (the per-client FORWARD jump could not be scoped to this client)
+   * @param deniedIpv6 DNS-override IPv6 scope denies
+   */
+  public IptablesResult iptablesFor(
+      String commonName,
+      String virtualIp,
+      String virtualIp6,
+      List<AccessRule> rules,
+      Set<String> deniedIps,
+      Set<String> deniedIpv6,
+      boolean ipv6Enabled) {
     String chain = chainName(commonName);
     List<String> apply = new ArrayList<>();
     List<String> remove = new ArrayList<>();
+    List<String> apply6 = new ArrayList<>();
+    List<String> remove6 = new ArrayList<>();
 
     boolean hasRules = !rules.isEmpty();
     boolean hasDenies = deniedIps != null && !deniedIps.isEmpty();
-    if (!hasRules && !hasDenies) {
-      return new IptablesResult(apply, remove);
+    boolean hasDenies6 = ipv6Enabled && deniedIpv6 != null && !deniedIpv6.isEmpty();
+    if (!hasRules && !hasDenies && !hasDenies6) {
+      return new IptablesResult(apply, remove, apply6, remove6);
     }
 
+    emitIpv4(chain, virtualIp, rules, deniedIps, hasRules, apply, remove);
+
+    if (ipv6Enabled && virtualIp6 != null && !virtualIp6.isBlank() && (hasRules || hasDenies6)) {
+      emitIpv6(chain, virtualIp6, rules, deniedIpv6, hasRules, apply6, remove6);
+    }
+    return new IptablesResult(apply, remove, apply6, remove6);
+  }
+
+  private void emitIpv4(
+      String chain,
+      String virtualIp,
+      List<AccessRule> rules,
+      Set<String> deniedIps,
+      boolean hasRules,
+      List<String> apply,
+      List<String> remove) {
     apply.add("iptables -N " + chain);
     // Always permit the connection itself and DNS resolution.
     apply.add("iptables -A " + chain + " -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT");
@@ -104,7 +144,10 @@ public class RuleEngine {
 
     String src = virtualIp == null || virtualIp.isBlank() ? "" : "-s " + virtualIp + " ";
     for (AccessRule rule : rules) {
-      for (String dst : destinationSpecs(rule)) {
+      for (String dst : destinationSpecs(rule, false)) {
+        if (dst.contains(":")) {
+          continue;
+        }
         apply.add(
             "iptables -A "
                 + chain
@@ -124,7 +167,48 @@ public class RuleEngine {
     remove.add("iptables -D FORWARD " + src + "-j " + chain);
     remove.add("iptables -F " + chain);
     remove.add("iptables -X " + chain);
-    return new IptablesResult(apply, remove);
+  }
+
+  private void emitIpv6(
+      String chain,
+      String virtualIp6,
+      List<AccessRule> rules,
+      Set<String> deniedIpv6,
+      boolean hasRules,
+      List<String> apply,
+      List<String> remove) {
+    String chain6 = chain + "6";
+    String src = "-s " + virtualIp6 + " ";
+    apply.add("ip6tables -N " + chain6);
+    // Always permit the connection itself and DNS resolution over IPv6.
+    apply.add("ip6tables -A " + chain6 + " -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT");
+    apply.add("ip6tables -A " + chain6 + " -p udp --dport 53 -j ACCEPT");
+    apply.add("ip6tables -A " + chain6 + " -p tcp --dport 53 -j ACCEPT");
+
+    for (AccessRule rule : rules) {
+      for (String dst : destinationSpecs(rule, true)) {
+        if (!dst.contains(":")) {
+          continue;
+        }
+        apply.add(
+            "ip6tables -A "
+                + chain6
+                + " "
+                + args(rule, src, dst)
+                + " -j "
+                + target(rule.getAction()));
+      }
+    }
+    for (String ip : deniedIpv6) {
+      apply.add("ip6tables -A " + chain6 + " " + src + "-d " + ip + "/128 -j DROP");
+    }
+    // Default deny for clients with any access rule; scope-only chains stay open.
+    apply.add("ip6tables -A " + chain6 + " -j " + (hasRules ? "DROP" : "ACCEPT"));
+    apply.add("ip6tables -I FORWARD " + src + "-j " + chain6);
+
+    remove.add("ip6tables -D FORWARD " + src + "-j " + chain6);
+    remove.add("ip6tables -F " + chain6);
+    remove.add("ip6tables -X " + chain6);
   }
 
   /**
@@ -158,31 +242,27 @@ public class RuleEngine {
    * {@code dstDomain} rule targets the domain's current IPv4 addresses (one /32 match each). An
    * empty list means the destination cannot be resolved and the rule is skipped.
    */
-  List<String> destinationSpecs(AccessRule rule) {
+  List<String> destinationSpecs(AccessRule rule, boolean ipv6) {
     if (rule.getDstGroupId() != null && !rule.getDstGroupId().isBlank()) {
-      return groupDestinationSpecs(rule.getDstGroupId());
+      return groupDestinationSpecs(rule.getDstGroupId(), ipv6);
     }
     if (rule.getDstDomain() != null && !rule.getDstDomain().isBlank()) {
-      return domainDestinationSpecs(rule.getDstDomain());
+      return domainDestinationSpecs(rule.getDstDomain(), ipv6);
     }
     if (rule.getDstCidr() != null && !rule.getDstCidr().isBlank()) {
-      return List.of("-d " + rule.getDstCidr() + " ");
+      String cidr = rule.getDstCidr();
+      boolean v6 = cidr.contains(":");
+      if (v6 == ipv6) {
+        return List.of("-d " + cidr + " ");
+      }
+      return List.of();
     }
     return List.of("");
   }
 
-  private List<String> domainDestinationSpecs(String domain) {
-    // DNS overrides win: an internal hostname resolves to the authoritative override
-    // address, keeping the dnsmasq answer and the firewall rules in agreement.
-    Set<String> overrideIps = dnsOverrideService.resolveDomain(domain);
-    if (!overrideIps.isEmpty()) {
-      return overrideIps.stream().map(ip -> "-d " + ip + "/32 ").toList();
-    }
-    return domainResolver.resolve(domain).stream().map(ip -> "-d " + ip + "/32 ").toList();
-  }
-
-  private List<String> groupDestinationSpecs(String groupId) {
-    String pool = poolForGroupChain(groupId);
+  /** Resolves the group's effective IPv6 pool or member addresses to ip6tables dst specs. */
+  private List<String> groupDestinationSpecs(String groupId, boolean ipv6) {
+    String pool = ipv6 ? ipv6PoolForGroupChain(groupId) : poolForGroupChain(groupId);
     if (pool != null) {
       return List.of("-m iprange --dst-range " + normalizeRange(pool) + " ");
     }
@@ -190,11 +270,43 @@ public class RuleEngine {
     for (GroupMember member : memberRepository.findById_GroupId(groupId)) {
       userRepository
           .findById(member.getId().getUserId())
-          .map(User::getStaticIp)
+          .map(u -> ipv6 ? u.getStaticIpv6() : u.getStaticIp())
           .filter(ip -> ip != null && !ip.isBlank())
-          .ifPresent(ip -> specs.add("-d " + ip + "/32 "));
+          .ifPresent(ip -> specs.add("-d " + ip + (ipv6 ? "/128 " : "/32 ")));
     }
     return specs;
+  }
+
+  /** The group's own IPv6 pool, inherited from the closest ancestor group that defines one. */
+  private String ipv6PoolForGroupChain(String groupId) {
+    String current = groupId;
+    while (current != null && !current.isBlank()) {
+      Object pool = settingsService.groupSettings(current).get(SettingKeys.STATIC_IPV6_POOL);
+      if (pool != null && !pool.toString().isBlank()) {
+        return pool.toString();
+      }
+      current = groupRepository.findById(current).map(Group::getParentId).orElse(null);
+    }
+    return null;
+  }
+
+  private List<String> domainDestinationSpecs(String domain, boolean ipv6) {
+    if (ipv6) {
+      // DNS overrides win: an internal hostname resolves to the authoritative override
+      // address, keeping the dnsmasq answer and the firewall rules in agreement.
+      Set<String> overrideIpv6 = dnsOverrideService.resolveDomainIpv6(domain);
+      if (!overrideIpv6.isEmpty()) {
+        return overrideIpv6.stream().map(ip -> "-d " + ip + "/128 ").toList();
+      }
+      return domainResolver.resolveIpv6(domain).stream().map(ip -> "-d " + ip + "/128 ").toList();
+    }
+    // DNS overrides win: an internal hostname resolves to the authoritative override
+    // address, keeping the dnsmasq answer and the firewall rules in agreement.
+    Set<String> overrideIps = dnsOverrideService.resolveDomain(domain);
+    if (!overrideIps.isEmpty()) {
+      return overrideIps.stream().map(ip -> "-d " + ip + "/32 ").toList();
+    }
+    return domainResolver.resolve(domain).stream().map(ip -> "-d " + ip + "/32 ").toList();
   }
 
   /** The nearest static IP pool defined on the group or any of its ancestors, or null. */
@@ -208,6 +320,25 @@ public class RuleEngine {
       current = groupRepository.findById(current).map(Group::getParentId).orElse(null);
     }
     return null;
+  }
+
+  /**
+   * The IPv6 addresses of enabled non-GLOBAL DNS overrides the user may not reach: records whose
+   * scope target (exact user, or group chain membership) does not include the user. GLOBAL records
+   * never deny. Used by the connect path so scoped internal hostnames resolve for everyone but only
+   * authorized clients can actually reach them. Only populated when the record defines an IPv6
+   * address (dual-stack enabled).
+   */
+  public Set<String> scopeDenyIpv6For(String userId) {
+    Set<String> denied = new LinkedHashSet<>();
+    for (DnsRecord record : dnsOverrideService.nonGlobalEnabled()) {
+      if (record.getIpv6() != null
+          && !record.getIpv6().isBlank()
+          && !scopeIncludes(record, userId)) {
+        denied.add(record.getIpv6());
+      }
+    }
+    return denied;
   }
 
   /** Normalizes a "start-end" pool expression into iptables iprange syntax. */

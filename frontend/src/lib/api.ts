@@ -251,7 +251,7 @@ export interface Daemon {
   daemonIndex: number;
   name: string | null;
   port: number;
-  proto: "udp" | "tcp";
+  proto: "udp" | "tcp" | "udp6" | "tcp6";
   subnet: string;
   subnetMask: string;
   dnsServers: string[];
@@ -261,6 +261,8 @@ export interface Daemon {
   clientCertNotRequired: boolean;
   authUserPass: boolean;
   adminHost: string | null;
+  ipv6Enabled: boolean;
+  ipv6Subnet: string | null;
   enabled: boolean;
   primary: boolean;
   createdAt: string;
@@ -426,6 +428,7 @@ export interface DnsRecordDto {
   id: string;
   hostname: string;
   ipv4: string;
+  ipv6: string | null;
   scope: "GLOBAL" | "GROUP" | "USER";
   scopeId: string | null;
   scopeName: string | null;

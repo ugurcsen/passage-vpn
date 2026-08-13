@@ -293,6 +293,36 @@ public class UserAdminService {
     return getUser(id);
   }
 
+  @Transactional
+  public UserDto setStaticIpv6(String id, String staticIpv6) {
+    requireUser(id);
+    ccdService.setStaticIpv6(id, staticIpv6);
+    auditLogService.record(
+        "USER_STATIC_IPV6_SET",
+        AuditLogService.CAT_USER,
+        id,
+        "user",
+        Map.of("staticIpv6", staticIpv6));
+    return getUser(id);
+  }
+
+  /** Allocates the next free static IPv6 from the user's group pool. */
+  @Transactional
+  public UserDto allocateStaticIpv6(String id) {
+    requireUser(id);
+    ccdService.allocateIpv6FromGroupPool(id);
+    auditLogService.record("USER_STATIC_IPV6_ALLOCATE", AuditLogService.CAT_USER, id, "user", null);
+    return getUser(id);
+  }
+
+  @Transactional
+  public UserDto clearStaticIpv6(String id) {
+    requireUser(id);
+    ccdService.clearStaticIpv6(id);
+    auditLogService.record("USER_STATIC_IPV6_CLEAR", AuditLogService.CAT_USER, id, "user", null);
+    return getUser(id);
+  }
+
   public record MfaSetup(String secret, String otpAuthUrl, String qrDataUrl) {}
 
   /** Generates a fresh TOTP secret; user must then confirm with {@link #enableMfa}. */

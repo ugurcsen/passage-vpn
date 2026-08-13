@@ -52,6 +52,7 @@ interface UserRow {
   createdAt?: string;
   lastLoginAt?: string;
   staticIp?: string;
+  staticIpv6?: string;
 }
 
 interface GroupRow {
@@ -115,6 +116,7 @@ export function UsersPage() {
   const [ccdMfaOnConnect, setCcdMfaOnConnect] = useState(false);
   const [ccdTunnelMode, setCcdTunnelMode] = useState("" as "" | "full" | "split");
   const [ccdStaticIp, setCcdStaticIp] = useState("");
+  const [ccdStaticIpv6, setCcdStaticIpv6] = useState("");
 
   const canManageMfa = currentUser?.role === "ADMIN";
   const isAdmin = currentUser?.role === "ADMIN";
@@ -261,6 +263,7 @@ export function UsersPage() {
     setCcdMfaOnConnect(false);
     setCcdTunnelMode("");
     setCcdStaticIp(row.staticIp ?? "");
+    setCcdStaticIpv6(row.staticIpv6 ?? "");
     try {
       const settings = await api<Record<string, unknown>>(
         endpoints.users + `/${row.id}/settings`,
@@ -326,6 +329,39 @@ export function UsersPage() {
       toast.success("Static IP allocated");
       const row = updated as unknown as UserRow;
       setCcdStaticIp(row.staticIp ?? "");
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Allocation failed"),
+  });
+
+  const saveStaticIpv6 = useMutation({
+    mutationFn: async (ip: string) => {
+      if (!ccdTarget) return;
+      if (ip.trim()) {
+        await api(endpoints.users + `/${ccdTarget.id}/static-ipv6`, {
+          method: "PUT",
+          body: JSON.stringify({ staticIpv6: ip.trim() }),
+        });
+      } else {
+        await api(endpoints.users + `/${ccdTarget.id}/static-ipv6`, { method: "DELETE" });
+      }
+    },
+    onSuccess: () => {
+      toast.success("Static IPv6 updated");
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Update failed"),
+  });
+
+  const allocateStaticIpv6 = useMutation({
+    mutationFn: async () => {
+      if (!ccdTarget) return;
+      return api(endpoints.users + `/${ccdTarget.id}/static-ipv6/allocate`, { method: "POST" });
+    },
+    onSuccess: (updated) => {
+      toast.success("Static IPv6 allocated");
+      const row = updated as unknown as UserRow;
+      setCcdStaticIpv6(row.staticIpv6 ?? "");
       invalidate();
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Allocation failed"),
@@ -439,6 +475,20 @@ export function UsersPage() {
       renderCell: (params) =>
         params.value ? (
           <Chip label={params.value as string} size="small" variant="outlined" color="info" />
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            —
+          </Typography>
+        ),
+    },
+    {
+      field: "staticIpv6",
+      headerName: "Static IPv6",
+      width: 190,
+      valueGetter: (_, row) => (row as UserRow).staticIpv6 ?? "",
+      renderCell: (params) =>
+        params.value ? (
+          <Chip label={params.value as string} size="small" variant="outlined" color="secondary" />
         ) : (
           <Typography variant="body2" color="text.secondary">
             —
@@ -835,6 +885,55 @@ export function UsersPage() {
                       onClick={() => {
                         setCcdStaticIp("");
                         saveStaticIp.mutate("");
+                      }}
+                    >
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Stack>
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                Static IPv6
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <TextField
+                  size="small"
+                  placeholder="e.g. fd00:1::42"
+                  value={ccdStaticIpv6}
+                  onChange={(e) => setCcdStaticIpv6(e.target.value)}
+                  sx={{ flex: 1 }}
+                  helperText={
+                    ccdTarget?.staticIpv6
+                      ? "Override the group pool allocation."
+                      : "Leave empty to clear."
+                  }
+                />
+                <Button
+                  variant="outlined"
+                  startIcon={<TuneIcon />}
+                  disabled={saveStaticIpv6.isPending}
+                  onClick={() => saveStaticIpv6.mutate(ccdStaticIpv6)}
+                >
+                  Set
+                </Button>
+                <Button
+                  variant="contained"
+                  disabled={allocateStaticIpv6.isPending}
+                  onClick={() => allocateStaticIpv6.mutate()}
+                  title="Allocate next free IPv6 from the group pool"
+                >
+                  {allocateStaticIpv6.isPending ? <CircularProgress size={18} /> : "Allocate IPv6"}
+                </Button>
+                {ccdTarget?.staticIpv6 && (
+                  <Tooltip title="Clear static IPv6">
+                    <IconButton
+                      size="small"
+                      disabled={saveStaticIpv6.isPending}
+                      onClick={() => {
+                        setCcdStaticIpv6("");
+                        saveStaticIpv6.mutate("");
                       }}
                     >
                       <ClearIcon fontSize="small" />

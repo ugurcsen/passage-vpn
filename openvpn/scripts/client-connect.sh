@@ -20,7 +20,7 @@ resp="$(curl -sS --max-time 8 \
     -X POST "$OPNL_INTERNAL_BASE_URL/internal/connect" \
     -H 'Content-Type: application/json' \
     -H 'X-Internal-Token: __INTERNAL_TOKEN__' \
-    -d "{\"commonName\":$(jq -Rn --arg v "${common_name:-}" '$v'),\"username\":$(jq -Rn --arg v "${username:-}" '$v'),\"daemonName\":$(jq -Rn --arg v "$daemon_name" '$v'),\"remoteIp\":$(jq -Rn --arg v "${trusted_ip:-}" '$v'),\"virtualIp\":$(jq -Rn --arg v "${ifconfig_pool_remote_ip:-}" '$v')}" \
+    -d "{\"commonName\":$(jq -Rn --arg v "${common_name:-}" '$v'),\"username\":$(jq -Rn --arg v "${username:-}" '$v'),\"daemonName\":$(jq -Rn --arg v "$daemon_name" '$v'),\"remoteIp\":$(jq -Rn --arg v "${trusted_ip:-}" '$v'),\"virtualIp\":$(jq -Rn --arg v "${ifconfig_pool_remote_ip:-}" '$v'),\"virtualIp6\":$(jq -Rn --arg v "${ifconfig_pool_remote_ip6:-${ifconfig_ipv6_remote:-}}" '$v')}" \
     || true)" || true
 
 if [[ -z "$resp" ]]; then
@@ -35,11 +35,16 @@ if [[ "$allowed" != "true" ]]; then
     exit 1
 fi
 
-# Install per-client iptables chain (no-op when the backend returned no rules).
+# Install per-client iptables chains (no-op when the backend returned no rules).
 while IFS= read -r cmd; do
     [[ -n "$cmd" ]] || continue
     eval "$cmd"
 done < <(echo "$resp" | jq -r '.iptablesApply[]?' 2>/dev/null || true)
+
+while IFS= read -r cmd; do
+    [[ -n "$cmd" ]] || continue
+    eval "$cmd"
+done < <(echo "$resp" | jq -r '.iptablesApply6[]?' 2>/dev/null || true)
 
 # Echo any pushed directives returned by the backend.
 echo "$resp" | jq -r '.pushes[]?' 2>/dev/null || true

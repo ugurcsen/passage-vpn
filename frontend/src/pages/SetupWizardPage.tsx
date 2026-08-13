@@ -28,7 +28,7 @@ const STEPS = [
 
 const DEFAULTS = {
   port: "1194",
-  proto: "udp" as "udp" | "tcp",
+  proto: "udp" as "udp" | "tcp" | "udp6" | "tcp6",
   subnet: "10.8.0.0",
   subnetMask: "255.255.255.0",
   dns: "1.1.1.1, 8.8.8.8",
@@ -37,6 +37,8 @@ const DEFAULTS = {
   clientCertNotRequired: false,
   authUserPass: true,
   adminHost: "vpn.example.com",
+  ipv6Enabled: false,
+  ipv6Subnet: "fd00:1::/64",
 };
 
 /** First-run wizard driving the backend setup state machine (admin → server → pki → complete). */
@@ -102,6 +104,8 @@ export function SetupWizardPage() {
         clientCertNotRequired: server.clientCertNotRequired,
         authUserPass: server.authUserPass,
         adminHost: server.adminHost.trim() || DEFAULTS.adminHost,
+        ipv6Enabled: server.ipv6Enabled,
+        ipv6Subnet: server.ipv6Enabled ? server.ipv6Subnet.trim() || null : null,
       };
       if (await runStep("server", payload)) setActiveStep((s) => s + 1);
       return;
@@ -175,11 +179,15 @@ export function SetupWizardPage() {
                         select
                         label="Protocol"
                         value={server.proto}
-                        onChange={(e) => update("proto", e.target.value as "udp" | "tcp")}
+                        onChange={(e) =>
+                          update("proto", e.target.value as "udp" | "tcp" | "udp6" | "tcp6")
+                        }
                         sx={{ width: 140 }}
                       >
                         <MenuItem value="udp">UDP</MenuItem>
                         <MenuItem value="tcp">TCP</MenuItem>
+                        <MenuItem value="udp6">UDP6</MenuItem>
+                        <MenuItem value="tcp6">TCP6</MenuItem>
                       </TextField>
                     </Box>
                     <Box sx={{ display: "flex", gap: 2 }}>
@@ -194,6 +202,23 @@ export function SetupWizardPage() {
                         onChange={(e) => update("subnetMask", e.target.value)}
                       />
                     </Box>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={server.ipv6Enabled}
+                          onChange={(e) => update("ipv6Enabled", e.target.checked)}
+                        />
+                      }
+                      label="Enable IPv6 (dual-stack tunnel)"
+                    />
+                    {server.ipv6Enabled && (
+                      <TextField
+                        label="IPv6 subnet"
+                        value={server.ipv6Subnet}
+                        onChange={(e) => update("ipv6Subnet", e.target.value)}
+                        helperText="Client subnet in CIDR form, e.g. fd00:1::/64"
+                      />
+                    )}
                     <TextField
                       label="DNS servers"
                       value={server.dns}

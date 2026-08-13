@@ -180,16 +180,22 @@ class AccessRuleServiceTest {
   @Test
   void iptablesForDelegatesToEngine() {
     RuleEngine.IptablesResult expected =
-        new RuleEngine.IptablesResult(List.of("apply"), List.of("remove"));
+        new RuleEngine.IptablesResult(List.of("apply"), List.of("remove"), List.of(), List.of());
     when(ruleEngine.effectiveFor("u1")).thenReturn(List.of());
     when(ruleEngine.scopeDenyIpsFor("u1")).thenReturn(Set.of());
-    when(ruleEngine.iptablesFor("alice", "10.8.0.5", List.of(), Set.of())).thenReturn(expected);
+    when(ruleEngine.scopeDenyIpv6For("u1")).thenReturn(Set.of());
+    when(ruleEngine.iptablesFor(
+            "alice", "10.8.0.5", "fd00:1::5", List.of(), Set.of(), Set.of(), true))
+        .thenReturn(expected);
 
-    RuleEngine.IptablesResult result = service.iptablesFor("alice", "10.8.0.5", "u1");
+    RuleEngine.IptablesResult result =
+        service.iptablesFor("alice", "10.8.0.5", "fd00:1::5", "u1", true);
 
     assertThat(result.apply()).containsExactly("apply");
+    assertThat(result.apply6()).isEmpty();
     verify(ruleEngine).effectiveFor("u1");
     verify(ruleEngine).scopeDenyIpsFor("u1");
+    verify(ruleEngine).scopeDenyIpv6For("u1");
   }
 
   @Test

@@ -2,6 +2,8 @@ package com.opnl.vpn.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -18,6 +20,7 @@ import com.opnl.vpn.auth.AuthService.VpnVerification;
 import com.opnl.vpn.common.GlobalExceptionHandler;
 import com.opnl.vpn.monitor.ConnectionLogService;
 import com.opnl.vpn.network.ConnectionRegistry;
+import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.setup.SetupService;
 import com.opnl.vpn.user.User;
@@ -44,6 +47,7 @@ class InternalControllerTest {
   private ConnectionRegistry connectionRegistry;
   private SettingsService settingsService;
   private ConnectionLogService connectionLogService;
+  private DaemonService daemonService;
   private MockMvc mvc;
 
   private User user(boolean banned, boolean locked) {
@@ -67,11 +71,17 @@ class InternalControllerTest {
     connectionRegistry = new ConnectionRegistry();
     settingsService = mock(SettingsService.class);
     connectionLogService = mock(ConnectionLogService.class);
+    daemonService = mock(DaemonService.class);
     when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user(false, false)));
     when(settingsService.effectiveForUser("u1")).thenReturn(Map.of());
-    when(ruleService.iptablesFor(anyString(), anyString(), anyString()))
+    when(daemonService.ipv6Enabled(anyInt())).thenReturn(false);
+    when(ruleService.iptablesFor(anyString(), anyString(), any(), anyString(), anyBoolean()))
         .thenReturn(
-            new IptablesResult(List.of("iptables -N OPNL_x"), List.of("iptables -X OPNL_x")));
+            new IptablesResult(
+                List.of("iptables -N OPNL_x"),
+                List.of("iptables -X OPNL_x"),
+                List.of(),
+                List.of()));
 
     mvc =
         MockMvcBuilders.standaloneSetup(
@@ -83,7 +93,8 @@ class InternalControllerTest {
                     ruleService,
                     connectionRegistry,
                     settingsService,
-                    connectionLogService))
+                    connectionLogService,
+                    daemonService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -135,7 +146,7 @@ class InternalControllerTest {
         .andExpect(jsonPath("$.iptablesApply[0]").value("iptables -N OPNL_x"))
         .andExpect(jsonPath("$.iptablesRemove[0]").value("iptables -X OPNL_x"))
         .andExpect(jsonPath("$.pushes").isEmpty());
-    verify(ruleService).iptablesFor("alice", "10.8.0.9", "u1");
+    verify(ruleService).iptablesFor("alice", "10.8.0.9", null, "u1", false);
   }
 
   @Test
@@ -259,7 +270,8 @@ class InternalControllerTest {
                     ruleService,
                     connectionRegistry,
                     settingsService,
-                    connectionLogService))
+                    connectionLogService,
+                    daemonService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .addFilters(filter)
             .build();
@@ -272,8 +284,7 @@ class InternalControllerTest {
   @Test
   void connectDeniesWhenMaxConnectionsReached() throws Exception {
     when(settingsService.effectiveForUser("u1")).thenReturn(Map.of("max_connections", 1));
-    connectionRegistry.register("alice", "alice", "10.8.0.8", "9.9.9.9", "daemon-0");
-
+    connectionRegistry.register("alice", "alice", "10.8.0.8", null, "9.9.9.9", "daemon-0");
     mvc.perform(
             post("/internal/connect")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -286,8 +297,7 @@ class InternalControllerTest {
   @Test
   void connectAllowsUnderMaxConnectionsLimit() throws Exception {
     when(settingsService.effectiveForUser("u1")).thenReturn(Map.of("max_connections", 2));
-    connectionRegistry.register("alice", "alice", "10.8.0.8", "9.9.9.9", "daemon-0");
-
+    connectionRegistry.register("alice", "alice", "10.8.0.8", null, "9.9.9.9", "daemon-0");
     mvc.perform(
             post("/internal/connect")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -339,7 +349,7 @@ class InternalControllerTest {
 
   @Test
   void disconnectUnregistersActiveSession() throws Exception {
-    connectionRegistry.register("alice", "alice", "10.8.0.9", "1.2.3.4", "daemon-0");
+    connectionRegistry.register("alice", "alice", "10.8.0.9", null, "1.2.3.4", "daemon-0");
     mvc.perform(
             post("/internal/disconnect")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -384,7 +394,7 @@ class InternalControllerTest {
         new ObjectMapper()
             .writeValueAsString(
                 new InternalController.ConnectResult(
-                    true, null, List.of(), List.of("a"), List.of("b")));
+                    true, null, List.of(), List.of("a"), List.of("b"), List.of(), List.of()));
     assertThat(json).contains("\"allowed\":true").doesNotContain("reason");
   }
 }

@@ -63,6 +63,17 @@ public class GroupAdminController {
     return groupAdminService.setStaticIpPool(id, request.pool());
   }
 
+  @GetMapping("/{id}/static-ipv6-pool")
+  public String staticIpv6Pool(@PathVariable String id) {
+    return groupAdminService.staticIpv6Pool(id);
+  }
+
+  @PutMapping("/{id}/static-ipv6-pool")
+  public String setStaticIpv6Pool(
+      @PathVariable String id, @Valid @RequestBody StaticIpPoolRequest request) {
+    return groupAdminService.setStaticIpv6Pool(id, request.pool());
+  }
+
   @PutMapping("/{id}/members")
   public GroupDto setMembers(
       @PathVariable String id, @Valid @RequestBody GroupMembersRequest request) {

@@ -28,6 +28,7 @@ class DnsmasqConfigServiceTest {
   private AccessRuleRepository ruleRepository;
   private DnsRecordRepository recordRepository;
   private DomainResolver domainResolver;
+  private DaemonService daemonService;
   private DnsmasqConfigService service;
 
   @BeforeEach
@@ -36,6 +37,7 @@ class DnsmasqConfigServiceTest {
     recordRepository = mock(DnsRecordRepository.class);
     when(recordRepository.findByEnabledTrue()).thenReturn(List.of());
     domainResolver = mock(DomainResolver.class);
+    daemonService = mock(DaemonService.class);
     service =
         new DnsmasqConfigService(
             new OpnlProperties(
@@ -49,7 +51,8 @@ class DnsmasqConfigServiceTest {
             ruleRepository,
             recordRepository,
             domainResolver,
-            new ServerConfigGenerator(new ObjectMapper()));
+            new ServerConfigGenerator(new ObjectMapper()),
+            daemonService);
   }
 
   private AccessRule domainRule(String id, String domain, boolean enabled) {

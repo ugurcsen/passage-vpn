@@ -154,7 +154,7 @@ describe("GroupsPage", () => {
 
     const row = screen.getByRole("row", { name: /devs/i });
     const actions = within(row).getAllByRole("button");
-    await user.click(actions[2]);
+    await user.click(actions[3]);
 
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByLabelText(/tunnel mode/i));
@@ -181,7 +181,7 @@ describe("GroupsPage", () => {
 
     const row = screen.getByRole("row", { name: /devs/i });
     const actions = within(row).getAllByRole("button");
-    await user.click(actions[2]);
+    await user.click(actions[3]);
 
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /^save$/i }));

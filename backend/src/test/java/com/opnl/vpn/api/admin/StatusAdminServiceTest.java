@@ -108,9 +108,8 @@ class StatusAdminServiceTest {
   void statusCountsActiveConnections() {
     service = serviceWith(17505);
     when(daemonService.list()).thenReturn(List.of(daemon(0, true)));
-    connectionRegistry.register("alice", "alice", "10.8.0.2", "203.0.113.5", "daemon-0");
-    connectionRegistry.register("bob", "bob", "10.8.0.3", "203.0.113.6", "daemon-0");
-
+    connectionRegistry.register("alice", "alice", "10.8.0.2", null, "203.0.113.5", "daemon-0");
+    connectionRegistry.register("bob", "bob", "10.8.0.3", null, "203.0.113.6", "daemon-0");
     ServerStatusDto status = service.status();
 
     assertThat(status.activeConnections()).isEqualTo(2);

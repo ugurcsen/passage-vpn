@@ -245,7 +245,8 @@ describe("UsersPage", () => {
 
     await user.click(screen.getByTestId("edit-ccd-alice"));
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText(/static ip/i)).toBeInTheDocument();
+    expect(within(dialog).getByText("Static IP")).toBeInTheDocument();
+    expect(within(dialog).getByText("Static IPv6")).toBeInTheDocument();
 
     fireEvent.change(within(dialog).getByLabelText(/dns servers/i), {
       target: { value: "1.1.1.1, 8.8.8.8" },

@@ -23,6 +23,12 @@ public final class SettingKeys {
   /** Group-level static IP pool, e.g. "10.8.0.100-10.8.0.199". */
   public static final String STATIC_IP_POOL = "static_ip_pool";
 
+  /** Static VPN IPv6 for the account (CCD `ifconfig-ipv6-push`). */
+  public static final String STATIC_IPV6 = "static_ipv6";
+
+  /** Group-level static IPv6 pool, e.g. "fd00:1::10-fd00:1::ff". */
+  public static final String STATIC_IPV6_POOL = "static_ipv6_pool";
+
   /** Restrict routing to these networks, comma separated. Empty = allow all. */
   public static final String ROUTE_RESTRICTION = "route_restriction";
 

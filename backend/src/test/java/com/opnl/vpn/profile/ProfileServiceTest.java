@@ -91,7 +91,9 @@ class ProfileServiceTest {
             true,
             false,
             false,
-            "vpn.example.com");
+            "vpn.example.com",
+            false,
+            null);
     when(daemonService.resolveForProfile(ProfileType.AUTO_LOGIN)).thenReturn(certOnly);
 
     OvpnFile file = service.downloadForUser("u1", ProfileType.AUTO_LOGIN);

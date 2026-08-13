@@ -65,7 +65,8 @@ class ConnectionLogServiceTest {
 
     Instant t0 = Instant.parse("2026-01-01T00:05:00Z");
     aggregator.update(
-        List.of(new MgmtClientStatus("alice", "203.0.113.5", "10.8.0.2", 4096, 8192, t0, 1)), t0);
+        List.of(new MgmtClientStatus("alice", "203.0.113.5", "10.8.0.2", null, 4096, 8192, t0, 1)),
+        t0);
 
     service.sessionEnded("alice");
 
@@ -187,7 +188,8 @@ class ConnectionLogServiceTest {
     when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     Instant t0 = Instant.parse("2026-01-01T00:05:00Z");
     aggregator.update(
-        List.of(new MgmtClientStatus("alice", "203.0.113.5", "10.8.0.2", 4096, 8192, t0, 1)), t0);
+        List.of(new MgmtClientStatus("alice", "203.0.113.5", "10.8.0.2", null, 4096, 8192, t0, 1)),
+        t0);
 
     service.reconcileOpenSessions(Set.of("bob"));
 

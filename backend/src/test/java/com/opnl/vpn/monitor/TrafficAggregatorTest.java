@@ -11,7 +11,8 @@ class TrafficAggregatorTest {
 
   private static MgmtClientStatus client(
       String commonName, long bytesIn, long bytesOut, Instant at) {
-    return new MgmtClientStatus(commonName, "203.0.113.5", "10.8.0.2", bytesIn, bytesOut, at, 1);
+    return new MgmtClientStatus(
+        commonName, "203.0.113.5", "10.8.0.2", null, bytesIn, bytesOut, at, 1);
   }
 
   @Test

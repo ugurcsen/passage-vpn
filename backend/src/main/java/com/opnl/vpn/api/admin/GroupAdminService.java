@@ -175,6 +175,27 @@ public class GroupAdminService {
     return staticIpPool(id);
   }
 
+  @Transactional(readOnly = true)
+  public String staticIpv6Pool(String id) {
+    requireGroup(id);
+    Object pool = settingsService.groupSettings(id).get(SettingKeys.STATIC_IPV6_POOL);
+    return pool == null ? null : pool.toString();
+  }
+
+  @Transactional
+  public String setStaticIpv6Pool(String id, String pool) {
+    requireGroup(id);
+    ccdService.validateIpv6Pool(pool);
+    if (pool == null || pool.isBlank()) {
+      settingsService.deleteGroupSetting(id, SettingKeys.STATIC_IPV6_POOL);
+    } else {
+      settingsService.setGroupSetting(id, SettingKeys.STATIC_IPV6_POOL, pool.trim());
+    }
+    auditLogService.record(
+        "GROUP_STATIC_IPV6_POOL_SET", AuditLogService.CAT_GROUP, id, "group", Map.of("pool", pool));
+    return staticIpv6Pool(id);
+  }
+
   @Transactional
   public Map<String, Object> deleteGroupSetting(String id, String key) {
     requireGroup(id);

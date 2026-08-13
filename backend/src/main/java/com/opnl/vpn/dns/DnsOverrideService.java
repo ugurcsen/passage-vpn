@@ -7,6 +7,7 @@ import com.opnl.vpn.group.GroupRepository;
 import com.opnl.vpn.network.DnsmasqConfigService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
+import java.net.Inet6Address;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -128,6 +129,23 @@ public class DnsOverrideService {
         .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
   }
 
+  /**
+   * Static IPv6 answers for a hostname from enabled overrides, or an empty set when no override
+   * matches or the override defines no IPv6 address. The rule engine and dnsmasq AAAA pinning use
+   * this when dual-stack is enabled.
+   */
+  @Transactional(readOnly = true)
+  public Set<String> resolveDomainIpv6(String hostname) {
+    if (hostname == null || hostname.isBlank()) {
+      return Set.of();
+    }
+    return recordRepository.findByEnabledTrue().stream()
+        .filter(record -> record.getHostname().equalsIgnoreCase(hostname.trim()))
+        .map(DnsRecord::getIpv6)
+        .filter(ip -> ip != null && !ip.isBlank())
+        .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+  }
+
   /** Enabled records that are scoped to a group or user (never GLOBAL). */
   @Transactional(readOnly = true)
   public List<DnsRecord> nonGlobalEnabled() {
@@ -139,6 +157,7 @@ public class DnsOverrideService {
   private void apply(DnsRecord record, DnsRecordDto dto) {
     record.setHostname(dto.hostname().trim().toLowerCase(Locale.ROOT));
     record.setIpv4(dto.ipv4().trim());
+    record.setIpv6(blankToNull(dto.ipv6()));
     record.setScope(dto.scope());
     record.setScopeId(dto.scope() == DnsRecord.Scope.GLOBAL ? null : dto.scopeId().trim());
     record.setEnabled(dto.enabled() == null || dto.enabled());
@@ -151,6 +170,13 @@ public class DnsOverrideService {
     }
     if (dto.ipv4() == null || dto.ipv4().isBlank()) {
       throw ApiException.badRequest("missing_ipv4", "IPv4 address is required");
+    }
+    if (dto.ipv6() != null && !dto.ipv6().isBlank()) {
+      try {
+        Inet6Address.getByName(dto.ipv6().trim());
+      } catch (Exception e) {
+        throw ApiException.badRequest("invalid_ipv6", "IPv6 address is invalid");
+      }
     }
     recordRepository
         .findByHostnameIgnoreCase(hostname)
@@ -181,6 +207,10 @@ public class DnsOverrideService {
     return recordRepository
         .findById(id)
         .orElseThrow(() -> ApiException.notFound("dns_record_not_found", "DNS record not found"));
+  }
+
+  private String blankToNull(String value) {
+    return value == null || value.isBlank() ? null : value.trim();
   }
 
   private String scopeName(DnsRecord record) {

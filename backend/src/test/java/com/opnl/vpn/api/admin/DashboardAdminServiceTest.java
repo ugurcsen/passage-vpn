@@ -85,10 +85,11 @@ class DashboardAdminServiceTest {
 
   @Test
   void dashboardRecentConnectionsCarryTrafficCounters() {
-    registry.register("alice", "alice", "10.8.0.2", "203.0.113.5", "daemon-0");
+    registry.register("alice", "alice", "10.8.0.2", null, "203.0.113.5", "daemon-0");
     Instant t0 = Instant.parse("2026-01-01T00:00:00Z");
     aggregator.update(
-        List.of(new MgmtClientStatus("alice", "203.0.113.5", "10.8.0.2", 4096, 2048, t0, 1)), t0);
+        List.of(new MgmtClientStatus("alice", "203.0.113.5", "10.8.0.2", null, 4096, 2048, t0, 1)),
+        t0);
 
     DashboardDto dashboard = service.dashboard();
 
@@ -102,8 +103,7 @@ class DashboardAdminServiceTest {
 
   @Test
   void dashboardRecentConnectionsFallBackToNullTrafficWhenAggregatorHasNoData() {
-    registry.register("alice", "alice", "10.8.0.2", "203.0.113.5", "daemon-0");
-
+    registry.register("alice", "alice", "10.8.0.2", null, "203.0.113.5", "daemon-0");
     DashboardDto dashboard = service.dashboard();
 
     assertThat(dashboard.activeConnections()).isEqualTo(1);

@@ -50,7 +50,9 @@ class ServerConfigGeneratorTest {
             false,
             false,
             true,
-            "vpn.example.com");
+            "vpn.example.com",
+            false,
+            null);
     String conf = generator.render(split, "/pki", "/ccd", "/scripts", "/logs", "nat");
     assertThat(conf).doesNotContain("redirect-gateway");
     assertThat(conf).contains("proto tcp");
@@ -89,7 +91,9 @@ class ServerConfigGeneratorTest {
             true,
             true,
             true,
-            "vpn.example.com");
+            "vpn.example.com",
+            false,
+            null);
     String conf = generator.render(generic, "/pki", "/ccd", "/scripts", "/logs", "nat");
     assertThat(conf).contains("verify-client-cert none");
     assertThat(conf).doesNotContain("client-cert-not-required");

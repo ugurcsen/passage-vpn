@@ -7,6 +7,7 @@ import com.opnl.vpn.auth.AuthService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.monitor.ConnectionLogService;
 import com.opnl.vpn.network.ConnectionRegistry;
+import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.setup.SetupService;
@@ -44,6 +45,7 @@ public class InternalController {
   private final ConnectionRegistry connectionRegistry;
   private final SettingsService settingsService;
   private final ConnectionLogService connectionLogService;
+  private final DaemonService daemonService;
 
   public InternalController(
       UserRepository userRepository,
@@ -53,7 +55,8 @@ public class InternalController {
       AccessRuleService ruleService,
       ConnectionRegistry connectionRegistry,
       SettingsService settingsService,
-      ConnectionLogService connectionLogService) {
+      ConnectionLogService connectionLogService,
+      DaemonService daemonService) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.setupService = setupService;
@@ -62,6 +65,7 @@ public class InternalController {
     this.connectionRegistry = connectionRegistry;
     this.settingsService = settingsService;
     this.connectionLogService = connectionLogService;
+    this.daemonService = daemonService;
   }
 
   /**
@@ -146,6 +150,7 @@ public class InternalController {
         user.getUsername(),
         user.getUsername(),
         request.virtualIp(),
+        request.virtualIp6(),
         request.remoteIp(),
         request.daemonName());
     connectionLogService.sessionStarted(
@@ -155,8 +160,14 @@ public class InternalController {
         request.remoteIp(),
         request.daemonName());
     IptablesResult result =
-        ruleService.iptablesFor(user.getUsername(), request.virtualIp(), user.getId());
-    return new ConnectResult(true, null, List.of(), result.apply(), result.remove());
+        ruleService.iptablesFor(
+            user.getUsername(),
+            request.virtualIp(),
+            request.virtualIp6(),
+            user.getId(),
+            daemonService.ipv6Enabled(daemonIndexOf(request.daemonName())));
+    return new ConnectResult(
+        true, null, List.of(), result.apply(), result.remove(), result.apply6(), result.remove6());
   }
 
   /**
@@ -166,13 +177,18 @@ public class InternalController {
   public DisconnectResult disconnect(@RequestBody ConnectRequest request) {
     User user = userRepository.findByUsername(request.commonName()).orElse(null);
     if (user == null) {
-      return new DisconnectResult(List.of());
+      return new DisconnectResult(List.of(), List.of());
     }
     connectionRegistry.unregister(user.getUsername());
     connectionLogService.sessionEnded(user.getUsername());
     IptablesResult result =
-        ruleService.iptablesFor(user.getUsername(), request.virtualIp(), user.getId());
-    return new DisconnectResult(result.remove());
+        ruleService.iptablesFor(
+            user.getUsername(),
+            request.virtualIp(),
+            request.virtualIp6(),
+            user.getId(),
+            daemonService.ipv6Enabled(daemonIndexOf(request.daemonName())));
+    return new DisconnectResult(result.remove(), result.remove6());
   }
 
   /**
@@ -185,7 +201,12 @@ public class InternalController {
   }
 
   public record ConnectRequest(
-      String commonName, String username, String daemonName, String remoteIp, String virtualIp) {}
+      String commonName,
+      String username,
+      String daemonName,
+      String remoteIp,
+      String virtualIp,
+      String virtualIp6) {}
 
   public record LearnAddressRequest(String operation, String address, String commonName) {}
 
@@ -195,14 +216,17 @@ public class InternalController {
       String reason,
       List<String> pushes,
       List<String> iptablesApply,
-      List<String> iptablesRemove) {
+      List<String> iptablesRemove,
+      List<String> iptablesApply6,
+      List<String> iptablesRemove6) {
 
     static ConnectResult deny(String reason) {
-      return new ConnectResult(false, reason, List.of(), List.of(), List.of());
+      return new ConnectResult(
+          false, reason, List.of(), List.of(), List.of(), List.of(), List.of());
     }
   }
 
-  public record DisconnectResult(List<String> remove) {}
+  public record DisconnectResult(List<String> remove, List<String> remove6) {}
 
   public record SeedRequest(String username, String password) {}
 
@@ -219,6 +243,19 @@ public class InternalController {
   private int maxConnections(User user) {
     Map<String, Object> effective = settingsService.effectiveForUser(user.getId());
     return asInt(effective.get(SettingKeys.MAX_CONNECTIONS));
+  }
+
+  /** Parses the trailing index of a daemon config name ({@code daemon-0} → 0). */
+  private static int daemonIndexOf(String daemonName) {
+    if (daemonName == null) {
+      return 0;
+    }
+    int idx = daemonName.lastIndexOf('-');
+    try {
+      return idx >= 0 ? Integer.parseInt(daemonName.substring(idx + 1).trim()) : 0;
+    } catch (NumberFormatException e) {
+      return 0;
+    }
   }
 
   private static int asInt(Object value) {

@@ -11,6 +11,10 @@ services:
     cap_add:
       - NET_ADMIN          # iptables-based access control (documented, required)
       - SYS_MODULE         # optional: tun module / DCO
+    sysctls:
+      - net.ipv6.conf.all.forwarding=1   # IPv6 (dual-stack) tunnel routing
+      - net.ipv6.conf.default.forwarding=1
+      - net.ipv6.conf.all.disable_ipv6=0
     volumes:
       - opnl-pki:/etc/opnl/pki        # PKI lives in pki/run (easyrsa cannot rm -rf a mountpoint)
       - opnl-ccd:/etc/opnl/ccd

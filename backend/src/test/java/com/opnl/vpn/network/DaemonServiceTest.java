@@ -187,6 +187,8 @@ class DaemonServiceTest {
                         false,
                         true,
                         null,
+                        false,
+                        null,
                         true)))
         .isInstanceOf(ApiException.class)
         .hasFieldOrPropertyWithValue("code", "daemon_index_taken");
@@ -213,6 +215,8 @@ class DaemonServiceTest {
                         true,
                         false,
                         true,
+                        null,
+                        false,
                         null,
                         true)))
         .isInstanceOf(ApiException.class)
@@ -241,6 +245,8 @@ class DaemonServiceTest {
             true,
             true,
             true,
+            null,
+            false,
             null,
             true));
 

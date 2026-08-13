@@ -57,6 +57,20 @@ export const KNOWN_SETTINGS: KnownSetting[] = [
     placeholder: "e.g. 10.8.0.42",
   },
   {
+    key: "static_ipv6",
+    label: "Static IPv6",
+    description: "Static VPN IPv6 address for the account (pushed via CCD ifconfig-ipv6-push).",
+    type: "string",
+    placeholder: "e.g. fd00:1::42",
+  },
+  {
+    key: "static_ipv6_pool",
+    label: "Static IPv6 pool",
+    description: "IPv6 address range (start-end) allocated to group members; the group is then reachable as a rule destination.",
+    type: "string",
+    placeholder: "e.g. fd00:1::10-fd00:1::ff",
+  },
+  {
     key: "dns_servers",
     label: "DNS servers",
     description: "DNS servers pushed to clients, comma separated.",
@@ -161,7 +175,7 @@ export function knownSetting(key: string): KnownSetting | undefined {
 /** Editable form state for the `network` (ServerConfig) setting. */
 export interface ServerConfigForm {
   port: string;
-  proto: "udp" | "tcp";
+  proto: "udp" | "tcp" | "udp6" | "tcp6";
   subnet: string;
   subnetMask: string;
   dnsServers: string;
@@ -171,6 +185,8 @@ export interface ServerConfigForm {
   clientCertNotRequired: boolean;
   authUserPass: boolean;
   adminHost: string;
+  ipv6Enabled: boolean;
+  ipv6Subnet: string;
 }
 
 /** Defaults matching the backend `ServerConfig.defaults()` (daemon 0, UDP 1194, 10.8.0.0/24). */
@@ -187,6 +203,8 @@ export function emptyServerConfigForm(): ServerConfigForm {
     clientCertNotRequired: false,
     authUserPass: true,
     adminHost: "vpn.example.com",
+    ipv6Enabled: false,
+    ipv6Subnet: "fd00:1::/64",
   };
 }
 
@@ -198,7 +216,14 @@ export function serverConfigToForm(value: unknown): ServerConfigForm {
     Array.isArray(v) ? v.map(String).join(", ") : typeof v === "string" ? v : "";
   return {
     port: typeof cfg.port === "number" ? String(cfg.port) : "1194",
-    proto: cfg.proto === "tcp" ? "tcp" : "udp",
+    proto:
+      cfg.proto === "tcp"
+        ? "tcp"
+        : cfg.proto === "udp6"
+          ? "udp6"
+          : cfg.proto === "tcp6"
+            ? "tcp6"
+            : "udp",
     subnet: str(cfg.subnet, "10.8.0.0"),
     subnetMask: str(cfg.subnetMask, "255.255.255.0"),
     dnsServers: list(cfg.dnsServers),
@@ -208,6 +233,8 @@ export function serverConfigToForm(value: unknown): ServerConfigForm {
     clientCertNotRequired: cfg.clientCertNotRequired === true,
     authUserPass: cfg.authUserPass !== false,
     adminHost: str(cfg.adminHost, "vpn.example.com"),
+    ipv6Enabled: cfg.ipv6Enabled === true,
+    ipv6Subnet: str(cfg.ipv6Subnet, "fd00:1::/64"),
   };
 }
 
@@ -231,6 +258,8 @@ export function formToServerConfig(form: ServerConfigForm): Record<string, unkno
     clientCertNotRequired: form.clientCertNotRequired,
     authUserPass: form.authUserPass,
     adminHost: form.adminHost.trim(),
+    ipv6Enabled: form.ipv6Enabled,
+    ipv6Subnet: form.ipv6Enabled ? form.ipv6Subnet.trim() || null : null,
   };
 }
 

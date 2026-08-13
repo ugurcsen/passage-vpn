@@ -51,18 +51,21 @@ public class DnsmasqConfigService implements ApplicationRunner {
   private final DnsRecordRepository recordRepository;
   private final DomainResolver domainResolver;
   private final ServerConfigGenerator configGenerator;
+  private final DaemonService daemonService;
 
   public DnsmasqConfigService(
       OpnlProperties properties,
       AccessRuleRepository ruleRepository,
       DnsRecordRepository recordRepository,
       DomainResolver domainResolver,
-      ServerConfigGenerator configGenerator) {
+      ServerConfigGenerator configGenerator,
+      DaemonService daemonService) {
     this.configDir = Path.of(properties.openvpn().configDir()).toAbsolutePath();
     this.ruleRepository = ruleRepository;
     this.recordRepository = recordRepository;
     this.domainResolver = domainResolver;
     this.configGenerator = configGenerator;
+    this.daemonService = daemonService;
   }
 
   @Override
@@ -74,49 +77,63 @@ public class DnsmasqConfigService implements ApplicationRunner {
    * Re-renders {@code opnl-domains.conf} and {@code opnl-dns-overrides.conf} from the current
    * enabled domain rules and DNS overrides. Access-rule domains that match an override resolve to
    * the override address instead of public DNS, so the dnsmasq answer and the firewall rules agree.
+   * When the primary daemon runs dual-stack, AAAA pins for domains and overrides are included; a
+   * purely IPv4 tunnel keeps AAAA answers unpinned (NODATA).
    */
   public synchronized void refresh() {
+    boolean ipv6Enabled = daemonService.primaryIpv6Enabled();
     Set<String> domains = new LinkedHashSet<>();
     for (AccessRule rule : ruleRepository.findByEnabledTrueAndDstDomainIsNotNull()) {
       if (rule.isEnabled() && rule.getDstDomain() != null && !rule.getDstDomain().isBlank()) {
         domains.add(rule.getDstDomain());
       }
     }
-    writeDomains(domains);
-    writeOverrides(recordRepository.findByEnabledTrue());
+    writeDomains(domains, ipv6Enabled);
+    writeOverrides(recordRepository.findByEnabledTrue(), ipv6Enabled);
   }
 
-  private void writeDomains(Set<String> domains) {
+  private void writeDomains(Set<String> domains, boolean ipv6Enabled) {
     Map<String, Set<String>> resolved = new LinkedHashMap<>();
     for (String domain : domains) {
       Set<String> overrideIps = overrideIps(domain);
-      resolved.put(domain, overrideIps.isEmpty() ? domainResolver.resolve(domain) : overrideIps);
+      Set<String> addresses = overrideIps.isEmpty() ? domainResolver.resolve(domain) : overrideIps;
+      if (ipv6Enabled) {
+        Set<String> ipv6 = new LinkedHashSet<>(addresses);
+        ipv6.addAll(overrideIpv6(domain));
+        if (overrideIps.isEmpty()) {
+          ipv6.addAll(domainResolver.resolveIpv6(domain));
+        }
+        resolved.put(domain, ipv6);
+      } else {
+        resolved.put(domain, addresses);
+      }
     }
     Path dir = configDir.resolve(DOMAINS_DIR_NAME);
     try {
       Files.createDirectories(dir);
-      String content = configGenerator.renderDnsmasqConfig(resolved);
+      String content = configGenerator.renderDnsmasqConfig(resolved, ipv6Enabled);
       Path file = dir.resolve(DOMAINS_FILE_NAME);
       Files.writeString(file, content, StandardCharsets.UTF_8);
       log.info(
-          "Wrote {} ({} domains, {} addresses)",
+          "Wrote {} ({} domains, {} addresses, ipv6={})",
           file,
           resolved.size(),
-          resolved.values().stream().mapToInt(Set::size).sum());
+          resolved.values().stream().mapToInt(Set::size).sum(),
+          ipv6Enabled);
     } catch (IOException e) {
       log.warn("Cannot write dnsmasq config: {}", e.getMessage());
     }
   }
 
-  private void writeOverrides(List<DnsRecord> records) {
+  private void writeOverrides(List<DnsRecord> records, boolean ipv6Enabled) {
     Path dir = configDir.resolve(DOMAINS_DIR_NAME);
     try {
       Files.createDirectories(dir);
       List<DnsRecord> enabled = records.stream().filter(DnsRecord::isEnabled).toList();
-      String content = configGenerator.renderDnsOverridesConfig(enabled);
+      String content = configGenerator.renderDnsOverridesConfig(enabled, ipv6Enabled);
       Path file = dir.resolve(OVERRIDES_FILE_NAME);
       Files.writeString(file, content, StandardCharsets.UTF_8);
-      log.info("Wrote {} ({} records)", file, enabled.size());
+      log.info("Wrote {} ({} records, ipv6={})", file, enabled.size(), ipv6Enabled);
     } catch (IOException e) {
       log.warn("Cannot write dnsmasq overrides config: {}", e.getMessage());
     }
@@ -127,6 +144,18 @@ public class DnsmasqConfigService implements ApplicationRunner {
     for (DnsRecord record : recordRepository.findByEnabledTrue()) {
       if (record.getHostname().equalsIgnoreCase(hostname)) {
         ips.add(record.getIpv4());
+      }
+    }
+    return ips;
+  }
+
+  private Set<String> overrideIpv6(String hostname) {
+    Set<String> ips = new LinkedHashSet<>();
+    for (DnsRecord record : recordRepository.findByEnabledTrue()) {
+      if (record.getHostname().equalsIgnoreCase(hostname)
+          && record.getIpv6() != null
+          && !record.getIpv6().isBlank()) {
+        ips.add(record.getIpv6());
       }
     }
     return ips;

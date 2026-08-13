@@ -46,6 +46,12 @@ public class DnsRecord {
   @Column(nullable = false, length = 45)
   private String ipv4;
 
+  /**
+   * Optional IPv6 answer dnsmasq returns for {@link #hostname}; null/blank disables the AAAA pin.
+   */
+  @Column(length = 45)
+  private String ipv6;
+
   @Column(nullable = false, length = 8)
   @Enumerated(EnumType.STRING)
   @Builder.Default

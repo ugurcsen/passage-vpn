@@ -136,7 +136,8 @@ export function SettingsPage() {
       port > 65535 ||
       c.subnet.trim() === "" ||
       c.subnetMask.trim() === "" ||
-      c.adminHost.trim() === ""
+      c.adminHost.trim() === "" ||
+      (c.ipv6Enabled && c.ipv6Subnet.trim() === "")
     );
   })();
   const dialogValid = dialog !== null && dialog.key.trim() !== "" && !numberInvalid && !configInvalid;
@@ -437,11 +438,15 @@ export function SettingsPage() {
                     select
                     label="Protocol"
                     value={dialog?.config?.proto ?? "udp"}
-                    onChange={(e) => updateConfig({ proto: e.target.value as "udp" | "tcp" })}
+                    onChange={(e) =>
+                      updateConfig({ proto: e.target.value as "udp" | "tcp" | "udp6" | "tcp6" })
+                    }
                     sx={{ flex: 1 }}
                   >
                     <MenuItem value="udp">UDP</MenuItem>
                     <MenuItem value="tcp">TCP</MenuItem>
+                    <MenuItem value="udp6">UDP6</MenuItem>
+                    <MenuItem value="tcp6">TCP6</MenuItem>
                   </TextField>
                 </Stack>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
@@ -461,6 +466,24 @@ export function SettingsPage() {
                     sx={{ flex: 1 }}
                   />
                 </Stack>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={dialog?.config?.ipv6Enabled ?? false}
+                      onChange={(e) => updateConfig({ ipv6Enabled: e.target.checked })}
+                    />
+                  }
+                  label="Enable IPv6 (dual-stack tunnel)"
+                />
+                {dialog?.config?.ipv6Enabled && (
+                  <TextField
+                    label="IPv6 subnet"
+                    value={dialog?.config?.ipv6Subnet ?? ""}
+                    onChange={(e) => updateConfig({ ipv6Subnet: e.target.value })}
+                    error={configInvalid && !(dialog?.config?.ipv6Subnet.trim())}
+                    helperText="Client subnet in CIDR form, e.g. fd00:1::/64"
+                  />
+                )}
                 <TextField
                   label="DNS servers"
                   value={dialog?.config?.dnsServers ?? ""}

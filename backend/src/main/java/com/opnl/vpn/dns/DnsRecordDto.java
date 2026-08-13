@@ -22,6 +22,15 @@ public record DnsRecordDto(
                 "^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(\\.(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3})$",
             message = "ipv4 must be a valid IPv4 address like 10.10.0.5")
         String ipv4,
+    @Pattern(
+            regexp =
+                "^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|"
+                    + "^([0-9a-fA-F]{1,4}:){1,7}:$|"
+                    + "^::([0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}$|"
+                    + "^([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$|"
+                    + "^::1$",
+            message = "ipv6 must be a valid IPv6 address like fd00::1")
+        String ipv6,
     @NotNull Scope scope,
     String scopeId,
     String scopeName,
@@ -44,6 +53,7 @@ public record DnsRecordDto(
         record.getId(),
         record.getHostname(),
         record.getIpv4(),
+        record.getIpv6(),
         record.getScope(),
         record.getScopeId(),
         scopeName,

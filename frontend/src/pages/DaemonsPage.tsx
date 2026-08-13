@@ -30,7 +30,7 @@ interface DaemonForm {
   name: string;
   daemonIndex: string;
   port: string;
-  proto: "udp" | "tcp";
+  proto: "udp" | "tcp" | "udp6" | "tcp6";
   subnet: string;
   subnetMask: string;
   dnsServers: string;
@@ -40,6 +40,8 @@ interface DaemonForm {
   clientCertNotRequired: boolean;
   authUserPass: boolean;
   adminHost: string;
+  ipv6Enabled: boolean;
+  ipv6Subnet: string;
   enabled: boolean;
 }
 
@@ -57,6 +59,8 @@ const EMPTY_FORM: DaemonForm = {
   clientCertNotRequired: false,
   authUserPass: true,
   adminHost: "",
+  ipv6Enabled: false,
+  ipv6Subnet: "fd00:1::/64",
   enabled: true,
 };
 
@@ -111,6 +115,8 @@ export function DaemonsPage() {
         clientCertNotRequired: form.clientCertNotRequired,
         authUserPass: form.authUserPass,
         adminHost: form.adminHost || null,
+        ipv6Enabled: form.ipv6Enabled,
+        ipv6Subnet: form.ipv6Enabled ? form.ipv6Subnet || null : null,
         enabled: form.enabled,
       };
       if (editing) {
@@ -167,6 +173,8 @@ export function DaemonsPage() {
       clientCertNotRequired: row.clientCertNotRequired,
       authUserPass: row.authUserPass,
       adminHost: row.adminHost ?? "",
+      ipv6Enabled: row.ipv6Enabled,
+      ipv6Subnet: row.ipv6Subnet ?? "fd00:1::/64",
       enabled: row.enabled,
     });
     setDialogOpen(true);
@@ -194,6 +202,13 @@ export function DaemonsPage() {
       headerName: "Subnet",
       width: 140,
       valueGetter: (_, row) => `${(row as Daemon).subnet}/${(row as Daemon).subnetMask}`,
+    },
+    {
+      field: "ipv6",
+      headerName: "IPv6",
+      width: 170,
+      valueGetter: (_, row) =>
+        (row as Daemon).ipv6Enabled ? (row as Daemon).ipv6Subnet ?? "enabled" : "—",
     },
     {
       field: "role",
@@ -344,11 +359,15 @@ export function DaemonsPage() {
                 select
                 label="Protocol"
                 value={form.proto}
-                onChange={(e) => setForm({ ...form, proto: e.target.value as "udp" | "tcp" })}
+                onChange={(e) =>
+                  setForm({ ...form, proto: e.target.value as "udp" | "tcp" | "udp6" | "tcp6" })
+                }
                 sx={{ width: 140 }}
               >
                 <MenuItem value="udp">UDP</MenuItem>
                 <MenuItem value="tcp">TCP</MenuItem>
+                <MenuItem value="udp6">UDP6</MenuItem>
+                <MenuItem value="tcp6">TCP6</MenuItem>
               </TextField>
               <TextField
                 label="Admin host"
@@ -406,6 +425,23 @@ export function DaemonsPage() {
               }
               label="Full tunnel (route all traffic through VPN)"
             />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={form.ipv6Enabled}
+                  onChange={(e) => setForm({ ...form, ipv6Enabled: e.target.checked })}
+                />
+              }
+              label="Enable IPv6 (dual-stack tunnel)"
+            />
+            {form.ipv6Enabled && (
+              <TextField
+                label="IPv6 subnet"
+                value={form.ipv6Subnet}
+                onChange={(e) => setForm({ ...form, ipv6Subnet: e.target.value })}
+                helperText="Client subnet in CIDR form, e.g. fd00:1::/64"
+              />
+            )}
             <FormControlLabel
               control={
                 <Switch

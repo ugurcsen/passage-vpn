@@ -20,6 +20,7 @@ public record MgmtStatus(
       String commonName,
       String realAddress,
       String virtualAddress,
+      String virtualIpv6,
       long bytesIn,
       long bytesOut,
       Instant connectedSince,
@@ -86,8 +87,17 @@ public record MgmtStatus(
         // keep -1
       }
     }
+    // Column 4 is the client's tunnel IPv6 address (blank for IPv4-only tunnels).
+    String v6 = parts.length > 4 && !parts[4].isBlank() ? parts[4] : null;
     return new MgmtClientStatus(
-        parts[1], parts[2], parts[3], parseLong(parts[5]), parseLong(parts[6]), since, clientId);
+        parts[1],
+        parts[2],
+        parts[3],
+        v6,
+        parseLong(parts[5]),
+        parseLong(parts[6]),
+        since,
+        clientId);
   }
 
   private static long parseLong(String value) {

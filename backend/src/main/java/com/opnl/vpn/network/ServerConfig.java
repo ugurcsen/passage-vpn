@@ -21,14 +21,23 @@ public record ServerConfig(
     boolean fullTunnel,
     boolean clientCertNotRequired,
     boolean authUserPass,
-    String adminHost) {
+    String adminHost,
+    boolean ipv6Enabled,
+    String ipv6Subnet) {
 
   public enum Protocol {
     udp,
-    tcp
+    tcp,
+    udp6,
+    tcp6
   }
 
-  /** Defaults for a fresh install: daemon 0, 10.8.0.0/24, UDP 1194. */
+  /** True when the IPv6 transport protocol (udp6/tcp6) was chosen. */
+  public boolean ipv6Transport() {
+    return proto == Protocol.udp6 || proto == Protocol.tcp6;
+  }
+
+  /** Defaults for a fresh install: daemon 0, 10.8.0.0/24, UDP 1194, IPv6 off. */
   public static ServerConfig defaults() {
     return new ServerConfig(
         0,
@@ -42,6 +51,8 @@ public record ServerConfig(
         true,
         false,
         true,
-        "vpn.example.com");
+        "vpn.example.com",
+        false,
+        null);
   }
 }

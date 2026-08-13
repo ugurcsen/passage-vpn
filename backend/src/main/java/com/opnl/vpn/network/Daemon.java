@@ -78,6 +78,13 @@ public class Daemon {
   @Column(name = "admin_host")
   private String adminHost;
 
+  @Column(name = "ipv6_enabled", nullable = false)
+  @Builder.Default
+  private boolean ipv6Enabled = false;
+
+  @Column(name = "ipv6_subnet")
+  private String ipv6Subnet;
+
   @Column(nullable = false)
   @Builder.Default
   private boolean enabled = true;

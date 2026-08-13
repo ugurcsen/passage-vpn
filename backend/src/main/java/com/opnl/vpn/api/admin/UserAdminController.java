@@ -120,6 +120,22 @@ public class UserAdminController {
     return userAdminService.clearStaticIp(id);
   }
 
+  @PutMapping("/{id}/static-ipv6")
+  public UserDto setStaticIpv6(
+      @PathVariable String id, @Valid @RequestBody StaticIpv6Request request) {
+    return userAdminService.setStaticIpv6(id, request.staticIpv6());
+  }
+
+  @PostMapping("/{id}/static-ipv6/allocate")
+  public UserDto allocateStaticIpv6(@PathVariable String id) {
+    return userAdminService.allocateStaticIpv6(id);
+  }
+
+  @DeleteMapping("/{id}/static-ipv6")
+  public UserDto clearStaticIpv6(@PathVariable String id) {
+    return userAdminService.clearStaticIpv6(id);
+  }
+
   @GetMapping("/{id}/settings")
   public Map<String, Object> settings(@PathVariable String id) {
     return userAdminService.userSettings(id);
@@ -155,4 +171,6 @@ public class UserAdminController {
       @NotNull UserAdminService.BulkAction action, @NotEmpty List<@NotBlank String> ids) {}
 
   public record StaticIpRequest(String staticIp) {}
+
+  public record StaticIpv6Request(String staticIpv6) {}
 }

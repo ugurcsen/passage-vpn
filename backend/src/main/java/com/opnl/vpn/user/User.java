@@ -74,6 +74,9 @@ public class User {
   @Column(name = "static_ip", length = 45)
   private String staticIp;
 
+  @Column(name = "static_ipv6", length = 45)
+  private String staticIpv6;
+
   public boolean isLocked(Instant now) {
     return lockedUntil != null && now.isBefore(lockedUntil);
   }
