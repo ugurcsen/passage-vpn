@@ -11,7 +11,8 @@ ENV_FILE     := .env
 
 .PHONY: help up down build logs ps restart \
         backend-dev frontend-dev \
-        test lint format \
+        test test-backend test-frontend \
+        lint lint-backend lint-frontend format \
         migrate seed-admin backup \
         api-docs pki-init clean reset install
 
@@ -52,12 +53,22 @@ frontend-dev: ## Run frontend Vite dev server
 # ---------- quality ----------
 
 test: ## Backend + frontend tests
+	$(MAKE) test-backend test-frontend
+
+test-backend: ## Backend tests (gradle)
 	cd $(BACKEND_DIR) && ./gradlew test
+
+test-frontend: ## Frontend tests (vitest)
 	cd $(FRONTEND_DIR) && npm run test
 
 lint: ## Frontend lint + backend spotless check
-	cd $(FRONTEND_DIR) && npm run lint
+	$(MAKE) lint-backend lint-frontend
+
+lint-backend: ## Backend spotless check
 	cd $(BACKEND_DIR) && ./gradlew spotlessCheck
+
+lint-frontend: ## Frontend eslint
+	cd $(FRONTEND_DIR) && npm run lint
 
 format: ## Apply formatting (backend spotless, frontend prettier via eslint --fix)
 	cd $(BACKEND_DIR) && ./gradlew spotlessApply
@@ -79,6 +90,8 @@ backup: ## Produce backup archive (config + PKI + DB dump)
 	@ts=$$(date +%Y%m%d-%H%M%S); tar -czf backup-opnl-$$ts.tar.gz -C data . && echo "Wrote backup-opnl-$$ts.tar.gz"
 
 api-docs: ## Regenerate docs/api.md from a running backend (needs up) + show swagger URL
+	@code=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/v3/api-docs); \
+	[ "$$code" = "200" ] || { echo "Backend not reachable on :8080 (got $$code) — run 'make up' first."; exit 1; }
 	python3 scripts/gen_api_docs.py "http://localhost:8080/v3/api-docs" > docs/api.md
 	@echo "Wrote docs/api.md"
 	@echo "Swagger UI: http://localhost:8080/swagger-ui.html"
