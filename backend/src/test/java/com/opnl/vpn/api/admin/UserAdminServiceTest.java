@@ -79,6 +79,7 @@ class UserAdminServiceTest {
     when(userRepository.countByRole(User.Role.ADMIN)).thenReturn(1L);
     when(memberRepository.findById_UserId(any())).thenReturn(List.of());
     when(settingsService.userSettings(any())).thenReturn(new java.util.HashMap<>());
+    when(settingsService.effectiveForUsers(any())).thenReturn(new java.util.HashMap<>());
   }
 
   @Test
@@ -243,7 +244,8 @@ class UserAdminServiceTest {
     when(userRepository.findAll()).thenReturn(List.of(alice, bob));
     when(groupRepository.findAll()).thenReturn(List.of());
     when(memberRepository.findAll()).thenReturn(List.of());
-    when(settingsService.userSettings(any())).thenReturn(java.util.Map.of());
+    when(settingsService.effectiveForUsers(any()))
+        .thenReturn(java.util.Map.of("u1", java.util.Map.of(), "u2", java.util.Map.of()));
 
     assertThat(service.listUsers("ali")).extracting(UserDto::username).containsExactly("alice");
     assertThat(service.listUsers("robert")).extracting(UserDto::username).containsExactly("bob");
@@ -251,6 +253,30 @@ class UserAdminServiceTest {
     assertThat(service.listUsers(null))
         .extracting(UserDto::username)
         .containsExactly("alice", "bob");
+  }
+
+  @Test
+  void listUsersResolvesSettingsInOneBatch() {
+    when(userRepository.findAll()).thenReturn(List.of(bob()));
+    when(groupRepository.findAll()).thenReturn(List.of());
+    when(memberRepository.findAll()).thenReturn(List.of());
+    when(settingsService.effectiveForUsers(any()))
+        .thenReturn(
+            java.util.Map.of(
+                "u2",
+                java.util.Map.of(
+                    com.opnl.vpn.setting.SettingKeys.REQUIRE_MFA,
+                    true,
+                    com.opnl.vpn.setting.SettingKeys.MUST_CHANGE_PASSWORD,
+                    true)));
+
+    List<UserDto> dtos = service.listUsers(null);
+
+    assertThat(dtos).hasSize(1);
+    assertThat(dtos.get(0).mfaRequired()).isTrue();
+    assertThat(dtos.get(0).mustChangePassword()).isTrue();
+    verify(settingsService, never()).userSettings(any());
+    verify(settingsService, never()).effectiveForUser(any());
   }
 
   @Test

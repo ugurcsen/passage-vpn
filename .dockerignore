@@ -1,0 +1,10 @@
+# Keep the image build context lean (backend + agent builds use the repo root).
+.git
+.github
+docs
+backend/build
+backend/.gradle
+frontend/node_modules
+frontend/dist
+.env
+*.md

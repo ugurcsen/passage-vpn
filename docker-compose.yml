@@ -6,6 +6,8 @@ services:
     build: ./openvpn
     container_name: opnl-openvpn
     restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
     devices:
       - /dev/net/tun          # TUN device for the VPN tunnel
     cap_add:
@@ -38,6 +40,8 @@ services:
       dockerfile: backend/Dockerfile
     container_name: opnl-backend
     restart: unless-stopped
+    mem_limit: 1g
+    cpus: 2.0
     env_file:
       - .env
     environment:
@@ -72,6 +76,8 @@ services:
     build: ./frontend
     container_name: opnl-frontend
     restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
     depends_on:
       - backend
     networks:
@@ -89,6 +95,8 @@ services:
       dockerfile: backend/Dockerfile
     container_name: opnl-node-agent
     restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
     environment:
       OPNL_PROFILE: agent
       OPNL_AGENT_CENTRAL_BASE_URL: ${OPNL_AGENT_CENTRAL_BASE_URL:-http://backend:8080}

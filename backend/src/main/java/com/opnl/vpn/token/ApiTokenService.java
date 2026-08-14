@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,8 +33,16 @@ public class ApiTokenService {
   /** Last-used timestamps are written at most this often to keep request load low. */
   private static final Duration LAST_USED_THROTTLE = Duration.ofSeconds(60);
 
+  /**
+   * Authenticated requests hit the token DB row on every call; tokens change rarely, so lookups are
+   * cached for a short TTL. Create/delete clears the cache; revocation therefore takes effect
+   * within the TTL window at worst.
+   */
+  private static final Duration AUTH_CACHE_TTL = Duration.ofSeconds(60);
+
   private final ApiTokenRepository repository;
   private final AuditLogService auditLogService;
+  private final ConcurrentHashMap<String, CacheEntry> authCache = new ConcurrentHashMap<>();
 
   public ApiTokenService(ApiTokenRepository repository, AuditLogService auditLogService) {
     this.repository = repository;
@@ -76,6 +85,7 @@ public class ApiTokenService {
         token.getId(),
         "api_token",
         Map.of("label", token.getLabel(), "role", token.getRole()));
+    authCache.clear();
     return new ApiTokenCreated(token, raw);
   }
 
@@ -91,6 +101,7 @@ public class ApiTokenService {
     }
     repository.deleteById(id);
     auditLogService.record("API_TOKEN_DELETE", AuditLogService.CAT_API, id, "api_token", Map.of());
+    authCache.clear();
   }
 
   /**
@@ -102,11 +113,19 @@ public class ApiTokenService {
     if (raw == null || !raw.startsWith(TOKEN_PREFIX)) {
       return Optional.empty();
     }
-    ApiToken token = repository.findByTokenHash(JwtService.hash(raw)).orElse(null);
-    if (token == null || token.expired(Instant.now())) {
-      return Optional.empty();
-    }
+    String hash = JwtService.hash(raw);
     Instant now = Instant.now();
+    CacheEntry entry = authCache.get(hash);
+    if (entry == null || entry.loadedAt().isBefore(now.minus(AUTH_CACHE_TTL))) {
+      ApiToken token = repository.findByTokenHash(hash).orElse(null);
+      if (token == null || token.expired(now)) {
+        authCache.remove(hash);
+        return Optional.empty();
+      }
+      entry = new CacheEntry(token, now);
+      authCache.put(hash, entry);
+    }
+    ApiToken token = entry.token();
     if (token.getLastUsedAt() == null
         || token.getLastUsedAt().isBefore(now.minus(LAST_USED_THROTTLE))) {
       token.setLastUsedAt(now);
@@ -123,4 +142,7 @@ public class ApiTokenService {
   }
 
   public record ApiTokenCreated(ApiToken token, String rawToken) {}
+
+  /** Cached lookup result with its load time so the TTL can be honored. */
+  private record CacheEntry(ApiToken token, Instant loadedAt) {}
 }

@@ -1,5 +1,5 @@
 import { Box, CircularProgress, ThemeProvider } from "@mui/material";
-import { useState, type ReactNode } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth, type Role } from "@/hooks/useAuth";
@@ -10,29 +10,31 @@ import { buildTheme } from "@/theme";
 import { canAccess, homePathFor } from "@/lib/roles";
 import { AppLayout } from "@/components/AppLayout";
 import { LoginPage } from "@/pages/LoginPage";
-import { MfaLoginPage } from "@/pages/MfaLoginPage";
-import { MfaEnrollPage } from "@/pages/MfaEnrollPage";
-import { SetupWizardPage } from "@/pages/SetupWizardPage";
-import { DashboardPage } from "@/pages/DashboardPage";
-import { UsersPage } from "@/pages/UsersPage";
-import { GroupsPage } from "@/pages/GroupsPage";
-import { CertsPage } from "@/pages/CertsPage";
-import { AccessRulesPage } from "@/pages/AccessRulesPage";
-import { DnsOverridesPage } from "@/pages/DnsOverridesPage";
-import { NodesPage } from "@/pages/NodesPage";
-import { ProfilesPage } from "@/pages/ProfilesPage";
-import { DaemonsPage } from "@/pages/DaemonsPage";
-import { StatusPage } from "@/pages/StatusPage";
-import { SettingsPage } from "@/pages/SettingsPage";
-import { BrandingPage } from "@/pages/BrandingPage";
-import { ConfigReportPage } from "@/pages/ConfigReportPage";
-import { BackupsPage } from "@/pages/BackupsPage";
-import { MaintenancePage } from "@/pages/MaintenancePage";
-import { AuditLogsPage } from "@/pages/AuditLogsPage";
-import { ApiTokensPage } from "@/pages/ApiTokensPage";
-import { PortalPage } from "@/pages/PortalPage";
-import { AccountPage } from "@/pages/AccountPage";
-import { SharePage } from "@/pages/SharePage";
+
+// Admin/portal pages are code-split per route so only the visited feature is loaded.
+const MfaLoginPage = lazy(() => import("@/pages/MfaLoginPage").then((m) => ({ default: m.MfaLoginPage })));
+const MfaEnrollPage = lazy(() => import("@/pages/MfaEnrollPage").then((m) => ({ default: m.MfaEnrollPage })));
+const SetupWizardPage = lazy(() => import("@/pages/SetupWizardPage").then((m) => ({ default: m.SetupWizardPage })));
+const DashboardPage = lazy(() => import("@/pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
+const UsersPage = lazy(() => import("@/pages/UsersPage").then((m) => ({ default: m.UsersPage })));
+const GroupsPage = lazy(() => import("@/pages/GroupsPage").then((m) => ({ default: m.GroupsPage })));
+const CertsPage = lazy(() => import("@/pages/CertsPage").then((m) => ({ default: m.CertsPage })));
+const AccessRulesPage = lazy(() => import("@/pages/AccessRulesPage").then((m) => ({ default: m.AccessRulesPage })));
+const DnsOverridesPage = lazy(() => import("@/pages/DnsOverridesPage").then((m) => ({ default: m.DnsOverridesPage })));
+const NodesPage = lazy(() => import("@/pages/NodesPage").then((m) => ({ default: m.NodesPage })));
+const ProfilesPage = lazy(() => import("@/pages/ProfilesPage").then((m) => ({ default: m.ProfilesPage })));
+const DaemonsPage = lazy(() => import("@/pages/DaemonsPage").then((m) => ({ default: m.DaemonsPage })));
+const StatusPage = lazy(() => import("@/pages/StatusPage").then((m) => ({ default: m.StatusPage })));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+const BrandingPage = lazy(() => import("@/pages/BrandingPage").then((m) => ({ default: m.BrandingPage })));
+const ConfigReportPage = lazy(() => import("@/pages/ConfigReportPage").then((m) => ({ default: m.ConfigReportPage })));
+const BackupsPage = lazy(() => import("@/pages/BackupsPage").then((m) => ({ default: m.BackupsPage })));
+const MaintenancePage = lazy(() => import("@/pages/MaintenancePage").then((m) => ({ default: m.MaintenancePage })));
+const AuditLogsPage = lazy(() => import("@/pages/AuditLogsPage").then((m) => ({ default: m.AuditLogsPage })));
+const ApiTokensPage = lazy(() => import("@/pages/ApiTokensPage").then((m) => ({ default: m.ApiTokensPage })));
+const PortalPage = lazy(() => import("@/pages/PortalPage").then((m) => ({ default: m.PortalPage })));
+const AccountPage = lazy(() => import("@/pages/AccountPage").then((m) => ({ default: m.AccountPage })));
+const SharePage = lazy(() => import("@/pages/SharePage").then((m) => ({ default: m.SharePage })));
 
 const THEME_KEY = "opnl.theme";
 
@@ -79,7 +81,8 @@ function ThemedApp() {
           <ToastProvider>
             <BrowserRouter>
               <AuthGate>
-                <Routes>
+                <Suspense fallback={<PageLoading />}>
+                  <Routes>
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/login/mfa" element={<MfaLoginPage />} />
                   <Route path="/login/enroll" element={<MfaEnrollPage />} />
@@ -159,6 +162,7 @@ function ThemedApp() {
                   </Route>
                   <Route path="*" element={<RedirectToHome />} />
                 </Routes>
+                </Suspense>
               </AuthGate>
             </BrowserRouter>
           </ToastProvider>

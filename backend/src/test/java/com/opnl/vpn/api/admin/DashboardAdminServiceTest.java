@@ -2,6 +2,8 @@ package com.opnl.vpn.api.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.config.OpnlProperties;
@@ -12,6 +14,7 @@ import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.network.Daemon;
 import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.network.ServerConfig.Protocol;
+import com.opnl.vpn.pki.Certificate;
 import com.opnl.vpn.pki.CertificateRepository;
 import com.opnl.vpn.user.UserRepository;
 import java.nio.file.Path;
@@ -27,11 +30,13 @@ class DashboardAdminServiceTest {
 
   private ConnectionRegistry registry;
   private TrafficAggregator aggregator;
+  private OpnlProperties properties;
+  private DaemonService daemonService;
   private DashboardAdminService service;
 
   @BeforeEach
   void setUp() {
-    OpnlProperties properties =
+    properties =
         new OpnlProperties(
             tempDir.resolve("data").toString(),
             "OpenVPN Panel",
@@ -52,7 +57,7 @@ class DashboardAdminServiceTest {
                 tempDir.resolve("logs").toString()));
     registry = new ConnectionRegistry();
     aggregator = new TrafficAggregator();
-    DaemonService daemonService = mock(DaemonService.class);
+    daemonService = mock(DaemonService.class);
     when(daemonService.list())
         .thenReturn(
             List.of(
@@ -110,5 +115,33 @@ class DashboardAdminServiceTest {
     assertThat(dashboard.recentConnections()).hasSize(1);
     assertThat(dashboard.recentConnections().get(0).bytesIn()).isNull();
     assertThat(dashboard.recentConnections().get(0).bytesOut()).isNull();
+  }
+
+  @Test
+  void dbCountsAreCachedWithinTtl() {
+    UserRepository userRepository = mock(UserRepository.class);
+    GroupRepository groupRepository = mock(GroupRepository.class);
+    CertificateRepository certificateRepository = mock(CertificateRepository.class);
+    when(userRepository.count()).thenReturn(3L);
+    when(groupRepository.count()).thenReturn(2L);
+    when(certificateRepository.countByStatus(Certificate.Status.VALID)).thenReturn(5L);
+    DashboardAdminService svc =
+        new DashboardAdminService(
+            userRepository,
+            groupRepository,
+            certificateRepository,
+            registry,
+            daemonService,
+            aggregator,
+            properties);
+
+    DashboardDto first = svc.dashboard();
+    DashboardDto second = svc.dashboard();
+
+    assertThat(first.users()).isEqualTo(3);
+    assertThat(second.users()).isEqualTo(3);
+    verify(userRepository, times(1)).count();
+    verify(groupRepository, times(1)).count();
+    verify(certificateRepository, times(1)).countByStatus(Certificate.Status.VALID);
   }
 }

@@ -2,14 +2,21 @@ package com.opnl.vpn.setting;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opnl.vpn.common.ApiException;
+import com.opnl.vpn.group.Group;
+import com.opnl.vpn.group.GroupMember;
 import com.opnl.vpn.group.GroupMemberRepository;
 import com.opnl.vpn.group.GroupRepository;
 import com.opnl.vpn.network.ServerSetting;
 import com.opnl.vpn.network.ServerSettingRepository;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +33,13 @@ public class SettingsService {
   private final GroupMemberRepository memberRepository;
   private final GroupRepository groupRepository_;
   private final ObjectMapper objectMapper;
+
+  /**
+   * Server-level settings are read on every auth/settings resolution but written rarely, so the
+   * decoded map is cached and invalidated on write. Writes within the same transaction still see a
+   * fresh read because the cache is cleared before the save commits.
+   */
+  private volatile Map<String, Object> serverSettingsCache;
 
   public SettingsService(
       ServerSettingRepository serverRepository,
@@ -46,11 +60,17 @@ public class SettingsService {
 
   @Transactional(readOnly = true)
   public Map<String, Object> serverSettings() {
+    Map<String, Object> cached = serverSettingsCache;
+    if (cached != null) {
+      return cached;
+    }
     Map<String, Object> map = new LinkedHashMap<>();
     for (ServerSetting setting : serverRepository.findAll()) {
       map.put(setting.getKey(), decode(setting.getValue()));
     }
-    return map;
+    // Order-preserving but immutable so no caller can corrupt the shared cache.
+    serverSettingsCache = java.util.Collections.unmodifiableMap(map);
+    return serverSettingsCache;
   }
 
   @Transactional
@@ -59,11 +79,13 @@ public class SettingsService {
         serverRepository.findById(key).orElseGet(() -> ServerSetting.builder().key(key).build());
     setting.setValue(encode(value));
     serverRepository.save(setting);
+    serverSettingsCache = null;
   }
 
   @Transactional
   public void deleteServerSetting(String key) {
     serverRepository.findById(key).ifPresent(serverRepository::delete);
+    serverSettingsCache = null;
   }
 
   // ---- group level --------------------------------------------------------
@@ -149,27 +171,82 @@ public class SettingsService {
     return result;
   }
 
+  /**
+   * Effective settings for many users in one pass. Batches every read (memberships, group and user
+   * settings, group hierarchy) so list views no longer issue per-user queries.
+   */
+  @Transactional(readOnly = true)
+  public Map<String, Map<String, Object>> effectiveForUsers(Collection<String> userIds) {
+    Map<String, Map<String, Object>> result = new HashMap<>();
+    if (userIds == null || userIds.isEmpty()) {
+      return result;
+    }
+    List<String> ids = userIds.stream().distinct().toList();
+    Map<String, Object> server = serverSettings();
+
+    Map<String, Group> groupById =
+        groupRepository_.findAll().stream().collect(Collectors.toMap(Group::getId, g -> g));
+    Map<String, List<GroupMember>> memberships =
+        memberRepository.findById_UserIdIn(ids).stream()
+            .collect(Collectors.groupingBy(m -> m.getId().getUserId()));
+    Set<String> involvedGroupIds = new LinkedHashSet<>();
+    for (List<GroupMember> members : memberships.values()) {
+      for (GroupMember member : members) {
+        collectChain(member.getId().getGroupId(), groupById, new ArrayList<>(), involvedGroupIds);
+      }
+    }
+    Map<String, List<GroupSetting>> groupSettings =
+        groupRepository.findByGroupIdIn(involvedGroupIds).stream()
+            .collect(Collectors.groupingBy(GroupSetting::getGroupId));
+    Map<String, List<UserSetting>> userSettings =
+        userRepository.findByUserIdIn(ids).stream()
+            .collect(Collectors.groupingBy(UserSetting::getUserId));
+
+    for (String userId : ids) {
+      Map<String, Object> effective = new LinkedHashMap<>(server);
+      List<String> chain = new ArrayList<>();
+      Set<String> visited = new LinkedHashSet<>();
+      for (GroupMember member : memberships.getOrDefault(userId, List.of())) {
+        collectChain(member.getId().getGroupId(), groupById, chain, visited);
+      }
+      for (String groupId : chain) {
+        for (GroupSetting setting : groupSettings.getOrDefault(groupId, List.of())) {
+          effective.put(setting.getKey(), decode(setting.getValue()));
+        }
+      }
+      for (UserSetting setting : userSettings.getOrDefault(userId, List.of())) {
+        effective.put(setting.getKey(), decode(setting.getValue()));
+      }
+      result.put(userId, effective);
+    }
+    return result;
+  }
+
   /** Groups that apply to a user, most specific (child) first, walking up ancestors. */
   @Transactional(readOnly = true)
   public List<String> groupChainForUser(String userId) {
+    Map<String, Group> groupById =
+        groupRepository_.findAll().stream().collect(Collectors.toMap(Group::getId, g -> g));
     List<String> chain = new ArrayList<>();
-    List<String> visited = new ArrayList<>();
+    Set<String> visited = new LinkedHashSet<>();
     for (var member : memberRepository.findById_UserId(userId)) {
-      collectAncestors(member.getId().getGroupId(), chain, visited);
+      collectChain(member.getId().getGroupId(), groupById, chain, visited);
     }
     return chain;
   }
 
-  private void collectAncestors(String groupId, List<String> chain, List<String> visited) {
+  /** Walks a group and its ancestors, appending to {@code chain} in child-first order. */
+  private void collectChain(
+      String groupId, Map<String, Group> groupById, List<String> chain, Set<String> visited) {
     if (groupId == null || visited.contains(groupId)) {
       return;
     }
     visited.add(groupId);
     chain.add(groupId);
-    groupRepository_
-        .findById(groupId)
-        .map(com.opnl.vpn.group.Group::getParentId)
-        .ifPresent(parent -> collectAncestors(parent, chain, visited));
+    Group group = groupById.get(groupId);
+    if (group != null && group.getParentId() != null) {
+      collectChain(group.getParentId(), groupById, chain, visited);
+    }
   }
 
   // ---- helpers ------------------------------------------------------------

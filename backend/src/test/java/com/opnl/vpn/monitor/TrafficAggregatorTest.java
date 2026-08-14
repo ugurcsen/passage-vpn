@@ -74,11 +74,25 @@ class TrafficAggregatorTest {
   }
 
   @Test
+  void identicalConsecutivePollsDoNotGrowHistory() {
+    TrafficAggregator aggregator = new TrafficAggregator();
+    Instant t0 = Instant.parse("2026-01-01T00:00:00Z");
+    aggregator.update(List.of(), t0);
+    aggregator.update(List.of(), t0.plusSeconds(5));
+    aggregator.update(List.of(), t0.plusSeconds(10));
+
+    assertThat(aggregator.history()).hasSize(1);
+  }
+
+  @Test
   void historyIsCappedAtMaxPoints() {
     TrafficAggregator aggregator = new TrafficAggregator();
     Instant t0 = Instant.parse("2026-01-01T00:00:00Z");
     for (int i = 0; i < 730; i++) {
-      aggregator.update(List.of(), t0.plusSeconds(i));
+      // Distinct rates each poll so the sparse ring still fills to its cap.
+      aggregator.update(
+          List.of(client("alice", (long) i * i * 100, (long) i * i * 50, t0.plusSeconds(i))),
+          t0.plusSeconds(i));
     }
     assertThat(aggregator.history()).hasSize(720);
   }

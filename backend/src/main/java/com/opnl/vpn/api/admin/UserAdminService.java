@@ -74,6 +74,9 @@ public class UserAdminService {
             .collect(Collectors.groupingBy(m -> m.getId().getUserId()));
     Map<String, String> groupNames =
         groupRepository.findAll().stream().collect(Collectors.toMap(Group::getId, Group::getName));
+    // Resolve effective settings for every user in a single batched pass (no per-user queries).
+    Map<String, Map<String, Object>> effectiveByUser =
+        settingsService.effectiveForUsers(users.stream().map(User::getId).toList());
     String needle = search == null ? "" : search.trim().toLowerCase();
     return users.stream()
         .filter(user -> matches(user, needle))
@@ -85,12 +88,11 @@ public class UserAdminService {
                       .filter(name -> name != null)
                       .sorted()
                       .toList();
+              Map<String, Object> effective = effectiveByUser.getOrDefault(user.getId(), Map.of());
               boolean mustChange =
-                  Boolean.TRUE.equals(
-                      settingsService
-                          .userSettings(user.getId())
-                          .get(SettingKeys.MUST_CHANGE_PASSWORD));
-              return UserDto.from(user, mfaRequired(user), mustChange, names);
+                  Boolean.TRUE.equals(effective.get(SettingKeys.MUST_CHANGE_PASSWORD));
+              boolean requireMfa = Boolean.TRUE.equals(effective.get(SettingKeys.REQUIRE_MFA));
+              return UserDto.from(user, requireMfa, mustChange, names);
             })
         .sorted(java.util.Comparator.comparing(UserDto::username, String.CASE_INSENSITIVE_ORDER))
         .toList();

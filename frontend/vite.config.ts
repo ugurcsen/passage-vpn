@@ -28,7 +28,8 @@ export default defineConfig({
         manualChunks: {
           react: ["react", "react-dom", "react-router-dom"],
           mui: ["@mui/material", "@mui/icons-material"],
-          "mui-x": ["@mui/x-data-grid", "@mui/x-charts"],
+          "mui-x-grid": ["@mui/x-data-grid"],
+          "mui-x-charts": ["@mui/x-charts"],
           query: ["@tanstack/react-query"],
           forms: ["react-hook-form", "zod", "@hookform/resolvers"],
         },

@@ -5,10 +5,12 @@ WORKDIR /workspace
 
 COPY backend/gradle/ gradle/
 COPY backend/gradlew backend/settings.gradle.kts backend/build.gradle.kts backend/gradle.properties ./
-RUN ./gradlew --no-daemon dependencies > /dev/null 2>&1 || true
+RUN --mount=type=cache,target=/root/.gradle/caches \
+    ./gradlew --no-daemon dependencies > /dev/null 2>&1 || true
 
 COPY backend/src src
-RUN ./gradlew --no-daemon bootJar
+RUN --mount=type=cache,target=/root/.gradle/caches \
+    ./gradlew --no-daemon bootJar
 
 # ---- Runtime stage: JRE + easy-rsa + openvpn (PKI authority) ----
 FROM eclipse-temurin:21-jre
@@ -27,7 +29,10 @@ ENV OPNL_DATA_DIR=/var/lib/opnl \
     OPNL_PKI_DIR=/etc/opnl/pki \
     OPNL_CCD_DIR=/etc/opnl/ccd \
     OPNL_CONFIG_DIR=/etc/opnl/config \
-    OPNL_SCRIPTS_SRC_DIR=/app/openvpn-scripts
+    OPNL_SCRIPTS_SRC_DIR=/app/openvpn-scripts \
+    # Bounded JVM heap (60% of the container limit) + tight metaspace so the JVM
+    # never balloons past the container memory cgroup; exit on OOM instead of hanging.
+    JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=60 -XX:MaxMetaspaceSize=256m -XX:+ExitOnOutOfMemoryError"
 RUN mkdir -p "$OPNL_DATA_DIR" "$OPNL_PKI_DIR" "$OPNL_CCD_DIR" "$OPNL_CONFIG_DIR"
 
 WORKDIR /app

@@ -22,6 +22,9 @@ describe("SharePage", () => {
       createObjectURL: vi.fn().mockReturnValue("blob:stub"),
       revokeObjectURL: vi.fn(),
     });
+    // A real anchor click on a blob URL makes jsdom attempt navigation and leak a
+    // "Not implemented" timer into the next test; block it for deterministic tests.
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   });
 
   afterEach(() => {

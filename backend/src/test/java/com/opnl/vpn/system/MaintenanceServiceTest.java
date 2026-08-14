@@ -288,4 +288,35 @@ class MaintenanceServiceTest {
     assertThat(result.signaled()).isEqualTo(1);
     assertThat(result.failed()).containsExactly(0);
   }
+
+  @Test
+  void vacuumCompactsTheSqliteDatabase() throws Exception {
+    maintenanceService.vacuumSqlite();
+
+    try (Connection conn = dataSource.getConnection();
+        Statement st = conn.createStatement();
+        java.sql.ResultSet rs = st.executeQuery("PRAGMA integrity_check")) {
+      rs.next();
+      assertThat(rs.getString(1)).isEqualTo("ok");
+    }
+  }
+
+  @Test
+  void vacuumIsANoopOnNonSqliteDatasources() {
+    MockEnvironment postgres = new MockEnvironment();
+    postgres.setProperty("spring.datasource.url", "jdbc:postgresql://localhost/opnl");
+    MaintenanceService svc =
+        new MaintenanceService(
+            dataSource,
+            postgres,
+            settingsService,
+            daemonService,
+            mgmtClientManager,
+            configSmokeTester,
+            properties,
+            auditLogService,
+            restarter);
+
+    svc.vacuumSqlite(); // must not touch the SQLite database
+  }
 }

@@ -32,6 +32,9 @@ server:
   shutdown: graceful
   forward-headers-strategy: native
   tomcat:
+    threads:
+      # Bounded request threads: the panel is a small fleet admin tool, not a public API.
+      max: ${OPNL_TOMCAT_THREADS:50}
     remoteip:
       remote-ip-header: X-Forwarded-For
       protocol-header: X-Forwarded-Proto

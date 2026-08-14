@@ -342,3 +342,19 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [ ] No secrets in code; `.env` only
 - [ ] English-only UI strings and comments
 - [ ] Code quality: lint + format (Spotless, ESLint), unit tests per module
+
+## Optimization (resource consumption)
+- [x] Monitor loop: idle gating (30s cadence with no WS subscribers) + delta broadcasts (skip unchanged snapshots) — `MonitorService`
+- [x] Traffic history: sparse append — identical consecutive polls do not grow history — `TrafficAggregator`
+- [x] User list: N+1 settings resolution replaced by one batched pass — `SettingsService.effectiveForUsers` + `UserAdminService.listUsers`
+- [x] Server settings decoded once and cached, invalidated on write — `SettingsService`
+- [x] Dashboard DB counters cached with a 2s TTL — `DashboardAdminService`
+- [x] API token lookups cached with a 60s TTL, cleared on create/delete — `ApiTokenService`
+- [x] JVM heap/metaspace bounded via `JAVA_TOOL_OPTIONS` (`MaxRAMPercentage=60`, metaspace 256m, exit on OOM) — `backend/Dockerfile`
+- [x] Frontend: route-level lazy loading (per-page chunks) + `mui-x` split into grid/charts chunks — `App.tsx`, `vite.config.ts`
+- [x] nginx: `gzip_static` (pre-compressed assets), immutable caching for hashed `/assets/`, `gzip_vary` — `nginx.conf`, `frontend/Dockerfile`
+- [x] Tomcat request thread pool capped at 50 (`OPNL_TOMCAT_THREADS`) — `application.yml`
+- [x] Docker Compose resource limits (CPU/mem) for openvpn/backend/frontend/agent
+- [x] Backend image: BuildKit Gradle cache mounts, `.dockerignore`, runtime trim kept on glibc Temurin (Alpine rejected: sqlite-jdbc JNI is glibc-only)
+- [x] CI: Gradle dependency cache via `gradle/actions/setup-gradle` — `.github/workflows/ci.yml`
+- [x] SQLite `VACUUM` nightly at 03:30 (after log/cert purges), SQLite-only via raw JDBC — `MaintenanceService.vacuumSqlite`

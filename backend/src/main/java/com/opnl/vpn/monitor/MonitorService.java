@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.opnl.vpn.api.admin.ConnectionDto;
 import com.opnl.vpn.api.admin.MonitorSnapshotDto;
 import com.opnl.vpn.api.admin.ServerStatusDto.DaemonStatus;
+import com.opnl.vpn.api.admin.SystemInfoDto;
 import com.opnl.vpn.api.admin.TrafficPointDto;
 import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.network.ConnectionRegistry;
@@ -12,6 +13,7 @@ import com.opnl.vpn.network.Daemon;
 import com.opnl.vpn.network.DaemonService;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -39,7 +41,18 @@ public class MonitorService {
   private final ConnectionLogService connectionLogService;
   private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
+  /** Full poll cadence while at least one status subscriber is connected. */
+  private static final Duration ACTIVE_INTERVAL = Duration.ofSeconds(5);
+
+  /**
+   * Cadence when nobody is watching: keeps the REST fallback and stale-session reconciliation
+   * reasonably fresh without doing management-interface work (DB reads, TCP polls) every 5 seconds.
+   */
+  private static final Duration IDLE_INTERVAL = Duration.ofSeconds(30);
+
   private volatile MonitorSnapshotDto latest;
+  private volatile Instant lastFullPoll = Instant.EPOCH;
+  private volatile String lastBroadcastKey;
 
   public MonitorService(
       MgmtClientManager clientManager,
@@ -65,6 +78,13 @@ public class MonitorService {
   /** Polls management interfaces and broadcasts the fresh snapshot. */
   @Scheduled(fixedDelay = 5_000, initialDelay = 3_000)
   public void poll() {
+    Instant now = Instant.now();
+    // Nobody is watching: only do the full (DB + TCP) poll on the idle cadence. The cheap
+    // scheduler wake-ups in between return immediately.
+    if (broadcaster.sessionCount() == 0 && lastFullPoll.plus(IDLE_INTERVAL).isAfter(now)) {
+      return;
+    }
+    lastFullPoll = now;
     Set<String> liveCommonNames = new HashSet<>();
     boolean allDaemonsVisible = true;
     boolean anyDaemonVisible = false;
@@ -98,10 +118,45 @@ public class MonitorService {
     latest = currentSnapshot();
     if (broadcaster.sessionCount() > 0) {
       try {
-        broadcaster.broadcast(objectMapper.writeValueAsString(latest));
+        String payload = objectMapper.writeValueAsString(latest);
+        // Skip broadcasting when nothing meaningful changed (the `at` timestamp is excluded from
+        // the comparison and CPU/disk figures are quantized so idle metrics do not churn the feed).
+        String key = broadcastKey(latest);
+        if (key == null || !key.equals(lastBroadcastKey)) {
+          broadcaster.broadcast(payload);
+          lastBroadcastKey = key;
+        }
       } catch (JsonProcessingException e) {
         log.warn("Cannot serialize monitor snapshot: {}", e.getMessage());
       }
+    }
+  }
+
+  /**
+   * A stable fingerprint of the snapshot's observable content. Includes the system figures
+   * coarse-grained (CPU rounded to a percent, byte figures as-is) so small sensor fluctuations do
+   * not count as a change, but real load changes still reach subscribed clients.
+   */
+  private String broadcastKey(MonitorSnapshotDto snapshot) {
+    try {
+      SystemInfoDto sys = snapshot.system();
+      Object key =
+          List.of(
+              snapshot.connections(),
+              snapshot.daemons(),
+              snapshot.bytesInPerSec(),
+              snapshot.bytesOutPerSec(),
+              snapshot.activeConnections(),
+              snapshot.history(),
+              Math.round(sys.cpuLoadPercent()),
+              sys.totalMemory(),
+              sys.freeMemory(),
+              sys.diskTotal(),
+              sys.diskFree(),
+              sys.availableProcessors());
+      return objectMapper.writeValueAsString(key);
+    } catch (JsonProcessingException e) {
+      return null;
     }
   }
 

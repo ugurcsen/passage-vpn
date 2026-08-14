@@ -24,6 +24,7 @@ import java.util.Map;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
@@ -132,6 +133,24 @@ public class MaintenanceService {
               .reduce((a, b) -> a + ", " + b)
               .orElse("unknown");
       throw ApiException.conflict("preflight_failed", "Preflight failed: " + failed);
+    }
+  }
+
+  /**
+   * Reclaims disk space freed by the nightly purge jobs. {@code VACUUM} is SQLite-specific, so this
+   * is a no-op on other datasources. Runs after the log/certificate purges at 03:15/03:20.
+   */
+  @Scheduled(cron = "0 30 3 * * *")
+  public void vacuumSqlite() {
+    if (!isSqlite()) {
+      return;
+    }
+    try (Connection connection = dataSource.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.execute("VACUUM");
+      log.info("SQLite database vacuumed");
+    } catch (SQLException e) {
+      log.warn("SQLite vacuum failed: {}", e.getMessage());
     }
   }
 

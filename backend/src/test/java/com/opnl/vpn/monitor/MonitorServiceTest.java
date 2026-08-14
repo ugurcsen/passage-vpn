@@ -2,8 +2,10 @@ package com.opnl.vpn.monitor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -229,5 +231,100 @@ class MonitorServiceTest {
     // carol is registered in-memory but missing from the live view -> dropped.
     assertThat(registry.sessions()).hasSize(1);
     assertThat(registry.sessions().get(0).commonName()).isEqualTo("alice");
+  }
+
+  @Test
+  void idlePollingRunsFullPollOnlyOnTheIdleCadence() {
+    when(clientManager.status(null, 0))
+        .thenReturn(new MgmtStatus(Instant.now(), "OpenVPN 2.6.20", 0, List.of(), false));
+    when(clientManager.status(null, 1))
+        .thenReturn(new MgmtStatus(Instant.now(), "OpenVPN 2.6.20", 0, List.of(), false));
+
+    service.poll();
+    service.poll();
+
+    // Second poll is inside the idle window (no subscribers) -> the full poll is skipped.
+    verify(connectionLogService, times(1)).reconcileOpenSessions(anySet());
+  }
+
+  @Test
+  void pollingRunsOnEveryTickWhileSubscribersAreConnected() {
+    MonitorBroadcaster broadcaster = mock(MonitorBroadcaster.class);
+    when(broadcaster.sessionCount()).thenReturn(1);
+    MonitorService svc =
+        new MonitorService(
+            clientManager,
+            new TrafficAggregator(),
+            registry,
+            daemonService,
+            broadcaster,
+            mock(SystemInfoService.class),
+            properties,
+            connectionLogService,
+            new ObjectMapper());
+    when(clientManager.status(null, 0))
+        .thenReturn(new MgmtStatus(Instant.now(), "OpenVPN 2.6.20", 0, List.of(), false));
+    when(clientManager.status(null, 1))
+        .thenReturn(new MgmtStatus(Instant.now(), "OpenVPN 2.6.20", 0, List.of(), false));
+
+    svc.poll();
+    svc.poll();
+
+    verify(connectionLogService, times(2)).reconcileOpenSessions(anySet());
+  }
+
+  @Test
+  void broadcastIsSkippedWhenTheSnapshotContentDidNotChange() {
+    MonitorBroadcaster broadcaster = mock(MonitorBroadcaster.class);
+    when(broadcaster.sessionCount()).thenReturn(1);
+    SystemInfoService systemInfoService = mock(SystemInfoService.class);
+    when(systemInfoService.systemInfo())
+        .thenReturn(new SystemInfoDto(25.0, 1_000_000, 400_000, 2_000_000, 800_000, 4));
+    MonitorService svc =
+        new MonitorService(
+            clientManager,
+            new TrafficAggregator(),
+            registry,
+            daemonService,
+            broadcaster,
+            systemInfoService,
+            properties,
+            connectionLogService,
+            new ObjectMapper()
+                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule()));
+
+    svc.poll();
+    svc.poll();
+
+    // Identical snapshots (no clients, unreachable daemons, stable system info) -> one broadcast.
+    verify(broadcaster, times(1)).broadcast(anyString());
+  }
+
+  @Test
+  void broadcastIsSentWhenTheSnapshotContentChanges() {
+    MonitorBroadcaster broadcaster = mock(MonitorBroadcaster.class);
+    when(broadcaster.sessionCount()).thenReturn(1);
+    SystemInfoService systemInfoService = mock(SystemInfoService.class);
+    when(systemInfoService.systemInfo())
+        .thenReturn(new SystemInfoDto(25.0, 1_000_000, 400_000, 2_000_000, 800_000, 4));
+    MonitorService svc =
+        new MonitorService(
+            clientManager,
+            new TrafficAggregator(),
+            registry,
+            daemonService,
+            broadcaster,
+            systemInfoService,
+            properties,
+            connectionLogService,
+            new ObjectMapper()
+                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule()));
+
+    svc.poll();
+    registry.register("alice", "alice", "10.8.0.2", null, "203.0.113.5", "daemon-0");
+    svc.poll();
+
+    // A new connection changes the snapshot -> both polls broadcast.
+    verify(broadcaster, times(2)).broadcast(anyString());
   }
 }

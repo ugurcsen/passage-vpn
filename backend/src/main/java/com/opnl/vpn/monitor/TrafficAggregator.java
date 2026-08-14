@@ -70,11 +70,24 @@ public class TrafficAggregator {
     }
     TrafficPoint point = new TrafficPoint(now, totalInPerSec, totalOutPerSec, clients.size());
     synchronized (history) {
+      // Only append when the aggregate actually changed; otherwise a ring of identical
+      // zero-points would grow forever while the system idles and every snapshot would re-serialize
+      // a large unchanged history. The traffic chart plots by timestamp, so sparse points are fine.
+      TrafficPoint last = history.peekLast();
+      if (last != null && samePoint(last, point)) {
+        return;
+      }
       history.addLast(point);
       while (history.size() > MAX_POINTS) {
         history.removeFirst();
       }
     }
+  }
+
+  private static boolean samePoint(TrafficPoint a, TrafficPoint b) {
+    return a.bytesInPerSec() == b.bytesInPerSec()
+        && a.bytesOutPerSec() == b.bytesOutPerSec()
+        && a.activeConnections() == b.activeConnections();
   }
 
   /** Current counters/rates for a session, or empty when never seen or already pruned. */

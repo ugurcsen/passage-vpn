@@ -1,5 +1,6 @@
 package com.opnl.vpn.group;
 
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -8,6 +9,8 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, GroupM
   List<GroupMember> findById_GroupId(String groupId);
 
   List<GroupMember> findById_UserId(String userId);
+
+  List<GroupMember> findById_UserIdIn(Collection<String> userIds);
 
   void deleteById_GroupId(String groupId);
 }

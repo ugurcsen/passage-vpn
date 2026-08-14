@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -171,6 +172,34 @@ class ApiTokenServiceTest {
     service.authenticate(raw);
 
     verify(repository, never()).save(token);
+  }
+
+  @Test
+  void authenticateCachesLookupWithinTtl() {
+    String raw = ApiTokenService.newToken();
+    var token = token("t1", "ADMIN");
+    when(repository.findByTokenHash(JwtService.hash(raw))).thenReturn(Optional.of(token));
+
+    assertThat(service.authenticate(raw)).isPresent();
+    assertThat(service.authenticate(raw)).isPresent();
+
+    verify(repository, times(1)).findByTokenHash(JwtService.hash(raw));
+  }
+
+  @Test
+  void deleteClearsTheAuthenticateCache() {
+    String raw = ApiTokenService.newToken();
+    var token = token("t1", "ADMIN");
+    when(repository.findByTokenHash(JwtService.hash(raw))).thenReturn(Optional.of(token));
+    assertThat(service.authenticate(raw)).isPresent();
+    when(repository.existsById("t1")).thenReturn(true);
+
+    service.delete("t1");
+
+    // Revocation must be visible immediately: the cached entry is dropped.
+    when(repository.findByTokenHash(JwtService.hash(raw))).thenReturn(Optional.empty());
+    assertThat(service.authenticate(raw)).isEmpty();
+    verify(repository, times(2)).findByTokenHash(JwtService.hash(raw));
   }
 
   @Test
