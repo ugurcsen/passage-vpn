@@ -606,6 +606,20 @@ Seeds sample users, groups, access rules, DNS overrides, certificate rows and co
 
 ---
 
+### `POST /api/admin/nodes/{id}/agent-cert`
+
+Issues (or re-issues) the mTLS client certificate the node's agent presents to the internal control plane. Returns the CA certificate, client cert/key PEM and a PKCS12 bundle plus its password.
+
+**Tags**: Admin - Nodes
+
+| Parameter | In | Type | Required |
+|---|---|---|---|
+| `id` | path | string | yes |
+
+**Responses**: 200
+
+---
+
 ### `GET /api/admin/profile-tokens`
 
 **Tags**: Admin - Profiles
@@ -1878,6 +1892,7 @@ _No fields._
 | `adminIp` | string | no |
 | `enabled` | boolean | no |
 | `mgmtHost` | string | no |
+| `mgmtPassword` | string | no |
 | `mgmtPortBase` | integer | no |
 | `name` | string | no |
 
@@ -1892,8 +1907,10 @@ _No fields._
 | `enabled` | boolean | no |
 | `id` | string | no |
 | `lastSeenAt` | string | no |
+| `lastSeenIp` | string | no |
 | `mgmtHost` | string | no |
 | `mgmtPortBase` | integer | no |
+| `mgmtPasswordSet` | boolean | no |
 | `name` | string | no |
 | `online` | boolean | no |
 

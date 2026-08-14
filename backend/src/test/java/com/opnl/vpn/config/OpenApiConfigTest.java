@@ -14,7 +14,12 @@ import org.springframework.test.web.servlet.MockMvc;
  * Verifies the generated OpenAPI spec exposes the JWT bearer scheme so Swagger UI shows an
  * "Authorize" button for authenticated testing.
  */
-@SpringBootTest(properties = "opnl.jwt.secret=test-context-secret-that-is-at-least-32-bytes")
+@SpringBootTest(
+    properties = {
+      "opnl.jwt.secret=test-context-secret-that-is-at-least-32-bytes",
+      "opnl.internal-token=test-internal-token",
+      "opnl.openvpn.mgmt-password=test-mgmt-pass"
+    })
 @AutoConfigureMockMvc
 class OpenApiConfigTest {
 

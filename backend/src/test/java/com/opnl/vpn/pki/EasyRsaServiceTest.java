@@ -51,7 +51,8 @@ class EasyRsaServiceTest {
                 "openvpn/scripts",
                 "http://backend:8080",
                 easyrsaBin.toString(),
-                tempDir.resolve("logs").toString()));
+                tempDir.resolve("logs").toString(),
+                "mgmt-pass"));
     service = new EasyRsaService(properties, new ProcessRunner());
     indexFile = pkiDir.resolve("index.txt");
   }

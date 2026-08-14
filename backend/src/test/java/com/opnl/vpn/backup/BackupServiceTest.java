@@ -66,7 +66,8 @@ class BackupServiceTest {
                 "./openvpn/scripts",
                 "http://backend:8080",
                 "easyrsa",
-                tempDir.resolve("logs").toString()));
+                tempDir.resolve("logs").toString(),
+                "mgmt-pass"));
 
     Files.createDirectories(tempDir.resolve("pki"));
     Files.createDirectories(tempDir.resolve("ccd"));

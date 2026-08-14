@@ -8,6 +8,75 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.2 — 2026-08-15
+
+Second **beta** milestone (SemVer pre-release): node & internal security
+hardening of the OpenVPN Access Server–style panel — a mandatory management
+password on every daemon, an mTLS-only internal transport for node agents, a
+mandatory internal token with fail-fast startup checks and source-IP pinning
+for agent endpoints. Includes everything from `v0.1.0-beta.1` plus the changes
+below. Tag: `v0.1.0-beta.2`.
+
+### Phase M7 — Node & internal security hardening
+- [x] **7.1 Mandatory management-interface password** — per-daemon password
+      files (`daemon-<idx>.mgmt-pass`, 0600) referenced from `daemon.conf`;
+      `MgmtHandshake` authenticates every management connection; `MgmtClientManager`
+      fails closed when a local/remote password is missing; `OPNL_OPENVPN_MGMT_PASSWORD`
+      enforced at startup (`SecurityBootstrapCheck`) and config-write time.
+- [x] **7.2 mTLS transport for node agents** — internal CA + keystore generated
+      on boot (`InternalTlsBootstrap`), mTLS-only Tomcat connector
+      (`opnl.internal.mtls-port`, 9443); per-node client certs issued via
+      `POST /api/admin/nodes/{id}/agent-cert` (CN `agent-<nodeName>`); the agent
+      authenticates with `opnl.agent.tls-ca|cert|key`; requests outside the mTLS
+      port or with a mismatched cert are rejected.
+- [x] **7.3 Mandatory internal token + fail-fast startup** — `OPNL_INTERNAL_TOKEN`
+      required, blank/`change-me-internal-token` rejected by `InternalTokenFilter`
+      and at startup; `NodeSecurityCheck` warns on nodes without a management
+      password.
+- [x] **7.4 Source-IP pinning for agent endpoints** — `adminIp`-based check on
+      `register`/`heartbeat` (403 `source_ip_mismatch`); `last_seen_ip` tracking
+      (Flyway V18).
+- [x] **7.5 Release** — this entry.
+
+### Fixed during production verification
+- **`MgmtHandshake` protocol bugs** — the real OpenVPN daemon sends the
+  `ENTER PASSWORD:` prompt without a trailing newline and expects the bare
+  password line back (no `PASSWORD:` prefix; `man_check_password` compares the
+  raw first line). The old `readLine()`-based greeting timed out and the
+  `PASSWORD:`-prefixed reply was rejected. Handshake rewritten as a char-based
+  reader; tests now drive a realistic fake daemon (newline-less prompt) and
+  assert the exact bytes the client sends.
+- **`mgmtReachable` probe starvation** — the status endpoint opened a fresh TCP
+  connection per call, but OpenVPN's management interface services a single
+  session at a time, so probes queued dead sockets and starved the persistent
+  monitor. Reachability now derives from the last fresh status polled over the
+  persistent session (90s freshness window) instead of probing.
+
+### Verified
+- Backend suite green (includes new `MgmtHandshakeTest` 5, `ConfigWriterTest` 3,
+  `SecurityBootstrapCheckTest` 4, `InternalControllerTest` 27,
+  `NodeRegistryServiceTest` 23); `./gradlew test` + `spotlessCheck` BUILD
+  SUCCESSFUL. Frontend: 142 tests green.
+- Production verification on `65.21.108.250`: backend + openvpn images rebuilt
+  and running healthy; V18 migration applied; internal TLS CA generated at
+  `/var/lib/opnl/internal-tls`; Tomcat on 8080 (http) + 9443 (mTLS-only, client
+  cert required — handshake without a certificate fails).
+- Management security confirmed: all three daemons run with
+  `management ... daemon-<idx>.mgmt-pass` (files `0600`); backend authenticates
+  with the generated `OPNL_OPENVPN_MGMT_PASSWORD` and all daemons report
+  `mgmtReachable`; wrong passwords are rejected by the daemon; monitoring polls
+  `status 3` over the persistent sessions every 30s.
+- Internal token enforced: `/internal/**` returns 401 without or with a wrong
+  `X-Internal-Token`; the real token passes. Preflight (Maintenance page)
+  reports PASS for database, settings, all daemons and PKI.
+- Chrome end-to-end pass on the production UI: login, dashboard (6 users, 2
+  groups, 4 active certs, 3/3 daemons), VPN Daemons, Live Status (all daemons
+  `Present | Reachable`, recent sessions with traffic), Settings (network mode
+  nat), Certificates (5 rows, revoke state), Users, Audit Log and VPN Nodes
+  pages all render; only a pre-existing MUI Data Grid height warning remains.
+
+---
+
 ## v0.1.0-beta.1 — 2026-08-14
 
 First **beta** milestone (SemVer pre-release): release hardening of the OpenVPN

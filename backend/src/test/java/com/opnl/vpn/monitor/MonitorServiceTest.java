@@ -59,7 +59,8 @@ class MonitorServiceTest {
                 "openvpn/scripts",
                 "http://backend:8080",
                 "easyrsa",
-                tempDir.resolve("logs").toString()));
+                tempDir.resolve("logs").toString(),
+                "mgmt-pass"));
     registry = new ConnectionRegistry();
     daemonService = mock(DaemonService.class);
     when(daemonService.list()).thenReturn(List.of(daemon(0), daemon(1)));

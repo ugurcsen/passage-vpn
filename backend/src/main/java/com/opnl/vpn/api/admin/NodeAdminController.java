@@ -1,7 +1,9 @@
 package com.opnl.vpn.api.admin;
 
+import com.opnl.vpn.internal.InternalTlsService;
 import com.opnl.vpn.network.NodeRegistryService;
 import com.opnl.vpn.network.NodeRegistryService.NodeRequest;
+import com.opnl.vpn.network.OpenVpnNode;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -24,9 +26,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class NodeAdminController {
 
   private final NodeRegistryService nodeRegistryService;
+  private final InternalTlsService tlsService;
 
-  public NodeAdminController(NodeRegistryService nodeRegistryService) {
+  public NodeAdminController(
+      NodeRegistryService nodeRegistryService, InternalTlsService tlsService) {
     this.nodeRegistryService = nodeRegistryService;
+    this.tlsService = tlsService;
   }
 
   @GetMapping
@@ -53,4 +58,24 @@ public class NodeAdminController {
   public OpenVpnNodeDto setEnabled(@PathVariable String id, @RequestParam boolean enabled) {
     return nodeRegistryService.setEnabled(id, enabled);
   }
+
+  /**
+   * Issues (or re-issues) the mTLS client certificate the node's agent presents to the internal
+   * control plane. The bundle must be installed on the remote gateway as {@code opnl.agent.tls-*}.
+   */
+  @PostMapping("/{id}/agent-cert")
+  public AgentCertResult issueAgentCert(@PathVariable String id) {
+    OpenVpnNode node = nodeRegistryService.requireNode(id);
+    InternalTlsService.AgentCertificate cert = tlsService.issueAgentCert(node.getName(), null);
+    return new AgentCertResult(
+        cert.nodeName(),
+        cert.caCertPem(),
+        cert.certPem(),
+        cert.keyPem(),
+        cert.pkcs12(),
+        cert.password());
+  }
+
+  public record AgentCertResult(
+      String nodeName, String caCert, String cert, String key, byte[] pkcs12, String password) {}
 }

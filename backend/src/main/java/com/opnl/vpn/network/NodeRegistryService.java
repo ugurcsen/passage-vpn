@@ -60,6 +60,10 @@ public class NodeRegistryService {
   @Transactional
   public OpenVpnNodeDto create(NodeRequest request) {
     validate(request, null);
+    if (request.mgmtPassword() == null || request.mgmtPassword().isBlank()) {
+      throw ApiException.badRequest(
+          "missing_mgmt_password", "Management password is required for the node");
+    }
     OpenVpnNode node =
         OpenVpnNode.builder()
             .id(UUID.randomUUID().toString())
@@ -67,6 +71,7 @@ public class NodeRegistryService {
             .mgmtHost(request.mgmtHost().trim())
             .mgmtPortBase(request.mgmtPortBase())
             .adminIp(blankToNull(request.adminIp()))
+            .mgmtPassword(request.mgmtPassword())
             .enabled(request.enabled() == null || request.enabled())
             .createdAt(Instant.now())
             .build();
@@ -94,6 +99,9 @@ public class NodeRegistryService {
     node.setMgmtHost(request.mgmtHost().trim());
     node.setMgmtPortBase(request.mgmtPortBase());
     node.setAdminIp(blankToNull(request.adminIp()));
+    if (request.mgmtPassword() != null && !request.mgmtPassword().isBlank()) {
+      node.setMgmtPassword(request.mgmtPassword());
+    }
     if (request.enabled() != null) {
       node.setEnabled(request.enabled());
     }
@@ -117,11 +125,16 @@ public class NodeRegistryService {
     return OpenVpnNodeDto.from(nodeRepository.save(node), Instant.now());
   }
 
-  /** Records a fresh agent heartbeat for a node. */
+  /**
+   * Records a fresh agent heartbeat for a node. When the node has a pinned admin IP, the heartbeat
+   * must originate from that exact source IP.
+   */
   @Transactional
-  public void heartbeat(String id) {
+  public void heartbeat(String id, String sourceIp) {
     OpenVpnNode node = requireNode(id);
+    enforceSourceIp(node, sourceIp);
     node.setLastSeenAt(Instant.now());
+    node.setLastSeenIp(sourceIp);
     nodeRepository.save(node);
   }
 
@@ -129,9 +142,19 @@ public class NodeRegistryService {
    * Idempotent upsert used by remote node agents (profile {@code agent}). Nodes are keyed by name:
    * the first call creates the node and any later call refreshes its endpoint details, re-enables
    * it and marks it online. Returns the node id so the agent can heartbeat afterwards.
+   *
+   * <p>The agent presents the management password of its own gateway (persisted here so the central
+   * can open management sessions) plus the source IP it connected from, which is pinned when the
+   * node has an admin IP set.
    */
   @Transactional
-  public String upsertByAgent(String name, String mgmtHost, int mgmtPortBase, String adminIp) {
+  public String upsertByAgent(
+      String name,
+      String mgmtHost,
+      int mgmtPortBase,
+      String adminIp,
+      String mgmtPassword,
+      String sourceIp) {
     String normalized = name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
     if (normalized.isBlank() || normalized.length() > 64) {
       throw ApiException.badRequest("missing_name", "Node name is required (max 64 chars)");
@@ -142,8 +165,13 @@ public class NodeRegistryService {
     if (mgmtPortBase < 1 || mgmtPortBase > 65535) {
       throw ApiException.badRequest("invalid_mgmt_port", "Management port base must be 1-65535");
     }
+    if (mgmtPassword == null || mgmtPassword.isBlank()) {
+      throw ApiException.badRequest(
+          "missing_mgmt_password", "Management password is required for agent registration");
+    }
     OpenVpnNode existing = nodeRepository.findByNameIgnoreCase(normalized).orElse(null);
     if (existing == null) {
+      enforceSourceIpAgainst(normalized, adminIp, sourceIp);
       OpenVpnNode node =
           OpenVpnNode.builder()
               .id(UUID.randomUUID().toString())
@@ -151,6 +179,8 @@ public class NodeRegistryService {
               .mgmtHost(mgmtHost.trim())
               .mgmtPortBase(mgmtPortBase)
               .adminIp(blankToNull(adminIp))
+              .mgmtPassword(mgmtPassword)
+              .lastSeenIp(sourceIp)
               .enabled(true)
               .createdAt(Instant.now())
               .lastSeenAt(Instant.now())
@@ -165,9 +195,12 @@ public class NodeRegistryService {
       log.info("Agent registered new node '{}' ({})", saved.getName(), saved.getId());
       return saved.getId();
     }
+    enforceSourceIp(existing, sourceIp);
     existing.setMgmtHost(mgmtHost.trim());
     existing.setMgmtPortBase(mgmtPortBase);
     existing.setAdminIp(blankToNull(adminIp));
+    existing.setMgmtPassword(mgmtPassword);
+    existing.setLastSeenIp(sourceIp);
     existing.setEnabled(true);
     existing.setLastSeenAt(Instant.now());
     nodeRepository.save(existing);
@@ -210,7 +243,38 @@ public class NodeRegistryService {
     return value == null || value.isBlank() ? null : value.trim();
   }
 
+  /**
+   * Rejects a request when the node has a pinned admin IP that does not match the observed source
+   * IP. Throws 403 otherwise; a missing admin IP means "allow any" (defense in depth only — the
+   * mTLS certificate is the primary identity).
+   */
+  private void enforceSourceIp(OpenVpnNode node, String sourceIp) {
+    enforceSourceIpAgainst(node.getName(), node.getAdminIp(), sourceIp);
+  }
+
+  private void enforceSourceIpAgainst(String nodeName, String adminIp, String sourceIp) {
+    String pinned = blankToNull(adminIp);
+    if (pinned == null || sourceIp == null || sourceIp.isBlank()) {
+      return;
+    }
+    if (!pinned.equals(sourceIp)) {
+      throw ApiException.forbidden(
+          "source_ip_mismatch",
+          "Registration for node '"
+              + nodeName
+              + "' rejected: source IP "
+              + sourceIp
+              + " does not match pinned admin IP "
+              + pinned);
+    }
+  }
+
   /** Payload for creating or updating a VPN node. */
   public record NodeRequest(
-      String name, String mgmtHost, int mgmtPortBase, String adminIp, Boolean enabled) {}
+      String name,
+      String mgmtHost,
+      int mgmtPortBase,
+      String adminIp,
+      String mgmtPassword,
+      Boolean enabled) {}
 }

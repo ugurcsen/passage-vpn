@@ -34,7 +34,7 @@ class NodeRegistryServiceTest {
   }
 
   private NodeRegistryService.NodeRequest request(String name, String host, int port) {
-    return new NodeRegistryService.NodeRequest(name, host, port, "10.0.0.5", true);
+    return new NodeRegistryService.NodeRequest(name, host, port, "10.0.0.5", "mgmt-pass", true);
   }
 
   private OpenVpnNode node(String id, String name, String host, int port) {
@@ -106,13 +106,42 @@ class NodeRegistryServiceTest {
     var result =
         service.update(
             "n1",
-            new NodeRegistryService.NodeRequest("edge-us", "vpn-us.example.com", 7506, null, true));
+            new NodeRegistryService.NodeRequest(
+                "edge-us", "vpn-us.example.com", 7506, null, "mgmt-pass", true));
 
     assertThat(result.name()).isEqualTo("edge-us");
     assertThat(result.mgmtHost()).isEqualTo("vpn-us.example.com");
     assertThat(result.mgmtPortBase()).isEqualTo(7506);
     assertThat(result.adminIp()).isNull();
+    assertThat(result.mgmtPasswordSet()).isTrue();
     verify(auditLogService).record("NODE_UPDATE", AuditLogService.CAT_NODE, "n1", "vpn_node", null);
+  }
+
+  @Test
+  void updateKeepsExistingPasswordWhenOmitted() {
+    OpenVpnNode existing = node("n1", "edge-eu", "vpn-eu.example.com", 7505);
+    existing.setMgmtPassword("old-pass");
+    when(nodeRepository.findById("n1")).thenReturn(Optional.of(existing));
+    when(nodeRepository.findByNameIgnoreCase("edge-eu")).thenReturn(Optional.of(existing));
+
+    service.update(
+        "n1",
+        new NodeRegistryService.NodeRequest(
+            "edge-eu", "vpn-eu.example.com", 7505, null, null, true));
+
+    assertThat(existing.getMgmtPassword()).isEqualTo("old-pass");
+  }
+
+  @Test
+  void createRejectsMissingMgmtPassword() {
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new NodeRegistryService.NodeRequest(
+                        "edge-eu", "vpn-eu.example.com", 7505, null, null, true)))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("Management password");
+    verify(nodeRepository, never()).save(any());
   }
 
   @Test
@@ -127,7 +156,7 @@ class NodeRegistryServiceTest {
                 service.update(
                     "n1",
                     new NodeRegistryService.NodeRequest(
-                        "edge-us", "vpn-us.example.com", 7506, null, true)))
+                        "edge-us", "vpn-us.example.com", 7506, null, "mgmt-pass", true)))
         .isInstanceOf(ApiException.class);
     verify(nodeRepository, never()).save(any());
   }
@@ -167,10 +196,32 @@ class NodeRegistryServiceTest {
     existing.setLastSeenAt(Instant.parse("2026-01-01T00:00:00Z"));
     when(nodeRepository.findById("n1")).thenReturn(Optional.of(existing));
 
-    service.heartbeat("n1");
+    service.heartbeat("n1", "10.0.0.5");
 
     assertThat(existing.getLastSeenAt()).isAfter(Instant.parse("2026-01-01T00:00:00Z"));
+    assertThat(existing.getLastSeenIp()).isEqualTo("10.0.0.5");
     verify(nodeRepository).save(existing);
+  }
+
+  @Test
+  void heartbeatRejectsMismatchedSourceIp() {
+    OpenVpnNode existing = node("n1", "edge-eu", "vpn-eu.example.com", 7505);
+    existing.setAdminIp("10.0.0.5");
+    when(nodeRepository.findById("n1")).thenReturn(Optional.of(existing));
+
+    assertThatThrownBy(() -> service.heartbeat("n1", "203.0.113.9"))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("does not match pinned admin IP");
+  }
+
+  @Test
+  void heartbeatAcceptsAnySourceWithoutAdminIp() {
+    OpenVpnNode existing = node("n1", "edge-eu", "vpn-eu.example.com", 7505);
+    when(nodeRepository.findById("n1")).thenReturn(Optional.of(existing));
+
+    service.heartbeat("n1", "203.0.113.9");
+
+    assertThat(existing.getLastSeenIp()).isEqualTo("203.0.113.9");
   }
 
   @Test
@@ -203,15 +254,41 @@ class NodeRegistryServiceTest {
   void upsertByAgentCreatesWhenMissing() {
     when(nodeRepository.findByNameIgnoreCase("edge-eu")).thenReturn(Optional.empty());
 
-    String id = service.upsertByAgent("Edge-EU", "vpn-eu.example.com", 7505, "10.0.0.5");
+    String id =
+        service.upsertByAgent(
+            "Edge-EU", "vpn-eu.example.com", 7505, "10.0.0.5", "mgmt-pass", "10.0.0.5");
 
     ArgumentCaptor<OpenVpnNode> captor = ArgumentCaptor.forClass(OpenVpnNode.class);
     verify(nodeRepository).save(captor.capture());
     assertThat(captor.getValue().getName()).isEqualTo("edge-eu");
     assertThat(captor.getValue().isEnabled()).isTrue();
     assertThat(captor.getValue().getLastSeenAt()).isNotNull();
+    assertThat(captor.getValue().getMgmtPassword()).isEqualTo("mgmt-pass");
+    assertThat(captor.getValue().getLastSeenIp()).isEqualTo("10.0.0.5");
     assertThat(id).isEqualTo(captor.getValue().getId());
     verify(auditLogService).record(anyString(), any(), eq(id), any(), any());
+  }
+
+  @Test
+  void upsertByAgentRejectsSourceIpMismatch() {
+    assertThatThrownBy(
+            () ->
+                service.upsertByAgent(
+                    "edge-eu", "vpn-eu.example.com", 7505, "10.0.0.5", "mgmt-pass", "203.0.113.9"))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("does not match pinned admin IP");
+    verify(nodeRepository, never()).save(any());
+  }
+
+  @Test
+  void upsertByAgentRejectsMissingMgmtPassword() {
+    assertThatThrownBy(
+            () ->
+                service.upsertByAgent(
+                    "edge-eu", "vpn-eu.example.com", 7505, null, null, "10.0.0.5"))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("Management password");
+    verify(nodeRepository, never()).save(any());
   }
 
   @Test
@@ -220,12 +297,14 @@ class NodeRegistryServiceTest {
     existing.setEnabled(false);
     when(nodeRepository.findByNameIgnoreCase("edge-eu")).thenReturn(Optional.of(existing));
 
-    String id = service.upsertByAgent("edge-eu", "10.0.0.9", 7605, null);
+    String id =
+        service.upsertByAgent("edge-eu", "10.0.0.9", 7605, null, "mgmt-pass", "203.0.113.9");
 
     assertThat(id).isEqualTo("n1");
     assertThat(existing.getMgmtHost()).isEqualTo("10.0.0.9");
     assertThat(existing.getMgmtPortBase()).isEqualTo(7605);
     assertThat(existing.getAdminIp()).isNull();
+    assertThat(existing.getMgmtPassword()).isEqualTo("mgmt-pass");
     assertThat(existing.isEnabled()).isTrue();
     assertThat(existing.getLastSeenAt()).isNotNull();
     verify(nodeRepository).save(existing);
@@ -233,7 +312,8 @@ class NodeRegistryServiceTest {
 
   @Test
   void upsertByAgentRejectsBlankName() {
-    assertThatThrownBy(() -> service.upsertByAgent(" ", "host", 7505, null))
+    assertThatThrownBy(
+            () -> service.upsertByAgent(" ", "host", 7505, null, "mgmt-pass", "10.0.0.5"))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("Node name is required");
     verify(nodeRepository, never()).save(any());
@@ -241,7 +321,8 @@ class NodeRegistryServiceTest {
 
   @Test
   void upsertByAgentRejectsInvalidPort() {
-    assertThatThrownBy(() -> service.upsertByAgent("edge-eu", "host", 70000, null))
+    assertThatThrownBy(
+            () -> service.upsertByAgent("edge-eu", "host", 70000, null, "mgmt-pass", "10.0.0.5"))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("Management port base");
   }

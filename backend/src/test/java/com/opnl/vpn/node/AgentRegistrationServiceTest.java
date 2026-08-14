@@ -3,6 +3,7 @@ package com.opnl.vpn.node;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opnl.vpn.config.AgentProperties;
@@ -64,11 +65,15 @@ class AgentRegistrationServiceTest {
             "openvpn",
             7505,
             null,
-            30);
+            "mgmt-pass",
+            30,
+            null,
+            null,
+            null);
     OpnlProperties opnl =
         new OpnlProperties("./data", "OpenVPN Panel", "secret-token", null, null, null);
     return new AgentRegistrationService(
-        properties, opnl, new ObjectMapper(), HttpClient.newHttpClient());
+        properties, opnl, new ObjectMapper(), mock(AgentTls.class), HttpClient.newHttpClient());
   }
 
   @Test
@@ -82,6 +87,7 @@ class AgentRegistrationServiceTest {
     assertTrue(registerBody.startsWith("/internal/node/register "));
     assertTrue(registerBody.contains("\"name\":\"edge-eu\""));
     assertTrue(registerBody.contains("\"mgmtPortBase\":7505"));
+    assertTrue(registerBody.contains("\"mgmtPassword\":\"mgmt-pass\""));
     assertEquals("secret-token", tokens.get(0));
     assertTrue(requests.get(1).startsWith("/internal/node/heartbeat "));
     assertTrue(requests.get(1).contains("\"nodeId\":\"n-1\""));
@@ -106,12 +112,21 @@ class AgentRegistrationServiceTest {
   void missingNodeNameDoesNotCallCentral() {
     AgentProperties properties =
         new AgentProperties(
-            "http://127.0.0.1:" + server.getAddress().getPort(), "", "openvpn", 7505, null, 30);
+            "http://127.0.0.1:" + server.getAddress().getPort(),
+            "",
+            "openvpn",
+            7505,
+            null,
+            "mgmt-pass",
+            30,
+            null,
+            null,
+            null);
     OpnlProperties opnl =
         new OpnlProperties("./data", "OpenVPN Panel", "secret-token", null, null, null);
     AgentRegistrationService service =
         new AgentRegistrationService(
-            properties, opnl, new ObjectMapper(), HttpClient.newHttpClient());
+            properties, opnl, new ObjectMapper(), mock(AgentTls.class), HttpClient.newHttpClient());
     service.tick();
     assertEquals(0, requests.size());
     assertNull(service.nodeId());
@@ -126,12 +141,16 @@ class AgentRegistrationServiceTest {
             "openvpn",
             7505,
             "10.0.0.5",
-            30);
+            "mgmt-pass",
+            30,
+            null,
+            null,
+            null);
     OpnlProperties opnl =
         new OpnlProperties("./data", "OpenVPN Panel", "secret-token", null, null, null);
     AgentRegistrationService service =
         new AgentRegistrationService(
-            properties, opnl, new ObjectMapper(), HttpClient.newHttpClient());
+            properties, opnl, new ObjectMapper(), mock(AgentTls.class), HttpClient.newHttpClient());
     service.tick();
     assertTrue(requests.get(0).contains("\"adminIp\":\"10.0.0.5\""));
   }

@@ -168,6 +168,12 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] README/docs finalization (Phase 4.7)
 - [x] Cross-cutting sweep (Phase 4.7)
 
+**M7 — Node & internal security hardening** (detail: `docs/ROADMAP.md` M7)
+- [x] Mandatory management-interface password (per-daemon `.mgmt-pass` files, `MgmtHandshake`, fail-closed `MgmtClientManager`, startup check)
+- [x] mTLS transport for node agents (internal CA/keystore bootstrap, 9443 connector, per-node agent certs via `/agent-cert`)
+- [x] Mandatory internal token + fail-fast startup (`InternalTokenFilter`, `SecurityBootstrapCheck`, `NodeSecurityCheck`)
+- [x] Source-IP pinning for agent register/heartbeat + `last_seen_ip` (Flyway V18)
+
 ---
 
 ## Phase 0 — Project Scaffolding

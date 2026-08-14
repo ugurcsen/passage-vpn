@@ -13,7 +13,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Protects /internal/** script-facing endpoints with a shared secret header (X-Internal-Token).
- * No-op when the configured token is blank.
+ * Enforced unconditionally: a blank token or the built-in {@code change-me} placeholder is rejected
+ * so a misconfigured deployment can never run with a well-known secret.
  */
 public class InternalTokenFilter extends OncePerRequestFilter {
 
@@ -28,17 +29,17 @@ public class InternalTokenFilter extends OncePerRequestFilter {
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    return !request.getRequestURI().startsWith("/internal/")
-        || expectedToken == null
-        || expectedToken.isBlank();
+    return !request.getRequestURI().startsWith("/internal/");
   }
 
   @Override
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
-    String provided = request.getHeader("X-Internal-Token");
-    if (!expectedToken.equals(provided)) {
+    if (expectedToken == null
+        || expectedToken.isBlank()
+        || OpnlProperties.DEFAULT_INTERNAL_TOKEN.equals(expectedToken)
+        || !expectedToken.equals(request.getHeader("X-Internal-Token"))) {
       response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
       response.setContentType(MediaType.APPLICATION_JSON_VALUE);
       objectMapper.writeValue(

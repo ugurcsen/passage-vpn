@@ -35,7 +35,8 @@ public class ServerConfigGenerator {
       String ccdDir,
       String scriptsDir,
       String logDir,
-      String networkMode) {
+      String networkMode,
+      String mgmtPwdFile) {
     String template;
     try {
       template = new ClassPathResource(TEMPLATE_PATH).getContentAsString(StandardCharsets.UTF_8);
@@ -50,6 +51,7 @@ public class ServerConfigGenerator {
         .replace("__PORT__", String.valueOf(config.port()))
         .replace("__PROTO__", config.proto().name())
         .replace("__MGMT_PORT__", String.valueOf(mgmtPort))
+        .replace("__MGMT_PWD_FILE__", mgmtPwdFile == null ? "" : mgmtPwdFile)
         .replace("__SUBNET__", config.subnet())
         .replace("__SUBNET_MASK__", config.subnetMask())
         .replace("__IPV6_SERVER__", renderIpv6Server(config))

@@ -89,7 +89,8 @@ class MaintenanceServiceTest {
                 "./openvpn/scripts",
                 "http://backend:8080",
                 "easyrsa",
-                tempDir.resolve("logs").toString()));
+                tempDir.resolve("logs").toString(),
+                "mgmt-pass"));
     this.properties = properties;
 
     Files.createDirectories(tempDir.resolve("pki"));

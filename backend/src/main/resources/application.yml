@@ -78,6 +78,7 @@ opnl:
   openvpn:
     mgmt-host: ${OPNL_OPENVPN_MGMT_HOST:openvpn}
     mgmt-port: ${OPNL_OPENVPN_MGMT_PORT:7505}
+    mgmt-password: ${OPNL_OPENVPN_MGMT_PASSWORD:}
     admin-host: ${OPNL_OPENVPN_ADMIN_HOST:localhost}
     pki-dir: ${OPNL_PKI_DIR:./data/pki}
     ccd-dir: ${OPNL_CCD_DIR:./data/ccd}
@@ -87,6 +88,9 @@ opnl:
     easyrsa-bin: ${OPNL_EASY_RSA_BIN:easyrsa}
     log-dir: ${OPNL_LOG_DIR:./data/config/logs}
     internal-base-url: ${OPNL_INTERNAL_BASE_URL:http://backend:8080}
+  internal:
+    mtls-port: ${OPNL_INTERNAL_MTLS_PORT:9443}
+    tls-dir: ${OPNL_INTERNAL_TLS_DIR:./data/internal-tls}
 
 logging:
   level:

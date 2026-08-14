@@ -42,7 +42,8 @@ class WsAuthHandshakeInterceptorTest {
                 "openvpn/scripts",
                 "http://backend:8080",
                 "easyrsa",
-                "logs"));
+                "logs",
+                "mgmt-pass"));
     jwtService = new JwtService(properties);
     interceptor = new WsAuthHandshakeInterceptor(jwtService);
     handler = mock(WebSocketHandler.class);

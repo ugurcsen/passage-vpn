@@ -165,7 +165,29 @@ Work started under M3 has been split: completed items shipped in
       final `docs/api.md`.
 - [x] **6.5 Cross-cutting sweep** — env-var-driven config audit, secret scan,
       English-only verification, Spotless/ESLint clean, full test suite green.
-- [ ] **6.6 Release** — `v0.1.0-beta.1` tag + `RELEASE_NOTES.md` entry.
+- [x] **6.6 Release** — `v0.1.0-beta.1` tag + `RELEASE_NOTES.md` entry.
+
+## M7 — Node & internal security hardening — TARGET `v0.1.0-beta.2` (released)
+
+- [x] **7.1 Mandatory management-interface password** — per-daemon password
+      files (`daemon-<idx>.mgmt-pass`, 0600) referenced from `daemon.conf`;
+      `MgmtHandshake` authenticates every management connection; `MgmtClientManager`
+      fails closed when a local/remote password is missing; `OPNL_OPENVPN_MGMT_PASSWORD`
+      enforced at startup (`SecurityBootstrapCheck`) and config-write time.
+- [x] **7.2 mTLS transport for node agents** — internal CA + keystore generated
+      on boot (`InternalTlsBootstrap`), mTLS-only Tomcat connector
+      (`opnl.internal.mtls-port`, 9443); per-node client certs issued via
+      `POST /api/admin/nodes/{id}/agent-cert` (CN `agent-<nodeName>`); the agent
+      authenticates with `opnl.agent.tls-ca|cert|key`; requests outside the mTLS
+      port or with a mismatched cert are rejected.
+- [x] **7.3 Mandatory internal token + fail-fast startup** — `OPNL_INTERNAL_TOKEN`
+      required, blank/`change-me-internal-token` rejected by `InternalTokenFilter`
+      and at startup; `NodeSecurityCheck` warns on nodes without a management
+      password.
+- [x] **7.4 Source-IP pinning for agent endpoints** — `adminIp`-based check on
+      `register`/`heartbeat` (403 `source_ip_mismatch`); `last_seen_ip` tracking
+      (Flyway V18).
+- [x] **7.5 Release** — `v0.1.0-beta.2` tag + `RELEASE_NOTES.md` entry.
 
 ## Cross-cutting
 

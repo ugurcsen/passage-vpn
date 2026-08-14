@@ -308,6 +308,69 @@ class InternalControllerTest {
   }
 
   @Test
+  void internalTokenFilterRejectsDefaultPlaceholderToken() throws Exception {
+    com.opnl.vpn.config.OpnlProperties props = mock(com.opnl.vpn.config.OpnlProperties.class);
+    when(props.internalToken())
+        .thenReturn(com.opnl.vpn.config.OpnlProperties.DEFAULT_INTERNAL_TOKEN);
+    var filter = new com.opnl.vpn.security.InternalTokenFilter(props);
+    var filtered =
+        MockMvcBuilders.standaloneSetup(
+                new InternalController(
+                    userRepository,
+                    passwordEncoder,
+                    setupService,
+                    authService,
+                    ruleService,
+                    connectionRegistry,
+                    settingsService,
+                    connectionLogService,
+                    daemonService,
+                    demoSeedService))
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .addFilters(filter)
+            .build();
+    filtered
+        .perform(
+            post("/internal/connect")
+                .header(
+                    "X-Internal-Token", com.opnl.vpn.config.OpnlProperties.DEFAULT_INTERNAL_TOKEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("invalid_internal_token"));
+  }
+
+  @Test
+  void internalTokenFilterAllowsMatchingToken() throws Exception {
+    com.opnl.vpn.config.OpnlProperties props = mock(com.opnl.vpn.config.OpnlProperties.class);
+    when(props.internalToken()).thenReturn("secret");
+    var filter = new com.opnl.vpn.security.InternalTokenFilter(props);
+    var filtered =
+        MockMvcBuilders.standaloneSetup(
+                new InternalController(
+                    userRepository,
+                    passwordEncoder,
+                    setupService,
+                    authService,
+                    ruleService,
+                    connectionRegistry,
+                    settingsService,
+                    connectionLogService,
+                    daemonService,
+                    demoSeedService))
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .addFilters(filter)
+            .build();
+    filtered
+        .perform(
+            post("/internal/connect")
+                .header("X-Internal-Token", "secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
+        .andExpect(status().isOk());
+  }
+
+  @Test
   void connectDeniesWhenMaxConnectionsReached() throws Exception {
     when(settingsService.effectiveForUser("u1")).thenReturn(Map.of("max_connections", 1));
     connectionRegistry.register("alice", "alice", "10.8.0.8", null, "9.9.9.9", "daemon-0");

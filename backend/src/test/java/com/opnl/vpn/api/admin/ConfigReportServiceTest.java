@@ -65,7 +65,8 @@ class ConfigReportServiceTest {
                     "./openvpn/scripts",
                     "http://backend:8080",
                     "easyrsa",
-                    "./data/config/logs")),
+                    "./data/config/logs",
+                    "mgmt-pass")),
             environment);
   }
 

@@ -54,7 +54,8 @@ class DashboardAdminServiceTest {
                 "openvpn/scripts",
                 "http://backend:8080",
                 "easyrsa",
-                tempDir.resolve("logs").toString()));
+                tempDir.resolve("logs").toString(),
+                "mgmt-pass"));
     registry = new ConnectionRegistry();
     aggregator = new TrafficAggregator();
     daemonService = mock(DaemonService.class);

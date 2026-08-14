@@ -107,9 +107,11 @@ public class MgmtClientManager {
 
     String host;
     int port;
+    String password;
     if (nodeId == null) {
       host = properties.openvpn().mgmtHost();
       port = properties.openvpn().mgmtPort() + daemonIndex;
+      password = properties.openvpn().mgmtPassword();
     } else {
       Optional<OpenVpnNode> node = nodeRegistryService.findNode(nodeId);
       if (node.isEmpty() || !node.get().isEnabled()) {
@@ -118,8 +120,18 @@ public class MgmtClientManager {
       OpenVpnNode gateway = node.get();
       host = gateway.getMgmtHost();
       port = gateway.getMgmtPortBase() + daemonIndex;
+      password = gateway.getMgmtPassword();
     }
-    MgmtClient fresh = new MgmtClient(host, port, daemonIndex, nodeId);
+    if (password == null || password.isBlank()) {
+      log.warn(
+          "Skipping management connection to {}:{} (node={}, daemon {}): no management password configured",
+          host,
+          port,
+          nodeId == null ? "local" : nodeId,
+          daemonIndex);
+      return null;
+    }
+    MgmtClient fresh = new MgmtClient(host, port, daemonIndex, nodeId, password);
     if (fresh.connect()) {
       clients.put(endpoint, fresh);
       return fresh;

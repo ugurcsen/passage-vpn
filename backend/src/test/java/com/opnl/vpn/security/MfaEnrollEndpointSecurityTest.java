@@ -15,7 +15,12 @@ import org.springframework.test.web.servlet.MockMvc;
  * in {@link SecurityConfig#PUBLIC_PATHS}). A blank preAuthToken must produce a validation 400, not
  * an unauthenticated 401.
  */
-@SpringBootTest(properties = "opnl.jwt.secret=test-context-secret-that-is-at-least-32-bytes")
+@SpringBootTest(
+    properties = {
+      "opnl.jwt.secret=test-context-secret-that-is-at-least-32-bytes",
+      "opnl.internal-token=test-internal-token",
+      "opnl.openvpn.mgmt-password=test-mgmt-pass"
+    })
 @AutoConfigureMockMvc
 class MfaEnrollEndpointSecurityTest {
 

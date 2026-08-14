@@ -31,6 +31,7 @@ public class AgentRegistrationService {
   private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(5);
 
   private final AgentProperties properties;
+  private final AgentTls agentTls;
   private final String internalToken;
   private final ObjectMapper objectMapper;
   private final HttpClient httpClient;
@@ -43,19 +44,34 @@ public class AgentRegistrationService {
   }
 
   public AgentRegistrationService(
-      AgentProperties properties, OpnlProperties opnlProperties, ObjectMapper objectMapper) {
-    this(properties, opnlProperties, objectMapper, HttpClient.newHttpClient());
+      AgentProperties properties,
+      OpnlProperties opnlProperties,
+      ObjectMapper objectMapper,
+      AgentTls agentTls) {
+    this(properties, opnlProperties, objectMapper, agentTls, clientFor(agentTls));
   }
 
   AgentRegistrationService(
       AgentProperties properties,
       OpnlProperties opnlProperties,
       ObjectMapper objectMapper,
+      AgentTls agentTls,
       HttpClient httpClient) {
     this.properties = properties;
+    this.agentTls = agentTls;
     this.internalToken = opnlProperties.internalToken();
     this.objectMapper = objectMapper;
     this.httpClient = httpClient;
+  }
+
+  private static HttpClient clientFor(AgentTls agentTls) {
+    if (!agentTls.configured()) {
+      return HttpClient.newHttpClient();
+    }
+    return HttpClient.newBuilder()
+        .sslContext(agentTls.sslContext())
+        .connectTimeout(HTTP_TIMEOUT)
+        .build();
   }
 
   @Scheduled(fixedDelayString = "${opnl.agent.heartbeat-seconds:30}s", initialDelay = 5_000)
@@ -87,8 +103,15 @@ public class AgentRegistrationService {
     if (properties.mgmtPortBase() < 1 || properties.mgmtPortBase() > 65535) {
       throw new IllegalStateException("opnl.agent.mgmt-port-base must be 1-65535");
     }
+    if (properties.mgmtPassword() == null || properties.mgmtPassword().isBlank()) {
+      throw new IllegalStateException("opnl.agent.mgmt-password is required");
+    }
     if (properties.heartbeatSeconds() < 5 || properties.heartbeatSeconds() > 3600) {
       throw new IllegalStateException("opnl.agent.heartbeat-seconds must be 5-3600");
+    }
+    if (properties.centralBaseUrl().startsWith("https://") && !agentTls.configured()) {
+      throw new IllegalStateException(
+          "opnl.agent.tls-ca, opnl.agent.tls-cert and opnl.agent.tls-key are required for an https central-base-url");
     }
   }
 
@@ -103,7 +126,9 @@ public class AgentRegistrationService {
                 "mgmtPortBase",
                 properties.mgmtPortBase(),
                 "adminIp",
-                properties.adminIp() == null ? "" : properties.adminIp()));
+                properties.adminIp() == null ? "" : properties.adminIp(),
+                "mgmtPassword",
+                properties.mgmtPassword()));
     String response = post("/internal/node/register", body);
     if (response == null) {
       return;

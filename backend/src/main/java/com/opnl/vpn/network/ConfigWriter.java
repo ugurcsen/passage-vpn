@@ -23,8 +23,9 @@ public class ConfigWriter {
   }
 
   /**
-   * Renders and writes daemon-<index>.conf for the given config. Removes the previous config file
-   * of the same daemon index first.
+   * Renders and writes daemon-<index>.conf for the given config, plus the daemon's management
+   * password file (mode 0600) referenced from the config. Removes the previous config file of the
+   * same daemon index first.
    *
    * @param networkMode "nat" or "routed"; surfaced in the rendered config for the firewall script.
    */
@@ -33,6 +34,12 @@ public class ConfigWriter {
       ServerConfigGenerator generator,
       OpnlProperties props,
       String networkMode) {
+    String mgmtPassword = props.openvpn().mgmtPassword();
+    if (mgmtPassword == null || mgmtPassword.isBlank()) {
+      throw ApiException.internal(
+          "mgmt_password_missing",
+          "OPNL_OPENVPN_MGMT_PASSWORD is required before daemon configs can be written");
+    }
     try {
       Files.createDirectories(configDir);
       Files.createDirectories(logDir);
@@ -42,6 +49,7 @@ public class ConfigWriter {
       throw ApiException.internal("config_write", "Cannot create config dirs: " + e.getMessage());
     }
 
+    Path mgmtPassFile = writeMgmtPassword(config.daemonIndex(), mgmtPassword);
     String rendered =
         generator.render(
             config,
@@ -49,7 +57,8 @@ public class ConfigWriter {
             props.openvpn().ccdDir(),
             props.openvpn().scriptsDir(),
             logDir.toString(),
-            networkMode);
+            networkMode,
+            mgmtPassFile.toString());
 
     Path file = configDir.resolve("daemon-" + config.daemonIndex() + ".conf");
     try {
@@ -65,9 +74,30 @@ public class ConfigWriter {
     Path file = configDir.resolve("daemon-" + daemonIndex + ".conf");
     try {
       Files.deleteIfExists(file);
+      Files.deleteIfExists(configDir.resolve("daemon-" + daemonIndex + ".mgmt-pass"));
       log.info("Removed {}", file);
     } catch (IOException e) {
       throw ApiException.internal("config_write", "Cannot remove " + file + ": " + e.getMessage());
+    }
+  }
+
+  /** Persists the daemon's management password with owner-only permissions. */
+  private Path writeMgmtPassword(int daemonIndex, String password) {
+    Path file = configDir.resolve("daemon-" + daemonIndex + ".mgmt-pass");
+    try {
+      Files.writeString(file, password, StandardCharsets.UTF_8);
+      try {
+        Files.setPosixFilePermissions(
+            file,
+            java.util.EnumSet.of(
+                java.nio.file.attribute.PosixFilePermission.OWNER_READ,
+                java.nio.file.attribute.PosixFilePermission.OWNER_WRITE));
+      } catch (UnsupportedOperationException ignored) {
+        // Non-POSIX filesystem: rely on the platform defaults.
+      }
+      return file;
+    } catch (IOException e) {
+      throw ApiException.internal("config_write", "Cannot write " + file + ": " + e.getMessage());
     }
   }
 }

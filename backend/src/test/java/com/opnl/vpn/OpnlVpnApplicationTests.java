@@ -8,7 +8,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 
 /** Smoke test: full application context boots with SQLite + Flyway. */
-@SpringBootTest(properties = "opnl.jwt.secret=test-context-secret-that-is-at-least-32-bytes")
+@SpringBootTest(
+    properties = {
+      "opnl.jwt.secret=test-context-secret-that-is-at-least-32-bytes",
+      "opnl.internal-token=test-internal-token",
+      "opnl.openvpn.mgmt-password=test-mgmt-pass"
+    })
 class OpnlVpnApplicationTests {
 
   @Autowired private ApplicationContext context;

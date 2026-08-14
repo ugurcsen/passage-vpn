@@ -6,13 +6,12 @@ import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.monitor.MgmtClientManager;
+import com.opnl.vpn.monitor.MgmtStatus;
 import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.network.Daemon;
 import com.opnl.vpn.network.DaemonService;
-import com.opnl.vpn.network.NodeRegistryService;
 import com.opnl.vpn.network.ServerConfig.Protocol;
 import java.io.IOException;
-import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -35,7 +34,7 @@ class StatusAdminServiceTest {
     connectionRegistry = new ConnectionRegistry();
   }
 
-  private StatusAdminService serviceWith(int mgmtPort) {
+  private StatusAdminService serviceWith(MgmtClientManager clientManager) {
     OpnlProperties properties =
         new OpnlProperties(
             tempDir.resolve("data").toString(),
@@ -45,7 +44,7 @@ class StatusAdminServiceTest {
             new OpnlProperties.Auth("local", 5, 300, 300, 20, 60),
             new OpnlProperties.OpenVpn(
                 "127.0.0.1",
-                mgmtPort,
+                17505,
                 "vpn.example.com",
                 tempDir.resolve("pki").toString(),
                 tempDir.resolve("ccd").toString(),
@@ -54,13 +53,9 @@ class StatusAdminServiceTest {
                 "openvpn/scripts",
                 "http://backend:8080",
                 "easyrsa",
-                tempDir.resolve("logs").toString()));
-    return new StatusAdminService(
-        daemonService,
-        connectionRegistry,
-        new MgmtClientManager(properties, mock(NodeRegistryService.class)),
-        mock(NodeRegistryService.class),
-        properties);
+                tempDir.resolve("logs").toString(),
+                "mgmt-pass"));
+    return new StatusAdminService(daemonService, connectionRegistry, clientManager, properties);
   }
 
   private Daemon daemon(int index, boolean enabled) {
@@ -84,34 +79,51 @@ class StatusAdminServiceTest {
 
   @Test
   void statusReportsConfigPresenceAndMgmtReachability() throws IOException {
-    // Bind a real listener; daemon index 0 probes exactly this port.
-    try (ServerSocket listener = new ServerSocket(0)) {
-      int mgmtPort = listener.getLocalPort();
-      service = serviceWith(mgmtPort);
-      Files.createDirectories(tempDir.resolve("config"));
-      Files.writeString(tempDir.resolve("config").resolve("daemon-0.conf"), "port 1194\n");
-      when(daemonService.list()).thenReturn(List.of(daemon(0, true), daemon(1, true)));
+    MgmtClientManager clientManager = mock(MgmtClientManager.class);
+    // Fresh poll for daemon 0, never reached for daemon 1.
+    when(clientManager.cachedStatus(null, 0))
+        .thenReturn(new MgmtStatus(Instant.now(), "OpenVPN 2.6.20 [DCO]", 0, List.of(), true));
+    when(clientManager.cachedStatus(null, 1)).thenReturn(null);
+    service = serviceWith(clientManager);
 
-      ServerStatusDto status = service.status();
+    Files.createDirectories(tempDir.resolve("config"));
+    Files.writeString(tempDir.resolve("config").resolve("daemon-0.conf"), "port 1194\n");
+    when(daemonService.list()).thenReturn(List.of(daemon(0, true), daemon(1, true)));
 
-      assertThat(status.brand()).isEqualTo("OpenVPN Panel");
-      assertThat(status.activeConnections()).isZero();
-      assertThat(status.daemons()).hasSize(2);
+    ServerStatusDto status = service.status();
 
-      ServerStatusDto.DaemonStatus first = status.daemons().get(0);
-      assertThat(first.index()).isZero();
-      assertThat(first.configPresent()).isTrue();
-      assertThat(first.mgmtReachable()).isTrue();
+    assertThat(status.brand()).isEqualTo("OpenVPN Panel");
+    assertThat(status.activeConnections()).isZero();
+    assertThat(status.daemons()).hasSize(2);
 
-      ServerStatusDto.DaemonStatus second = status.daemons().get(1);
-      assertThat(second.configPresent()).isFalse();
-      assertThat(second.mgmtReachable()).isFalse();
-    }
+    ServerStatusDto.DaemonStatus first = status.daemons().get(0);
+    assertThat(first.index()).isZero();
+    assertThat(first.configPresent()).isTrue();
+    assertThat(first.mgmtReachable()).isTrue();
+    assertThat(first.dco()).isTrue();
+
+    ServerStatusDto.DaemonStatus second = status.daemons().get(1);
+    assertThat(second.configPresent()).isFalse();
+    assertThat(second.mgmtReachable()).isFalse();
+  }
+
+  @Test
+  void statusTreatsStaleManagementStatusAsUnreachable() {
+    MgmtClientManager clientManager = mock(MgmtClientManager.class);
+    // Last successful poll long before the freshness window.
+    when(clientManager.cachedStatus(null, 0))
+        .thenReturn(
+            new MgmtStatus(Instant.now().minusSeconds(600), "OpenVPN 2.6.20", 0, List.of(), false));
+    service = serviceWith(clientManager);
+
+    when(daemonService.list()).thenReturn(List.of(daemon(0, true)));
+
+    assertThat(service.status().daemons().get(0).mgmtReachable()).isFalse();
   }
 
   @Test
   void statusCountsActiveConnections() {
-    service = serviceWith(17505);
+    service = serviceWith(mock(MgmtClientManager.class));
     when(daemonService.list()).thenReturn(List.of(daemon(0, true)));
     connectionRegistry.register("alice", "alice", "10.8.0.2", null, "203.0.113.5", "daemon-0");
     connectionRegistry.register("bob", "bob", "10.8.0.3", null, "203.0.113.6", "daemon-0");

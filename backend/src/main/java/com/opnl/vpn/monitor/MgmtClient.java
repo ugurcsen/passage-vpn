@@ -31,23 +31,33 @@ public class MgmtClient implements Closeable {
   private final int port;
   private final int daemonIndex;
   private final String nodeId;
+  private final String password;
 
   private Socket socket;
   private BufferedReader reader;
   private BufferedWriter writer;
 
   public MgmtClient(String host, int port, int daemonIndex) {
-    this(host, port, daemonIndex, null);
+    this(host, port, daemonIndex, null, null);
   }
 
   /**
    * @param nodeId id of the node owning the daemon, or {@code null} for the local deployment
    */
   public MgmtClient(String host, int port, int daemonIndex, String nodeId) {
+    this(host, port, daemonIndex, nodeId, null);
+  }
+
+  /**
+   * @param nodeId id of the node owning the daemon, or {@code null} for the local deployment
+   * @param password management interface password, or {@code null} when none is configured
+   */
+  public MgmtClient(String host, int port, int daemonIndex, String nodeId, String password) {
     this.host = host;
     this.port = port;
     this.daemonIndex = daemonIndex;
     this.nodeId = nodeId;
+    this.password = password;
   }
 
   public int daemonIndex() {
@@ -62,7 +72,10 @@ public class MgmtClient implements Closeable {
     return socket != null && socket.isConnected() && !socket.isClosed();
   }
 
-  /** Opens (or re-opens) the connection. Returns false when the daemon is unreachable. */
+  /**
+   * Opens (or re-opens) the connection and performs the management handshake. Returns false when
+   * the daemon is unreachable or rejected our credentials.
+   */
   public synchronized boolean connect() {
     closeQuietly();
     try {
@@ -75,6 +88,7 @@ public class MgmtClient implements Closeable {
           new BufferedWriter(
               new OutputStreamWriter(fresh.getOutputStream(), StandardCharsets.UTF_8));
       this.socket = fresh;
+      MgmtHandshake.authenticate(fresh, reader, writer, password);
       log.info(
           "Connected to management interface {}:{} (node={}, daemon {})",
           host,
@@ -82,6 +96,16 @@ public class MgmtClient implements Closeable {
           nodeLabel(),
           daemonIndex);
       return true;
+    } catch (MgmtHandshake.AuthException e) {
+      log.warn(
+          "Management {}:{} auth failed (node={}, daemon {}): {}",
+          host,
+          port,
+          nodeLabel(),
+          daemonIndex,
+          e.getMessage());
+      closeQuietly();
+      return false;
     } catch (IOException e) {
       log.debug(
           "Management {}:{} unreachable (node={}, daemon {}): {}",

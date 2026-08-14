@@ -21,12 +21,19 @@ class ServerConfigGeneratorTest {
   @Test
   void fullTunnelPushesRedirectGateway() {
     String conf =
-        generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs", "nat");
+        generator.render(
+            ServerConfig.defaults(),
+            "/pki",
+            "/ccd",
+            "/scripts",
+            "/logs",
+            "nat",
+            "/config/daemon-0.mgmt-pass");
     assertThat(conf).contains("push \"redirect-gateway def1 bypass-dhcp\"");
     assertThat(conf).contains("port 1194");
     assertThat(conf).contains("proto udp");
     assertThat(conf).contains("server 10.8.0.0 255.255.255.0");
-    assertThat(conf).contains("management 0.0.0.0 7505");
+    assertThat(conf).contains("management 0.0.0.0 7505 /config/daemon-0.mgmt-pass");
     // management-signal must never be rendered: it would SIGUSR1-restart the
     // daemon (dropping all sessions) whenever the management client disconnects.
     assertThat(conf).doesNotContain("management-signal");
@@ -53,7 +60,9 @@ class ServerConfigGeneratorTest {
             "vpn.example.com",
             false,
             null);
-    String conf = generator.render(split, "/pki", "/ccd", "/scripts", "/logs", "nat");
+    String conf =
+        generator.render(
+            split, "/pki", "/ccd", "/scripts", "/logs", "nat", "/config/daemon-0.mgmt-pass");
     assertThat(conf).doesNotContain("redirect-gateway");
     assertThat(conf).contains("proto tcp");
     assertThat(conf).contains("port 1195");
@@ -94,7 +103,9 @@ class ServerConfigGeneratorTest {
             "vpn.example.com",
             false,
             null);
-    String conf = generator.render(generic, "/pki", "/ccd", "/scripts", "/logs", "nat");
+    String conf =
+        generator.render(
+            generic, "/pki", "/ccd", "/scripts", "/logs", "nat", "/config/daemon-0.mgmt-pass");
     assertThat(conf).contains("verify-client-cert none");
     assertThat(conf).doesNotContain("client-cert-not-required");
   }
@@ -102,13 +113,34 @@ class ServerConfigGeneratorTest {
   @Test
   void renderSurfacesNetworkMode() {
     String routed =
-        generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs", "routed");
+        generator.render(
+            ServerConfig.defaults(),
+            "/pki",
+            "/ccd",
+            "/scripts",
+            "/logs",
+            "routed",
+            "/config/daemon-0.mgmt-pass");
     assertThat(routed).contains("# network-mode routed");
     String nat =
-        generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs", "nat");
+        generator.render(
+            ServerConfig.defaults(),
+            "/pki",
+            "/ccd",
+            "/scripts",
+            "/logs",
+            "nat",
+            "/config/daemon-0.mgmt-pass");
     assertThat(nat).contains("# network-mode nat");
     String blank =
-        generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs", null);
+        generator.render(
+            ServerConfig.defaults(),
+            "/pki",
+            "/ccd",
+            "/scripts",
+            "/logs",
+            null,
+            "/config/daemon-0.mgmt-pass");
     assertThat(blank).contains("# network-mode nat");
   }
 
@@ -128,7 +160,14 @@ class ServerConfigGeneratorTest {
   @Test
   void renderSubstitutesEveryPlaceholder() {
     String conf =
-        generator.render(ServerConfig.defaults(), "/pki", "/ccd", "/scripts", "/logs", "nat");
+        generator.render(
+            ServerConfig.defaults(),
+            "/pki",
+            "/ccd",
+            "/scripts",
+            "/logs",
+            "nat",
+            "/config/daemon-0.mgmt-pass");
     for (String token :
         List.of(
             "__PORT__",

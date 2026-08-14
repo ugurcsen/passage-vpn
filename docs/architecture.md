@@ -82,6 +82,14 @@ reconnect storms. Protocol is the OpenVPN management interface: plain-text
 commands (`status 3`, `kill`, `signal`) and asynchronous `>` events consumed by
 the monitor.
 
+The management interface is **password-protected**: every generated daemon
+config points at a per-daemon password file (`daemon-<index>.mgmt-pass`, mode
+0600) via `management 0.0.0.0 <port> <file>`, and the backend authenticates on
+connect (`MgmtHandshake`). Both the local backend (`OPNL_OPENVPN_MGMT_PASSWORD`)
+and every registered node must carry a management password; connections to a
+daemon without one are refused (fail closed). Startup fails fast when the local
+password is missing or still the placeholder (`SecurityBootstrapCheck`).
+
 The daemon template deliberately does **not** enable
 `restart-on-management-disconnect`, because the backend keeps persistent
 connections and container-level reloads replace that mechanism.
@@ -89,7 +97,8 @@ connections and container-level reloads replace that mechanism.
 ### 2.4 Script callbacks (the connect/disconnect path)
 
 OpenVPN invokes scripts that call back into the backend over the restricted
-docker network (`/internal/**`, guarded by `X-Internal-Token`):
+docker network (`/internal/**`, guarded by the mandatory `X-Internal-Token`
+shared secret):
 
 - `verify-user-pass.sh` — `auth-user-pass-verify` (password, optional inline
   TOTP) against `/internal/auth/verify`; triggers the auth-pending flow when MFA
@@ -141,7 +150,10 @@ Package root `com.opnl.vpn` (`backend/src/main/java/com/opnl/vpn`):
 - `/api/portal/**` — self-service (own profile, own certificates), scoped to the
   calling user.
 - `/internal/**` — script-facing endpoints; not routable outside the docker
-  network, guarded by `X-Internal-Token` (`InternalTokenFilter`).
+  network. The local script callbacks are guarded by the mandatory
+  `X-Internal-Token` shared secret (`InternalTokenFilter`), and the node-agent
+  endpoints (`/internal/node/*`) additionally run on a **mutual-TLS connector**
+  (port 9443) that requires a client certificate whose `CN = agent-<nodeName>`.
 - `/api/setup/**`, `/api/public/**`, `/api/portal/share/**`, auth endpoints,
   `/ws/**`, Swagger and health paths are public by design
   (`PUBLIC_PATHS` in `SecurityConfig`).
@@ -173,6 +185,22 @@ authorization via `@PreAuthorize("hasRole('ADMIN')")` etc. and the Swagger
   port base. Status/kill/monitoring route per (node, daemon). The `agent`
   Spring profile (`com.opnl.vpn.node`) turns a backend image into a node agent
   that registers and heartbeats via `/internal/node/*`.
+  - **Transport security**: the agent talks to the central backend over an
+    mTLS-only connector (`opnl.internal.mtls-port`, default 9443). The central
+    backend generates its internal CA + server keystore on first boot
+    (`InternalTlsBootstrap`) and issues one client certificate per node via
+    `POST /api/admin/nodes/{id}/agent-cert` (CN `agent-<nodeName>`); the agent
+    presents it through `opnl.agent.tls-ca|cert|key`. Requests that do not
+    arrive on the mTLS port, lack a client cert, or carry a cert for a
+    different node are rejected (`mtls_required` / `client_cert_required` /
+    `cert_identity_mismatch`). `X-Internal-Token` remains as defense-in-depth.
+  - **Management credentials**: `register` requires a management password,
+    stored per node; the central backend authenticates to the remote daemon
+    with it (fail closed if missing).
+  - **Source-IP pinning**: when a node has `adminIp` set, agent `register` and
+    `heartbeat` are only accepted from that address (403
+    `source_ip_mismatch`), hardening the registration path even before the
+    certificate is provisioned.
 - **Per-client firewall**: see `docs/access-rules.md`.
 
 ## 6. Frontend

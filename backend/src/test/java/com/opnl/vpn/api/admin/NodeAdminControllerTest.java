@@ -14,7 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opnl.vpn.common.GlobalExceptionHandler;
+import com.opnl.vpn.internal.InternalTlsService;
 import com.opnl.vpn.network.NodeRegistryService;
+import com.opnl.vpn.network.OpenVpnNode;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -28,15 +30,17 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class NodeAdminControllerTest {
 
   private NodeRegistryService nodeRegistryService;
+  private InternalTlsService tlsService;
   private MockMvc mvc;
   private ObjectMapper objectMapper;
 
   @BeforeEach
   void setUp() {
     nodeRegistryService = mock(NodeRegistryService.class);
+    tlsService = mock(InternalTlsService.class);
     objectMapper = new ObjectMapper();
     mvc =
-        MockMvcBuilders.standaloneSetup(new NodeAdminController(nodeRegistryService))
+        MockMvcBuilders.standaloneSetup(new NodeAdminController(nodeRegistryService, tlsService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -48,6 +52,8 @@ class NodeAdminControllerTest {
         "vpn-eu.example.com",
         7505,
         "10.0.0.5",
+        true,
+        null,
         true,
         Instant.parse("2026-01-01T00:00:00Z"),
         null,
@@ -109,5 +115,29 @@ class NodeAdminControllerTest {
     mvc.perform(post("/api/admin/nodes/n1/enabled").param("enabled", "false"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.enabled").value(true));
+  }
+
+  @Test
+  void agentCertDelegatesToTlsService() throws Exception {
+    OpenVpnNode node =
+        OpenVpnNode.builder()
+            .id("n1")
+            .name("edge-eu")
+            .mgmtHost("vpn-eu.example.com")
+            .mgmtPortBase(7505)
+            .enabled(true)
+            .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .build();
+    when(nodeRegistryService.requireNode("n1")).thenReturn(node);
+    when(tlsService.issueAgentCert("edge-eu", null))
+        .thenReturn(
+            new InternalTlsService.AgentCertificate(
+                "edge-eu", "ca-pem", "cert-pem", "key-pem", new byte[] {1, 2, 3}, "bundle-pass"));
+    mvc.perform(post("/api/admin/nodes/n1/agent-cert"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.nodeName").value("edge-eu"))
+        .andExpect(jsonPath("$.caCert").value("ca-pem"))
+        .andExpect(jsonPath("$.password").value("bundle-pass"));
+    verify(tlsService).issueAgentCert("edge-eu", null);
   }
 }

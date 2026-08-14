@@ -213,7 +213,10 @@ shopt -s nullglob
 
 conf_sig() {
     local sig="" conf
-    for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do
+    # Include the management password files: a password rotation must also
+    # reload the daemons, otherwise the old password stays active until the
+    # next unrelated config change.
+    for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf "$OPNL_CONFIG_DIR"/daemon-*.mgmt-pass; do
         [ -f "$conf" ] && sig+="$(md5sum "$conf" | cut -d' ' -f1)"
     done
     echo "$sig"

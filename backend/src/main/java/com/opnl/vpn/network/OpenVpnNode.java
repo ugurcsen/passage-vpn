@@ -40,6 +40,14 @@ public class OpenVpnNode {
   @Column(name = "admin_ip")
   private String adminIp;
 
+  /** Management interface password for this gateway (used to open management sessions). */
+  @Column(name = "mgmt_password")
+  private String mgmtPassword;
+
+  /** Source IP of the last accepted registration/heartbeat; used for admin-IP pinning. */
+  @Column(name = "last_seen_ip")
+  private String lastSeenIp;
+
   @Column(nullable = false)
   @Builder.Default
   private boolean enabled = true;

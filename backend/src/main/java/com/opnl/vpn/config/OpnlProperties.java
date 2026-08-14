@@ -11,6 +11,8 @@ import org.springframework.validation.annotation.Validated;
 public record OpnlProperties(
     String dataDir, String brandName, String internalToken, Jwt jwt, Auth auth, OpenVpn openvpn) {
 
+  public static final String DEFAULT_INTERNAL_TOKEN = "change-me-internal-token";
+
   public record Jwt(@NotBlank String secret, long accessTtlSeconds, long refreshTtlDays) {
     public Duration accessTtl() {
       return Duration.ofSeconds(accessTtlSeconds);
@@ -40,7 +42,8 @@ public record OpnlProperties(
       String scriptsSrcDir,
       String internalBaseUrl,
       String easyrsaBin,
-      String logDir) {
+      String logDir,
+      String mgmtPassword) {
     public String mgmtEndpoint() {
       return mgmtHost + ":" + mgmtPort;
     }
