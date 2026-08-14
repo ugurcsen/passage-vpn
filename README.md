@@ -9,8 +9,14 @@ features on top of open source components:
 - **Deploy**: Docker Compose, Makefile, `install.sh`
 
 See `AGENTS.md` for the agent/developer guide, `TODO.md` for the phased roadmap,
-`RELEASE_NOTES.md` for release history, and `docs/` for architecture and API
-documentation.
+`RELEASE_NOTES.md` for release history, and `docs/` for detailed documentation:
+
+| Doc | Contents |
+|---|---|
+| `docs/architecture.md` | Component topology, backend module map, VPN/management integration, security model |
+| `docs/access-rules.md` | Firewall + DNS control: rule model, iptables rendering, domain pinning, dual-stack |
+| `docs/api.md` | REST API reference (regenerated with `make api-docs`) |
+| `docs/ROADMAP.md` | Milestone status for the current release cycle |
 
 ## Quick start
 
@@ -22,21 +28,30 @@ make up                      # build + start all services
 make logs                    # follow logs; open http://localhost:8080
 ```
 
+On first boot complete the setup wizard (admin account → VPN server → PKI).
+Alternatively bootstrap non-interactively with `make seed-admin` and try the
+sample dataset with `make seed-demo` (or set `OPNL_DEMO_MODE=true` in `.env`
+to auto-load it on first boot). Demo users use the password `demo-password-1`.
+
 ## Features
 
-- Users & groups with per-user/per-group settings and inheritance
-- Local auth + TOTP MFA, brute-force lockout, JWT + RBAC (Admin/Reseller/User)
-- Built-in CA via Easy-RSA; issue / revoke / restore / rotate certificates; CRL
-- Connection profiles: user-locked, auto-login, server-locked, generic; .ovpn download,
-  token URLs, QR sharing, client self-service portal
-- Access control rules (IP/subnet, protocol/port, full/split tunnel) via iptables
-- Live monitoring: online users, traffic, session history, dashboard, WebSocket push
-- Branding, configuration report, backup/restore, multi-daemon
-- Multi-node: `openvpn_nodes` registry + admin VPN Nodes page; node-aware
-  status/kill/monitoring routing; backend `agent` Spring profile registers and
-  heartbeats remote gateway nodes to the central backend (`/internal/node/*`)
-- PostgreSQL profile (`OPNL_PROFILE=postgres`) with a dedicated
-  `db/migration-postgresql` migration set + parity test
+| Area | Capabilities |
+|---|---|
+| Users & groups | Accounts, groups with parent/subgroup inheritance, per-user/per-group settings, lock/ban |
+| Auth | Local auth + TOTP MFA, brute-force lockout, JWT access/refresh tokens, RBAC (Admin/Reseller/User), API tokens for automation |
+| PKI | Built-in CA via Easy-RSA; issue / revoke / restore / rotate certificates; CRL |
+| Connection profiles | User-locked, auto-login, server-locked, generic; `.ovpn` download, token URLs, QR sharing, client self-service portal |
+| Access control | Rules per user/group/global (IP/subnet, protocol/port, group subnet, domain), full/split tunnel, DNS overrides with scoped access, dual-stack iptables/ip6tables enforcement |
+| Monitoring | Online users, traffic, session history, live dashboard, WebSocket push, multi-daemon status/kill |
+| Nodes | `openvpn_nodes` registry + VPN Nodes page; node-aware status/kill/monitoring; backend `agent` profile registers remote gateways via `/internal/node/*` |
+| Operations | Branding, config report, backup/restore, audit log, demo/seed mode, PostgreSQL profile (`OPNL_PROFILE=postgres`) |
+
+## Documentation
+
+- **Architecture** — `docs/architecture.md`
+- **Access rules & DNS control** — `docs/access-rules.md`
+- **API reference** — `docs/api.md` (Swagger UI at `/swagger-ui.html` on the backend)
+- **Roadmap** — `docs/ROADMAP.md`
 
 ## Development
 

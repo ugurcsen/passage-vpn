@@ -30,6 +30,8 @@ case with wrong status code / masking, `[LOW]` polish / hardening.
 | 10 | LOW | Empty `#root` flash when loading `/login` after a hard reload | frontend router |
 | 11 | LOW | A11y: form field without id/name attribute | frontend |
 | 12 | LOW | Pre-fix invalid access rule remains in production data | data hygiene |
+| 13 | MED | Demo-seeded cert rows have no backing PKI files | demo mode |
+| 14 | HIGH | Full-tunnel VPN client on the server host black-holes host routing | operational |
 
 ---
 
@@ -395,6 +397,50 @@ surfaces and keeps the invalid value visible to admins.
 2. Add a regression step (section 4): re-create `not-a-cidr` → must be rejected 400
    (confirms finding 2.7 holds); the only way a bad CIDR exists is via pre-validation data.
 
+### 2.13 MED — Demo-seeded certificate rows have no backing PKI files
+
+**Location** `system/DemoSeedService` (demo cert rows) + `profile/ProfileService`
+(`downloadForUser` → cert lookup).
+
+**Repro** Fresh install → load demo data → `GET /api/admin/users/{alice}/profiles/USER_LOCKED/download`
+→ `404 pki_missing: issued/alice.crt`.
+
+**Root cause** Demo mode creates `Certificate` rows (VALID/REVOKED) without issuing real
+Easy-RSA artifacts, and profile download reads the physical `issued/<cn>.crt`. By design
+(the demo dialog states "Real client certificates are not issued"), but the resulting
+`pki_missing` error is misleading.
+
+**Impact** Demo users cannot download connection profiles; a fresh real user downloads a
+working profile (verified: real Easy-RSA cert issued, valid `.ovpn` with the configured
+`remote` endpoint).
+
+**Fix** Either issue the real cert on demand during profile download for demo certs, or
+return a friendlier `demo_cert`-style error pointing at the demo limitation.
+
+### 2.14 HIGH — Full-tunnel VPN client on the server host black-holes host routing
+
+**Location** OpenVPN client `redirect-gateway` (full-tunnel profile) + host deployment.
+
+**Repro** Start the full-tunnel `.ovpn` client on the same host that runs the VPN server.
+After connect, ALL of the host's outbound traffic (SSH responses, HTTP/panel, ICMP) is
+routed into the `tun`, which does not carry it back → the host becomes unreachable from
+the network (SSH, ping, ports 80/8080 all time out). Recovery required out-of-band access
+(Hetzner console: reboot the host or `pkill -f "openvpn --config /tmp/e2e.ovpn"` — tunnel
+routes are removed on process exit; the client is not persisted across reboot).
+
+**Root cause** The full-tunnel profile installs default routes via the tunnel on the
+client, and the server host's own egress is not exempted, so the host's replies to
+inbound connections vanish into the tunnel.
+
+**Impact** Self-hosting foot-gun: any admin running the client on the VPN server host
+locks themselves out. Not a defect in tunnel functionality for normal clients on separate
+hosts.
+
+**Fix** Document explicitly: "do not run a VPN client on the same host as the VPN server."
+For the E2E harness, run the connect test from a separate client host/VM. Consider, as
+future hardening, pushing a `route-nopull`-style warning when the client's local address
+equals the server host.
+
 ---
 
 ## 3. Verified non-issues and API notes
@@ -421,6 +467,55 @@ Recorded during testing so they are not re-reported as bugs:
 - **E2E data**: share-token `usesLeft` is enforced (`token_exhausted` 409), unknown token
   → `token_not_found` 404, MFA wrong code → `invalid_code` 401, unknown admin API path →
   see finding 2.5.
+
+### M6 fresh-install E2E pass (2026-08-14, `install.sh --reset` on 65.21.108.250)
+
+Verified on a clean install (images rebuilt, volumes wiped, `.env` preserved):
+
+- **Wizard (setup state COMPLETE)**: admin step (credentials from `.env`), VPN server
+  step (defaults; daemon created, `adminHost` = `OPNL_OPENVPN_ADMIN_HOST`), PKI step →
+  "Certificate authority initialized." CA, `server.crt`/`server.key`, `ta.key`, CRL and
+  `index.txt` all present in the PKI dir.
+- **Login** with the wizard admin → Dashboard renders all nav pages + the demo-data
+  button; daemon #0 (UDP 1194) listed.
+- **Demo data (button)**: confirm dialog → POST → toast "Demo data loaded" → stats
+  refresh (users 5, groups 2, active certs 2). API confirms users admin(ADMIN) /
+  alice/bob/carol(USER) / dave(RESELLER), all 4 access rules (`/api/admin/rules`:
+  GLOBAL ALLOW 10.8.0.0/24, GROUP DENY 10.0.0.0/8, USER alice ALLOW TCP
+  10.8.0.5/32:22, GLOBAL ALLOW git.internal) and 2 DNS overrides
+  (`git.internal→10.8.0.5` GLOBAL, `docs.internal→10.8.0.6` GROUP).
+- **Profile generation**: `GET /api/admin/users/{id}/profiles/USER_LOCKED/download`
+  issues a real Easy-RSA cert and returns a valid `.ovpn` (JSON `{filename, content}` —
+  note the API returns a JSON body, not a raw file download). The `remote` line matches
+  the daemon's corrected `adminHost`.
+- **VPN connect flow (verified end-to-end from a *separate* client)**: fresh user `e2e`
+  → real cert issued → client connects over UDP 1194 with TLS + user/pass auth (verify
+  via backend `/internal/auth`) → virtual IP `10.8.0.2` assigned, `AES-256-GCM` data
+  channel, PUSH_REPLY carries `dhcp-option DNS 10.8.0.1`, `redirect-gateway`, and
+  `ping-restart 120`; session appears in `/api/admin/connections` (username / virtual IP /
+  daemon / connectedAt) and in the daemon status file with byte counters (RX/TX rising).
+  DNS overrides resolve through the tunnel (`git.internal→10.8.0.5`,
+  `docs.internal→10.8.0.6`) and upstream resolution works (`google.com→216.58.x.x`).
+  Firewall enforcement confirmed: because GLOBAL access rules exist, *every* user gets a
+  default-deny chain — `wget http://ipv4.icanhazip.com` through the tunnel times out
+  (blocked), while DNS (dport 53) and the allowed VPN-internal/git.internal flows are
+  ACCEPTed. After an abrupt client kill, the server's inactivity timeout
+  (`--ping-restart`; note the server doubles the client's 120 to **240s**) fires
+  `client-disconnect`, the backend session clears (`/api/admin/connections` → 0 active),
+  and the per-client iptables chain is removed (only the base `OPNL_DOMAINS` chain
+  remains).
+- **Connect-test caveat**: use a separate host/VM or a disposable `docker run
+  --cap-add=NET_ADMIN --device /dev/net/tun` client container, never the server host
+  itself (finding 2.14). The generated `.ovpn` `auth-user-pass` prompt requires an
+  external `--auth-user-pass <file>` for headless use; `--daemon` must not be used as a
+  container entrypoint (parent exits → container stops).
+- **Test-harness caveats**: the wizard admin-host field got a *mangled* value
+  (`vpn.example.com65.21.108.250`) because the automation `fill` appended to the MUI
+  input; the daemon entity retained `vpn.example.com`. Fixed via
+  `PUT /api/admin/daemons/{id}` (`adminHost: 65.21.108.250`) which regenerated
+  `daemon-0.conf`. Profiles use the daemon entity, so the stale
+  `server_settings` JSON value is harmless. The tunnel connect test must run from a
+  **separate** client host (see finding 2.14).
 
 ---
 

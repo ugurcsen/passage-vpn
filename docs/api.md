@@ -309,6 +309,18 @@ API token as `X-API-Token: opnl_...` (see the Admin - API tokens endpoints).
 
 ---
 
+### `POST /api/admin/demo/seed`
+
+Seeds sample users, groups, access rules, DNS overrides, certificate rows and connection history
+
+**Tags**: Admin - Demo
+
+**Request body**: `SeedDemoRequest`
+
+**Responses**: 200
+
+---
+
 ### `GET /api/admin/dns-overrides`
 
 **Tags**: Admin - DNS Overrides
@@ -1324,6 +1336,16 @@ Exchanges the current refreshToken for a fresh accessToken/refreshToken pair. A 
 
 ---
 
+### `POST /internal/seed-demo`
+
+**Tags**: Internal
+
+**Request body**: `SeedDemoRequest`
+
+**Responses**: 200
+
+---
+
 ## Schemas
 
 ### AccessRuleDto
@@ -1652,6 +1674,14 @@ Exchanges the current refreshToken for a fresh accessToken/refreshToken pair. A 
 | `clearCcd` | boolean | no |
 | `deleteAccessRules` | boolean | no |
 | `deleteCertificates` | boolean | no |
+
+---
+
+### DemoSeedResult
+
+| Field | Type | Required |
+|---|---|---|
+| `users` | integer | no |
 
 ---
 
@@ -2026,6 +2056,22 @@ _No fields._
 |---|---|---|
 | `message` | string | no |
 | `restartRequired` | boolean | no |
+
+---
+
+### SeedDemoRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `force` | boolean | no |
+
+---
+
+### SeedDemoResponse
+
+| Field | Type | Required |
+|---|---|---|
+| `users` | integer | no |
 
 ---
 

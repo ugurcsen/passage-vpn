@@ -53,6 +53,14 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] 2.12 LOW — purge legacy `not-a-cidr:443` access rule from the staging DB; regression:
       re-create → 400 (finding 2.7 holds)
 
+**P0.5 — Follow-up sweep (M6 fresh-install E2E, `docs/test-findings.md` 2.13–2.14)**
+- [ ] 2.13 MED — demo-seeded cert rows have no backing PKI files: profile download for a
+      demo user returns `pki_missing`; either issue the real cert on demand or return a
+      clearer demo-capped error
+- [ ] 2.14 HIGH — docs: never run a full-tunnel VPN client on the VPN server host
+      (black-holes host routing, requires OOB recovery); add an operational note to
+      `README`/`docs/architecture.md`
+
 **P4 — MFA integration completion (approved plan)**
 - [x] Client `static-challenge` directive in password-auth .ovpn profiles
       (USER_LOCKED/SERVER_LOCKED/GENERIC) when MFA is in force (user `mfaEnabled`
@@ -154,8 +162,9 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 **M6 — v0.1.0-beta.1 — Release Hardening** (detail: `docs/ROADMAP.md` M6)
 - [x] Demo/seed mode (Phase 4.7)
 - [x] CI docker build job (Phase 4.7)
-- [ ] Fresh-install E2E test pass, README/docs finalization (Phase 4.7)
-- [ ] Cross-cutting sweep
+- [x] Fresh-install E2E test pass (Phase 4.7)
+- [x] README/docs finalization (Phase 4.7)
+- [x] Cross-cutting sweep (Phase 4.7)
 
 ---
 
@@ -321,7 +330,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] PostgreSQL profile validation — `db/migration-postgresql` set (V1–V17 minus V13), `application-postgres.yml`, `MigrationParityTest`
 - [x] Seed data + demo mode
 - [ ] E2E test pass (backend unit+integration, frontend unit)
-- [ ] README + docs finalization
+- [x] README + docs finalization
 - [x] CI workflow (backend test + spotless, frontend lint + build + test, docker image build job)
 
 ---

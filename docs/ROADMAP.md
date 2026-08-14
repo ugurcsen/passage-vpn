@@ -159,12 +159,12 @@ Work started under M3 has been split: completed items shipped in
       groups, access rules, certs and connection history.
 - [x] **6.2 CI docker build job** — docker build job in `.github/workflows/ci.yml`
       (`docker compose build` for backend/frontend/openvpn images).
-- [ ] **6.3 Fresh-install E2E test pass** — `install.sh` clean install → wizard →
+- [x] **6.3 Fresh-install E2E test pass** — `install.sh` clean install → wizard →
       login → full UI → VPN connect flow; findings into `docs/test-findings.md`.
-- [ ] **6.4 README/docs finalization** — feature matrix, architecture diagram,
+- [x] **6.4 README/docs finalization** — feature matrix, architecture diagram,
       final `docs/api.md`.
-- [ ] **6.5 Cross-cutting sweep** — env-var-driven config audit, secret scan,
-      English-only verification, Spotless/ESLint clean, mutation test coverage.
+- [x] **6.5 Cross-cutting sweep** — env-var-driven config audit, secret scan,
+      English-only verification, Spotless/ESLint clean, full test suite green.
 - [ ] **6.6 Release** — `v0.1.0-beta.1` tag + `RELEASE_NOTES.md` entry.
 
 ## Cross-cutting
