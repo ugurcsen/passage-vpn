@@ -82,7 +82,7 @@ Work started under M3 has been split: completed items shipped in
 - [x] **3.1b API tokens for automation** — shipped (`/api/admin/api-tokens`, `X-API-Token`)
 - [x] **3.2 Brand settings + configuration report + backup/restore** — shipped in `v0.1.0-alpha.5`
 - [x] **3.4a `install.sh` full installer + first-run wizard UI** — shipped
-- [ ] **3.1c `docs/api.md` generation** — → M4
+- [x] **3.1c `docs/api.md` generation** — shipped in M4 (4.3)
 - [ ] **3.3 Multi-node registry + node-aware routing + `agent` profile** — → M5
 - [ ] **3.4b Demo/seed mode** — → M6
 - [ ] **3.5 PostgreSQL profile validation** — → M5
@@ -103,12 +103,18 @@ Work started under M3 has been split: completed items shipped in
       iptables rules by `apply-rules.sh`; domain picker on the Access Rules page.
       Tests: `RuleEngineTest` domain resolution, `ServerConfigGeneratorTest`
       dnsmasq config rendering.
-- [ ] **4.3 `docs/api.md` generation** — regenerate via `make api-docs` against
-      the live backend and commit; verify in live E2E.
-- [ ] **4.4 Full CRUD API completion** — audit admin/portal namespaces for gaps
-      (daemon management, connection kill, node lifecycle) and fill them.
-- [ ] **4.5 Makefile polish** — complete targets, `api-docs` verification step,
-      `help` refresh.
+- [x] **4.3 `docs/api.md` generation** — regenerated live via `make api-docs`
+      against the production backend and committed (`v0.1.0-alpha.15`).
+- [x] **4.4 Full CRUD API completion** — audit done against the live OpenAPI
+      document: daemon management (CRUD + enabled/restore) ✓, connection kill ✓,
+      node lifecycle → M5; users full CRUD, groups/rules/daemons/dns-overrides
+      list+create+update+delete, certs lifecycle ops, portal self-service
+      complete. Single-resource GET symmetry for list-driven resources is not
+      needed by the UI (list returns full DTOs) and was left as-is.
+- [x] **4.5 Makefile polish** — `api-docs` target gains a backend-reachability
+      guard (friendly error instead of a raw urllib failure), split
+      `test-backend`/`test-frontend`/`lint-backend`/`lint-frontend` targets,
+      refreshed `help`.
 - [x] **4.7 DNS overrides** — admin-defined internal hostname → IPv4 records
       served authoritatively by the shared dnsmasq (`Flyway V12`, entity
       `DnsRecord`, `DnsOverrideService`, `/api/admin/dns-overrides`). GLOBAL

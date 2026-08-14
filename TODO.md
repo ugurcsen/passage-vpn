@@ -132,9 +132,12 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       scoped override is reachable by out-of-scope users via an ALLOW rule
       (ALLOW-wins ordering unchanged), surfaced as tooltip warnings in the DNS
       Overrides and Access Rules grids
-- [ ] `docs/api.md` generation (script + make target ready; regenerate live in E2E)
-- [ ] Full CRUD API completion (Phase 4.4)
-- [ ] Makefile polish (Phase 4.7)
+- [x] `docs/api.md` generation — regenerated live via `make api-docs`
+      (`v0.1.0-alpha.15`, 110 endpoints + schemas)
+- [x] Full CRUD API completion — audit done: daemon management ✓, connection
+      kill ✓, node lifecycle → M5; admin + portal namespaces full CRUD
+- [x] Makefile polish — `api-docs` backend guard + split
+      `test-backend`/`test-frontend`/`lint-backend`/`lint-frontend` targets
 - [x] M4 release — `v0.1.0-alpha.8` tag + `RELEASE_NOTES.md` entry
 
 **P1 — PKI reconciliation & deletion cleanup (v0.1.0-alpha.12)**
@@ -294,9 +297,9 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] `connection_logs` retention policy
 
 ### 4.4 REST API
-- [ ] Full CRUD API for all resources (admin + portal namespaces)
+- [x] Full CRUD API for all resources (admin + portal namespaces)
 - [x] OpenAPI/Swagger UI + bearer-auth testing (v0.1.0-alpha.4)
-- [ ] `docs/api.md` generation; API tokens for automation
+- [x] `docs/api.md` generation; API tokens for automation
 - [x] API tokens for automation
 
 ### 4.5 Branding, backup, config report
@@ -312,7 +315,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [ ] Backend `agent` Spring profile (lightweight OpenVPN node agent) — stretch
 
 ### 4.7 Deployment & polish
-- [ ] Complete `Makefile` targets
+- [x] Complete `Makefile` targets (api-docs guard, split test/lint targets)
 - [x] `install.sh` full installer (preflight, env, build, up, wizard)
 - [x] First-run wizard UI (frontend) — admin → VPN server → PKI → complete; login gated on `COMPLETE`
 - [ ] PostgreSQL docker profile + `application-postgres.yml` validation
