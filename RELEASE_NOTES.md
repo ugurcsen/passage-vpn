@@ -8,6 +8,23 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.14.2 — 2026-08-14
+
+Patch release recording the live verification of mandatory MFA on
+`65.21.108.250` (deploys `v0.1.0-alpha.14` + `.14.1`). Full API end-to-end
+pass: admin and an unenrolled user are both forced to enroll after login, the
+QR/secret provisioning and TOTP confirm succeed and issue session tokens,
+`GET /api/auth/me` reports `mfaEnabled=true`/`mfaRequired=true`, VPN
+`verifyVpnLogin` denies with `mfa_required` without a code and allows with a
+valid code (wrong code → `invalid_code`), and admin + self-service
+`mfa/disable` both return 403 under the policy. Browser UI pass: Settings lists
+"Require MFA", the Users MFA column renders, and an unenrolled user is
+redirected to `/login/enroll`, scans the QR, enters a valid code and signs in.
+Test users and the `require_mfa` setting were removed afterwards, restoring the
+original production state. Tag: `v0.1.0-alpha.14.2`.
+
+---
+
 ## v0.1.0-alpha.14.1 — 2026-08-14
 
 Patch release fixing forced-MFA enrollment on the live deployment: the new
