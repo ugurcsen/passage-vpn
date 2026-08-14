@@ -19,6 +19,7 @@ import { GroupsPage } from "@/pages/GroupsPage";
 import { CertsPage } from "@/pages/CertsPage";
 import { AccessRulesPage } from "@/pages/AccessRulesPage";
 import { DnsOverridesPage } from "@/pages/DnsOverridesPage";
+import { NodesPage } from "@/pages/NodesPage";
 import { ProfilesPage } from "@/pages/ProfilesPage";
 import { DaemonsPage } from "@/pages/DaemonsPage";
 import { StatusPage } from "@/pages/StatusPage";
@@ -102,6 +103,10 @@ function ThemedApp() {
                     <Route
                       path="/dns"
                       element={<RoleRoute roles={["ADMIN"]}><DnsOverridesPage /></RoleRoute>}
+                    />
+                    <Route
+                      path="/nodes"
+                      element={<RoleRoute roles={["ADMIN"]}><NodesPage /></RoleRoute>}
                     />
                     <Route
                       path="/profiles"

@@ -83,6 +83,7 @@ describe("AppLayout navigation by role", () => {
     present("Access Rules");
     present("Connection Profiles");
     present("VPN Daemons");
+    present("VPN Nodes");
     present("Live Status");
     present("Settings");
     present("Branding");

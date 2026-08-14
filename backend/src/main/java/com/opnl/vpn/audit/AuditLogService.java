@@ -46,6 +46,7 @@ public class AuditLogService {
   public static final String CAT_API = "API";
   public static final String CAT_BACKUP = "BACKUP";
   public static final String CAT_DNS = "DNS";
+  public static final String CAT_NODE = "NODE";
 
   public static final String CAT_SYSTEM = "SYSTEM";
 

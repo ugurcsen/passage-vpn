@@ -147,7 +147,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] alpha.12 release — tag + `RELEASE_NOTES.md` entry
 
 **M5 — v0.1.0-alpha.9 — Multi-node & Ops** (detail: `docs/ROADMAP.md` M5)
-- [ ] `openvpn_nodes` registry + node-aware status/kill/monitoring routing (Phase 4.6)
+- [~] `openvpn_nodes` registry (5.1 done) + node-aware status/kill/monitoring routing (Phase 4.6)
 - [ ] Backend `agent` Spring profile (Phase 4.6)
 - [ ] PostgreSQL docker profile validation (Phase 4.7)
 

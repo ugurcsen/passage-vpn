@@ -26,6 +26,7 @@ import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import DownloadIcon from "@mui/icons-material/Download";
 import DnsIcon from "@mui/icons-material/Dns";
 import LanguageIcon from "@mui/icons-material/Language";
+import HubIcon from "@mui/icons-material/Hub";
 import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import SettingsIcon from "@mui/icons-material/Settings";
 import SecurityIcon from "@mui/icons-material/Security";
@@ -61,6 +62,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "DNS Overrides", path: "/dns", icon: <LanguageIcon />, roles: ["ADMIN"] },
   { label: "Connection Profiles", path: "/profiles", icon: <DownloadIcon />, roles: ["ADMIN"] },
   { label: "VPN Daemons", path: "/daemons", icon: <DnsIcon />, roles: ["ADMIN"] },
+  { label: "VPN Nodes", path: "/nodes", icon: <HubIcon />, roles: ["ADMIN"] },
   { label: "My Profiles", path: "/portal", icon: <PersonIcon /> },
   { label: "My Account", path: "/portal/account", icon: <SecurityIcon /> },
   { label: "Live Status", path: "/status", icon: <MonitorHeartIcon />, roles: ["ADMIN"] },

@@ -220,6 +220,7 @@ export const endpoints = {
   certs: "/admin/certs",
   rules: "/admin/rules",
   dnsOverrides: "/admin/dns-overrides",
+  nodes: "/admin/nodes",
   daemons: "/admin/daemons",
   profileTokens: "/admin/profile-tokens",
   portalProfiles: "/portal/profiles",
@@ -438,6 +439,20 @@ export interface DnsRecordDto {
   createdAt: string;
   /** ALLOW rules that let out-of-scope users reach this address despite its scope. */
   warnings: string[];
+}
+
+/** A registered VPN gateway node managed by the central backend. */
+export interface OpenVpnNode {
+  id: string;
+  name: string;
+  mgmtHost: string;
+  mgmtPortBase: number;
+  adminIp: string | null;
+  enabled: boolean;
+  createdAt: string;
+  lastSeenAt: string | null;
+  /** True when the node's agent heartbeat is fresh (within the online window). */
+  online: boolean;
 }
 
 /** Snapshot of the running configuration for support/auditing. */
