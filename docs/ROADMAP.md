@@ -142,7 +142,7 @@ Work started under M3 has been split: completed items shipped in
       (reconnect/backoff), node-scoped `/api/admin/monitor`, `/api/admin/status`,
       connection-logs reconciliation and `kill <cn>`; node column/picker on the
       Status page.
-- [ ] **5.3 Backend `agent` Spring profile** — lightweight agent managing its own
+- [x] **5.3 Backend `agent` Spring profile** — lightweight agent managing its own
       openvpn container, registering/heartbeating to the central backend via
       `/internal/node/*` (network-restricted, `OPNL_INTERNAL_TOKEN`).
       `application-agent.yml`.
