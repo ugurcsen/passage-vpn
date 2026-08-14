@@ -8,7 +8,11 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
   flyway:
     enabled: true
-    locations: classpath:db/migration
+    # PostgreSQL keeps its own migration set (Boolean defaults use TRUE/FALSE,
+    # which SQLite writes as 1/0). Keep db/migration-postgresql in sync with the
+    # base db/migration files; MigrationParityTest enforces version parity. The
+    # set lives OUTSIDE db/migration so Flyway never scans both trees at once.
+    locations: classpath:db/migration-postgresql
 
 # PostgreSQL profile: override SQLite defaults for portable-to-PostgreSQL validation.
 # SQLite-specific migration quirks are avoided by writing portable SQL in db/migration.

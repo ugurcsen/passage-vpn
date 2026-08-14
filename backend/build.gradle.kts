@@ -43,6 +43,7 @@ dependencies {
 
     // Database: SQLite + Flyway (PostgreSQL-ready)
     implementation("org.xerial:sqlite-jdbc")
+    runtimeOnly("org.postgresql:postgresql")
     // Flyway 9.x: last line with built-in SQLite support; also works for PostgreSQL.
     implementation("org.flywaydb:flyway-core:9.22.3")
     implementation("org.hibernate.orm:hibernate-community-dialects")
