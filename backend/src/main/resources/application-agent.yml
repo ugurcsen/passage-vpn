@@ -1,0 +1,8 @@
+opnl:
+  agent:
+    central-base-url: ${OPNL_AGENT_CENTRAL_BASE_URL:http://backend:8080}
+    node-name: ${OPNL_AGENT_NODE_NAME:}
+    mgmt-host: ${OPNL_AGENT_MGMT_HOST:openvpn}
+    mgmt-port-base: ${OPNL_AGENT_MGMT_PORT_BASE:7505}
+    admin-ip: ${OPNL_AGENT_ADMIN_IP:}
+    heartbeat-seconds: ${OPNL_AGENT_HEARTBEAT_SECONDS:30}

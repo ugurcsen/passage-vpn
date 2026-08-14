@@ -128,6 +128,62 @@ public class NodeRegistryService {
     nodeRepository.save(node);
   }
 
+  /**
+   * Idempotent upsert used by remote node agents (profile {@code agent}). Nodes are keyed by name:
+   * the first call creates the node and any later call refreshes its endpoint details, re-enables
+   * it and marks it online. Returns the node id so the agent can heartbeat afterwards.
+   */
+  @Transactional
+  public String upsertByAgent(String name, String mgmtHost, int mgmtPortBase, String adminIp) {
+    String normalized = name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
+    if (normalized.isBlank() || normalized.length() > 64) {
+      throw ApiException.badRequest("missing_name", "Node name is required (max 64 chars)");
+    }
+    if (mgmtHost == null || mgmtHost.isBlank()) {
+      throw ApiException.badRequest("missing_mgmt_host", "Management host is required");
+    }
+    if (mgmtPortBase < 1 || mgmtPortBase > 65535) {
+      throw ApiException.badRequest("invalid_mgmt_port", "Management port base must be 1-65535");
+    }
+    OpenVpnNode existing = nodeRepository.findByNameIgnoreCase(normalized).orElse(null);
+    if (existing == null) {
+      OpenVpnNode node =
+          OpenVpnNode.builder()
+              .id(UUID.randomUUID().toString())
+              .name(normalized)
+              .mgmtHost(mgmtHost.trim())
+              .mgmtPortBase(mgmtPortBase)
+              .adminIp(blankToNull(adminIp))
+              .enabled(true)
+              .createdAt(Instant.now())
+              .lastSeenAt(Instant.now())
+              .build();
+      OpenVpnNode saved = nodeRepository.save(node);
+      auditLogService.record(
+          "NODE_CREATE",
+          AuditLogService.CAT_NODE,
+          saved.getId(),
+          "vpn_node",
+          Map.of("name", saved.getName(), "mgmtHost", saved.getMgmtHost()));
+      log.info("Agent registered new node '{}' ({})", saved.getName(), saved.getId());
+      return saved.getId();
+    }
+    existing.setMgmtHost(mgmtHost.trim());
+    existing.setMgmtPortBase(mgmtPortBase);
+    existing.setAdminIp(blankToNull(adminIp));
+    existing.setEnabled(true);
+    existing.setLastSeenAt(Instant.now());
+    nodeRepository.save(existing);
+    auditLogService.record(
+        "NODE_UPDATE",
+        AuditLogService.CAT_NODE,
+        existing.getId(),
+        "vpn_node",
+        Map.of("name", existing.getName(), "source", "agent"));
+    log.info("Agent re-registered node '{}' ({})", existing.getName(), existing.getId());
+    return existing.getId();
+  }
+
   private void validate(NodeRequest request, String currentId) {
     String name = request.name() == null ? "" : request.name().trim().toLowerCase(Locale.ROOT);
     if (name.isBlank()) {

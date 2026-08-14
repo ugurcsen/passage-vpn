@@ -79,6 +79,31 @@ services:
     ports:
       - "${OPNL_FRONTEND_PORT:-80}:80"
 
+  # --- Remote node agent (opt-in; start on a gateway node with --profile node) ---
+  # Registers/heartbeats to the central backend and must share OPNL_INTERNAL_TOKEN.
+  #   docker compose --profile node up -d opnl-agent
+  opnl-agent:
+    profiles: ["node"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: opnl-node-agent
+    restart: unless-stopped
+    environment:
+      OPNL_PROFILE: agent
+      OPNL_AGENT_CENTRAL_BASE_URL: ${OPNL_AGENT_CENTRAL_BASE_URL:-http://backend:8080}
+      OPNL_AGENT_NODE_NAME: ${OPNL_AGENT_NODE_NAME:-}
+      OPNL_AGENT_MGMT_HOST: ${OPNL_AGENT_MGMT_HOST:-openvpn}
+      OPNL_AGENT_MGMT_PORT_BASE: ${OPNL_AGENT_MGMT_PORT_BASE:-7505}
+      OPNL_AGENT_ADMIN_IP: ${OPNL_AGENT_ADMIN_IP:-}
+      OPNL_AGENT_HEARTBEAT_SECONDS: ${OPNL_AGENT_HEARTBEAT_SECONDS:-30}
+      OPNL_INTERNAL_TOKEN: ${OPNL_INTERNAL_TOKEN:-change-me-internal-token}
+      OPNL_SERVER_PORT: ${OPNL_SERVER_PORT:-8080}
+    networks:
+      - opnl-net
+    expose:
+      - "8080"
+
   # --- CI / test runners (build stage; activate with --profile ci) ---
   # docker compose --profile ci run --rm backend-build test
   # docker compose --profile ci run --rm frontend-build run test

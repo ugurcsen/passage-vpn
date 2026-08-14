@@ -188,4 +188,51 @@ class NodeRegistryServiceTest {
         .thenReturn(List.of(node("n1", "edge-eu", "vpn-eu.example.com", 7505)));
     assertThat(service.enabledNodes()).hasSize(1);
   }
+
+  @Test
+  void upsertByAgentCreatesWhenMissing() {
+    when(nodeRepository.findByNameIgnoreCase("edge-eu")).thenReturn(Optional.empty());
+
+    String id = service.upsertByAgent("Edge-EU", "vpn-eu.example.com", 7505, "10.0.0.5");
+
+    ArgumentCaptor<OpenVpnNode> captor = ArgumentCaptor.forClass(OpenVpnNode.class);
+    verify(nodeRepository).save(captor.capture());
+    assertThat(captor.getValue().getName()).isEqualTo("edge-eu");
+    assertThat(captor.getValue().isEnabled()).isTrue();
+    assertThat(captor.getValue().getLastSeenAt()).isNotNull();
+    assertThat(id).isEqualTo(captor.getValue().getId());
+    verify(auditLogService).record(anyString(), any(), eq(id), any(), any());
+  }
+
+  @Test
+  void upsertByAgentReusesExistingNode() {
+    OpenVpnNode existing = node("n1", "edge-eu", "vpn-eu.example.com", 7505);
+    existing.setEnabled(false);
+    when(nodeRepository.findByNameIgnoreCase("edge-eu")).thenReturn(Optional.of(existing));
+
+    String id = service.upsertByAgent("edge-eu", "10.0.0.9", 7605, null);
+
+    assertThat(id).isEqualTo("n1");
+    assertThat(existing.getMgmtHost()).isEqualTo("10.0.0.9");
+    assertThat(existing.getMgmtPortBase()).isEqualTo(7605);
+    assertThat(existing.getAdminIp()).isNull();
+    assertThat(existing.isEnabled()).isTrue();
+    assertThat(existing.getLastSeenAt()).isNotNull();
+    verify(nodeRepository).save(existing);
+  }
+
+  @Test
+  void upsertByAgentRejectsBlankName() {
+    assertThatThrownBy(() -> service.upsertByAgent(" ", "host", 7505, null))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("Node name is required");
+    verify(nodeRepository, never()).save(any());
+  }
+
+  @Test
+  void upsertByAgentRejectsInvalidPort() {
+    assertThatThrownBy(() -> service.upsertByAgent("edge-eu", "host", 70000, null))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("Management port base");
+  }
 }
