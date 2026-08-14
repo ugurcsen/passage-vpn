@@ -8,6 +8,76 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.13 — 2026-08-14
+
+Thirteenth tagged milestone (SemVer pre-release): backup import with restore
+hardening, and the Maintenance page (Danger Zone). Uploaded archives are
+validated before they are kept, a restored database snapshot must pass
+integrity, foreign-key and schema-version checks (with a rollback copy kept),
+and a preflight gate runs config smoke tests so restart/reload are refused
+while the installation is unhealthy. Includes everything from
+`v0.1.0-alpha.12` plus the changes below. Tag: `v0.1.0-alpha.13`.
+
+### Phase M4.5 follow-up — Backup import & restore hardening
+- [x] `POST /api/admin/backups/import` (ADMIN, multipart) — uploads streamed to
+      a temp file, validated (must contain `manifest.json` or `opnl.db`, plus a
+      normalized-path zip-slip scan), then stored under the backup filename
+      pattern or renamed `imported-<stamp>.zip` on collision; audited as
+      `BACKUP_IMPORT`; Spring + nginx request limits raised to 256 MB
+- [x] `BackupService.validateSnapshot` — a backup DB is swapped in only after
+      `PRAGMA integrity_check`, `PRAGMA foreign_key_check` and a Flyway
+      schema-version match against the live database, so a restore can never
+      crash-loop the backend
+- [x] `BackupService.createRollbackCopy` — pre-restore DB preserved as
+      `rollback/opnl.db.pre-restore-<stamp>` (newest 5 kept) and surfaced in
+      the restore response + audit record
+- [x] Restore re-marks extracted `.sh`/`.py` helper scripts executable — ZIP
+      entries and plain copies drop the exec bit, which broke daemon reloads
+      after a restore (`Options error: ... Permission denied (errno=13)`)
+- [x] `createBackup` staging cleanup moved to a `finally` so no
+      `backup-<random>` directories leak after successful backups
+- [x] Frontend — Backups page gains an "Import" button; a successful import
+      opens a "Restore imported backup" confirmation that can restore right away
+
+### Phase M4.5 follow-up — Maintenance page (Danger Zone)
+- [x] `SettingValidator` — server-setting validation extracted from
+      `SettingsAdminController` so the settings API and the preflight check
+      share the same rules
+- [x] `ConfigSmokeTester`/`OpenvpnConfigSmokeTester` — parses each daemon
+      config with `openvpn --config <file> --dev null --route-noexec
+      --ifconfig-noexec` (3 s timeout); `Options error` = FAIL, runtime issues
+      = WARN so a healthy config is never blocked
+- [x] `MaintenanceService.preflight` — database integrity + foreign keys,
+      server settings, per-daemon config smoke test, PKI file/expiry sanity;
+      `passed` only when nothing FAILs
+- [x] `POST /api/admin/system/preflight|restart-backend|reload-daemons`
+      (ADMIN) — restart/reload return 409 while any check FAILs
+- [x] `MgmtClient.signal`/`MgmtClientManager.signal` — management `signal
+      SIGHUP` with reconnect, then re-verification after the restart
+- [x] `ApplicationRestarter`/`DefaultApplicationRestarter` — graceful context
+      close shortly after the HTTP response so Docker's restart policy brings
+      the backend back; audited `SYSTEM_RESTART`/`SYSTEM_RELOAD`
+- [x] Frontend — Maintenance page: preflight check list with PASS/WARN/FAIL
+      chips plus a Danger Zone with "Restart backend" / "Reload OpenVPN
+      daemons" confirm dialogs; action rows use `flex: 1` + `minWidth: 0` text
+      and `flexShrink: 0` buttons so text and action never overlap
+- [x] `docker-compose.yml` — backend mounts the shared `opnl-logs` volume so
+      the daemon smoke test can open the config's `status __LOG_DIR__/status`
+      file (preflight was FAIL without it)
+
+### Verified
+- Backend suite green (56 classes / 433 tests, spotless clean); frontend suite
+  green (27 files / 133 tests, lint 0 errors, `tsc -b` clean).
+- Live on `65.21.108.250`: an `e2e-import.zip` upload triggered the
+  auto-restore prompt and restored end-to-end ("must be restarted" toast);
+  preflight reports 4/4 PASS; reload-daemons returns
+  `{"signaled":1,"total":1,"failed":[]}`; restart-backend responds first, then
+  the container restarts (`RestartCount=1`) and the UI reconnects. The smoke
+  test correctly caught a restored config whose helper scripts had lost their
+  exec bit, fixed by `markScriptExecutable` on restore.
+
+---
+
 ## v0.1.0-alpha.12 — 2026-08-14
 
 Twelfth tagged milestone (SemVer pre-release): PKI reconciliation and
