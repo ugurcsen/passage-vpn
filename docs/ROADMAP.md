@@ -138,7 +138,7 @@ Work started under M3 has been split: completed items shipped in
 - [x] **5.1 `openvpn_nodes` registry** — Flyway V15 entity (name, mgmtHost,
       mgmtPortBase, adminIp, enabled); `NodeRegistryService` + admin CRUD API
       + `/api/admin/nodes`; frontend VPN Nodes page.
-- [ ] **5.2 Node-aware status/kill/monitoring routing** — per-node `MgmtClient`
+- [x] **5.2 Node-aware status/kill/monitoring routing** — per-node `MgmtClient`
       (reconnect/backoff), node-scoped `/api/admin/monitor`, `/api/admin/status`,
       connection-logs reconciliation and `kill <cn>`; node column/picker on the
       Status page.
