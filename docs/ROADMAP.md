@@ -148,8 +148,10 @@ Work started under M3 has been split: completed items shipped in
       `application-agent.yml`.
 - [x] **5.4 PostgreSQL profile validation** — end-to-end validation of
       `docker-compose.postgres.yml` + `application-postgres.yml`; all Flyway
-      migrations V1–V13 apply on Postgres; fix any SQLite-only SQL.
-- [ ] **5.5 Release** — `v0.1.0-alpha.7` tag + `RELEASE_NOTES.md` entry.
+      migrations V1–V17 (minus the never-created V13) apply on
+      Postgres via the dedicated `db/migration-postgresql` set; a
+      `MigrationParityTest` guards version parity and SQLite-only idioms.
+- [x] **5.5 Release** — `v0.1.0-alpha.16` tag + `RELEASE_NOTES.md` entry.
 
 ## M6 — Release Hardening — TARGET `v0.1.0-beta.1`
 

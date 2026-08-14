@@ -8,6 +8,58 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.16 — 2026-08-14
+
+Sixteenth tagged milestone (SemVer pre-release): the full M5 multi-node
+milestone — node registry, node-aware status/kill/monitoring routing, an agent
+Spring profile for remote VPN nodes and PostgreSQL profile validation. A node
+is now a first-class entity (`openvpn_nodes`, Flyway V15) managed through the
+admin `VPN Nodes` UI and `/api/admin/nodes` CRUD; status/kill/monitoring and
+connection-log reconciliation route per node through a reconnect/backoff
+`MgmtClient`; a new `agent` Spring profile (with the opt-in `node` compose
+profile) runs a lightweight agent that manages its own openvpn container and
+registers/heartbeats to the central backend via network-restricted
+`/internal/node/*` (protected by `OPNL_INTERNAL_TOKEN`). PostgreSQL support is
+validated end to end: the full Flyway set now lives under
+`db/migration-postgresql` (V1–V17 minus the never-created V13, with portable
+`TRUE`/`FALSE` boolean defaults) and a parity test guards the two sets.
+Includes everything from `v0.1.0-alpha.15` plus the changes below. Tag:
+`v0.1.0-alpha.16`.
+
+### Phase M5 — Multi-node & ops (node registry, agent, PostgreSQL validation)
+- [x] **5.1 `openvpn_nodes` registry** — Flyway V15 entity (name, mgmtHost,
+      mgmtPortBase, adminIp, enabled); `NodeRegistryService` + admin CRUD API
+      + `/api/admin/nodes`; frontend VPN Nodes page.
+- [x] **5.2 Node-aware status/kill/monitoring routing** — per-node `MgmtClient`
+      (reconnect/backoff), node-scoped `/api/admin/monitor`, `/api/admin/status`,
+      connection-logs reconciliation and `kill <cn>`; node column/picker on the
+      Status page.
+- [x] **5.3 Backend `agent` Spring profile** — lightweight agent managing its own
+      openvpn container, registering/heartbeating to the central backend via
+      `/internal/node/*` (network-restricted, `OPNL_INTERNAL_TOKEN`).
+      `application-agent.yml`.
+- [x] **5.4 PostgreSQL profile validation** — end-to-end validation of the
+      Postgres profile: all Flyway migrations V1–V17 (minus the never-created
+      V13) apply on `postgres:16-alpine` with portable `TRUE`/`FALSE` boolean
+      defaults via the dedicated `db/migration-postgresql` set; a
+      `MigrationParityTest` guards version parity and SQLite-only idioms.
+- [x] **5.5 Release** — this entry.
+
+### Verified
+- Backend suite green on the production checkout (480 tests, 0 failures).
+- Postgres validation: fresh `postgres:16-alpine` container, backend boot with
+  `OPNL_PROFILE=postgres` applied all 16 migrations ("now at version v17"),
+  Hibernate `ddl-auto: validate` passed, `/actuator/health` UP, and a
+  `/internal/seed-admin` write (with `X-Internal-Token`) created a row whose
+  booleans verified the portable defaults.
+- Production deploy: backend image rebuilt and restarted on `65.21.108.250`,
+  migrations V15–V17 applied to the live SQLite DB (data intact),
+  `/api/admin/nodes` returns 200 with the node registry and daemon status
+  still streams per node; `docs/api.md` regenerated live (now documents the
+  `/api/admin/nodes` CRUD + `/internal/node/*` and `nodeId` fields).
+
+---
+
 ## v0.1.0-alpha.15 — 2026-08-14
 
 Fifteenth tagged milestone (SemVer pre-release): M4 completion — generated API

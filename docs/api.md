@@ -537,6 +537,63 @@ API token as `X-API-Token: opnl_...` (see the Admin - API tokens endpoints).
 
 ---
 
+### `GET /api/admin/nodes`
+
+**Tags**: Admin - Nodes
+
+**Responses**: 200
+
+---
+
+### `POST /api/admin/nodes`
+
+**Tags**: Admin - Nodes
+
+**Request body**: `NodeRequest`
+
+**Responses**: 200
+
+---
+
+### `PUT /api/admin/nodes/{id}`
+
+**Tags**: Admin - Nodes
+
+| Parameter | In | Type | Required |
+|---|---|---|---|
+| `id` | path | string | yes |
+
+**Request body**: `NodeRequest`
+
+**Responses**: 200
+
+---
+
+### `DELETE /api/admin/nodes/{id}`
+
+**Tags**: Admin - Nodes
+
+| Parameter | In | Type | Required |
+|---|---|---|---|
+| `id` | path | string | yes |
+
+**Responses**: 200
+
+---
+
+### `POST /api/admin/nodes/{id}/enabled`
+
+**Tags**: Admin - Nodes
+
+| Parameter | In | Type | Required |
+|---|---|---|---|
+| `id` | path | string | yes |
+| `enabled` | query | boolean | yes |
+
+**Responses**: 200
+
+---
+
 ### `GET /api/admin/profile-tokens`
 
 **Tags**: Admin - Profiles
@@ -1237,6 +1294,26 @@ Exchanges the current refreshToken for a fresh accessToken/refreshToken pair. A 
 
 ---
 
+### `POST /internal/node/heartbeat`
+
+**Tags**: Node agent
+
+**Request body**: `HeartbeatRequest`
+
+**Responses**: 200
+
+---
+
+### `POST /internal/node/register`
+
+**Tags**: Node agent
+
+**Request body**: `RegisterRequest`
+
+**Responses**: 200
+
+---
+
 ### `POST /internal/seed-admin`
 
 **Tags**: Internal
@@ -1382,6 +1459,7 @@ Exchanges the current refreshToken for a fresh accessToken/refreshToken pair. A 
 |---|---|---|
 | `commonName` | string | no |
 | `daemonName` | string | no |
+| `nodeId` | string | no |
 | `remoteIp` | string | no |
 | `username` | string | no |
 | `virtualIp` | string | no |
@@ -1414,6 +1492,7 @@ Exchanges the current refreshToken for a fresh accessToken/refreshToken pair. A 
 | `commonName` | string | no |
 | `connectedAt` | string | no |
 | `daemonName` | string | no |
+| `nodeId` | string | no |
 | `remoteIp` | string | no |
 | `username` | string | no |
 | `virtualIp` | string | no |
@@ -1432,6 +1511,7 @@ Exchanges the current refreshToken for a fresh accessToken/refreshToken pair. A 
 | `daemonName` | string | no |
 | `disconnectedAt` | string | no |
 | `durationSeconds` | integer | no |
+| `nodeId` | string | no |
 | `remoteIp` | string | no |
 | `username` | string | no |
 | `virtualIp` | string | no |
@@ -1479,6 +1559,7 @@ Exchanges the current refreshToken for a fresh accessToken/refreshToken pair. A 
 | `ipv6Enabled` | boolean | no |
 | `ipv6Subnet` | string | no |
 | `name` | string | no |
+| `nodeId` | string | no |
 | `port` | integer | no |
 | `primary` | boolean | no |
 | `proto` | string | no |
@@ -1503,6 +1584,7 @@ Exchanges the current refreshToken for a fresh accessToken/refreshToken pair. A 
 | `ipv6Enabled` | boolean | no |
 | `ipv6Subnet` | string | no |
 | `name` | string | no |
+| `nodeId` | string | no |
 | `port` | integer | no |
 | `proto` | string | yes |
 | `subnet` | string | yes |
@@ -1520,6 +1602,7 @@ Exchanges the current refreshToken for a fresh accessToken/refreshToken pair. A 
 | `index` | integer | no |
 | `mgmtReachable` | boolean | no |
 | `name` | string | no |
+| `nodeId` | string | no |
 | `port` | integer | no |
 | `proto` | string | no |
 
@@ -1639,6 +1722,14 @@ Exchanges the current refreshToken for a fresh accessToken/refreshToken pair. A 
 
 ---
 
+### HeartbeatRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `nodeId` | string | no |
+
+---
+
 ### IssueRequest
 
 | Field | Type | Required |
@@ -1747,6 +1838,34 @@ _No fields._
 | `daemons` | list[DaemonStatus] | no |
 | `history` | list[TrafficPointDto] | no |
 | `system` | SystemInfoDto | no |
+
+---
+
+### NodeRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `adminIp` | string | no |
+| `enabled` | boolean | no |
+| `mgmtHost` | string | no |
+| `mgmtPortBase` | integer | no |
+| `name` | string | no |
+
+---
+
+### OpenVpnNodeDto
+
+| Field | Type | Required |
+|---|---|---|
+| `adminIp` | string | no |
+| `createdAt` | string | no |
+| `enabled` | boolean | no |
+| `id` | string | no |
+| `lastSeenAt` | string | no |
+| `mgmtHost` | string | no |
+| `mgmtPortBase` | integer | no |
+| `name` | string | no |
+| `online` | boolean | no |
 
 ---
 
@@ -1861,6 +1980,25 @@ _No fields._
 | Field | Type | Required |
 |---|---|---|
 | `refreshToken` | string | no |
+
+---
+
+### RegisterRequest
+
+| Field | Type | Required |
+|---|---|---|
+| `adminIp` | string | no |
+| `mgmtHost` | string | no |
+| `mgmtPortBase` | integer | no |
+| `name` | string | no |
+
+---
+
+### RegisterResult
+
+| Field | Type | Required |
+|---|---|---|
+| `nodeId` | string | no |
 
 ---
 
