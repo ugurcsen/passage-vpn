@@ -47,6 +47,8 @@ public class AuditLogService {
   public static final String CAT_BACKUP = "BACKUP";
   public static final String CAT_DNS = "DNS";
 
+  public static final String CAT_SYSTEM = "SYSTEM";
+
   private final AuditLogRepository repository;
   private final SettingsService settingsService;
   private final UserRepository userRepository;

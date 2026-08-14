@@ -287,6 +287,8 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Brand settings (logo, name, footer, primary color) → theme via API
 - [x] Configuration report (settings snapshot + PKI inventory + versions)
 - [x] Backup: ZIP of config + PKI + DB snapshot; restore flow
+- [x] Backup import (upload + marker/zip-slip validation) + auto-restore prompt; exec-bit preserved on restore
+- [x] Maintenance: preflight checks (db, settings, daemon config, pki) + backend restart + daemon reload (Danger Zone)
 
 ### 4.6 Multi-node
 - [ ] `openvpn_nodes` registry (name, management endpoint, admin IP)

@@ -37,6 +37,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import PaletteIcon from "@mui/icons-material/Palette";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
 import BackupIcon from "@mui/icons-material/Backup";
+import BuildIcon from "@mui/icons-material/Build";
 import { useAuth, type Role } from "@/hooks/useAuth";
 import { useBrand } from "@/hooks/useBrand";
 import { canAccess } from "@/lib/roles";
@@ -67,6 +68,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Branding", path: "/branding", icon: <PaletteIcon />, roles: ["ADMIN"] },
   { label: "Config Report", path: "/config-report", icon: <FactCheckIcon />, roles: ["ADMIN"] },
   { label: "Backups", path: "/backups", icon: <BackupIcon />, roles: ["ADMIN"] },
+  { label: "Maintenance", path: "/maintenance", icon: <BuildIcon />, roles: ["ADMIN"] },
   { label: "Audit Log", path: "/audit-logs", icon: <HistoryIcon />, roles: ["ADMIN"] },
   { label: "API Tokens", path: "/api-tokens", icon: <KeyIcon />, roles: ["ADMIN"] },
 ];

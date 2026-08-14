@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -19,7 +19,15 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import DownloadIcon from "@mui/icons-material/Download";
 import RestoreIcon from "@mui/icons-material/Restore";
-import { api, downloadBackup, endpoints, type BackupInfo, type RestoreResult } from "@/lib/api";
+import UploadIcon from "@mui/icons-material/Upload";
+import {
+  api,
+  downloadBackup,
+  endpoints,
+  importBackup,
+  type BackupInfo,
+  type RestoreResult,
+} from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
@@ -34,11 +42,13 @@ function formatDate(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
-/** Backups page: create, download and restore full-server backup archives. */
+/** Backups page: create, download, import and restore full-server backup archives. */
 export function BackupsPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [confirm, setConfirm] = useState<{ name: string } | null>(null);
+  const [pendingImport, setPendingImport] = useState<{ name: string } | null>(null);
 
   const { data, isLoading, error } = useQuery<BackupInfo[]>({
     queryKey: ["backups"],
@@ -54,6 +64,17 @@ export function BackupsPage() {
       invalidate();
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Create failed"),
+  });
+
+  const importArchive = useMutation({
+    mutationFn: (file: File) => importBackup(file),
+    onSuccess: (backup) => {
+      toast.success(`Backup imported: ${backup.name}`);
+      invalidate();
+      setPendingImport({ name: backup.name });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Import failed"),
   });
 
   const download = useMutation({
@@ -83,8 +104,9 @@ export function BackupsPage() {
         Backups
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Create a point-in-time archive of the database, PKI, configs and CCD files. Restoring
-        replaces current data — a restart is required when the database was restored.
+        Create, import or restore a point-in-time archive of the database, PKI, configs and CCD
+        files. Restoring replaces current data — a restart is required when the database was
+        restored.
       </Typography>
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -102,14 +124,35 @@ export function BackupsPage() {
           <Typography variant="h6" fontWeight={600}>
             Backup archives
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            disabled={create.isPending}
-            onClick={() => create.mutate()}
-          >
-            Create backup
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              disabled={create.isPending}
+              onClick={() => create.mutate()}
+            >
+              Create backup
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<UploadIcon />}
+              disabled={importArchive.isPending}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Import
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".zip,application/zip"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) importArchive.mutate(file);
+              }}
+            />
+          </Stack>
         </Stack>
 
         {isLoading ? (
@@ -177,6 +220,20 @@ export function BackupsPage() {
         onConfirm={() => {
           if (confirm) restore.mutate(confirm.name);
           setConfirm(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!pendingImport}
+        title="Restore imported backup"
+        message={`"${pendingImport?.name}" was imported successfully. Restore it now? Current data will be replaced with the contents of this archive.`}
+        confirmLabel="Restore"
+        danger
+        loading={restore.isPending}
+        onCancel={() => setPendingImport(null)}
+        onConfirm={() => {
+          if (pendingImport) restore.mutate(pendingImport.name);
+          setPendingImport(null);
         }}
       />
     </Box>

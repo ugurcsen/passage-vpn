@@ -131,6 +131,31 @@ public class MgmtClient implements Closeable {
     }
   }
 
+  /**
+   * Sends the given signal (e.g. {@code SIGHUP}) to the daemon via the management {@code signal}
+   * command. Returns whether the daemon acknowledged it.
+   */
+  public synchronized boolean signal(String signal) {
+    if (!isConnected() && !connect()) {
+      return false;
+    }
+    try {
+      writer.write("signal " + signal + "\n");
+      writer.flush();
+      String response = reader.readLine();
+      if (response == null) {
+        // EOF: daemon went away mid-command; drop the dead socket.
+        closeQuietly();
+        return false;
+      }
+      return response.startsWith("SUCCESS:");
+    } catch (IOException e) {
+      log.debug("Management signal failed on daemon {}: {}", daemonIndex, e.getMessage());
+      closeQuietly();
+      return false;
+    }
+  }
+
   private void closeQuietly() {
     try {
       if (reader != null) {

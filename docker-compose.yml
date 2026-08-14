@@ -59,6 +59,7 @@ services:
       - opnl-pki:/etc/opnl/pki
       - opnl-ccd:/etc/opnl/ccd
       - opnl-config:/etc/opnl/config
+      - opnl-logs:/var/log/opnl
     depends_on:
       - openvpn
     networks:

@@ -95,6 +95,11 @@ class BackupServiceTest {
     assertThat(backups).hasSize(1);
     assertThat(backups.get(0).name()).isEqualTo(info.name());
 
+    // The staging tree (PKI/config/db copies) must not be left behind.
+    try (var stream = Files.list(tempDir.resolve("backups"))) {
+      assertThat(stream.filter(Files::isDirectory)).isEmpty();
+    }
+
     Path archive = tempDir.resolve("backups").resolve(info.name());
     assertThat(archive).exists();
 
@@ -151,11 +156,156 @@ class BackupServiceTest {
   }
 
   @Test
+  void restoreKeepsHelperScriptsExecutable() throws Exception {
+    Path script = tempDir.resolve("config/scripts/client-connect.sh");
+    Files.createDirectories(script.getParent());
+    Files.writeString(script, "#!/bin/sh\necho hi\n");
+    script.toFile().setExecutable(true, true);
+    assertThat(script.toFile().canExecute()).isTrue();
+
+    BackupInfo info = backupService.createBackup();
+
+    // A previous restore wiped the executable bit; the next restore must bring it back.
+    script.toFile().setExecutable(false, true);
+    assertThat(script.toFile().canExecute()).isFalse();
+
+    backupService.restore(info.name());
+
+    assertThat(script).exists();
+    assertThat(script.toFile().canExecute()).isTrue();
+  }
+
+  @Test
   void resolveBackupRejectsTraversal() {
     assertThatThrownBy(() -> backupService.resolveBackup("../secret.zip"))
         .isInstanceOf(ApiException.class)
         .extracting(e -> ((ApiException) e).getStatus())
         .isEqualTo(org.springframework.http.HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  void importArchiveAcceptsValidArchiveAndKeepsName() throws Exception {
+    BackupInfo original = backupService.createBackup();
+    byte[] bytes = Files.readAllBytes(tempDir.resolve("backups").resolve(original.name()));
+
+    BackupInfo imported =
+        backupService.importArchive(new java.io.ByteArrayInputStream(bytes), "restored-copy.zip");
+
+    assertThat(imported.name()).isEqualTo("restored-copy.zip");
+    assertThat(imported.sizeBytes()).isEqualTo(original.sizeBytes());
+    assertThat(tempDir.resolve("backups").resolve(imported.name())).exists();
+    List<BackupInfo> backups = backupService.listBackups();
+    assertThat(backups).hasSize(2);
+    verify(auditLogService)
+        .record(eq("BACKUP_IMPORT"), eq(AuditLogService.CAT_BACKUP), any(), any(), any());
+  }
+
+  @Test
+  void importArchiveResolvesCollisionWithSuffix() throws Exception {
+    BackupInfo original = backupService.createBackup();
+    byte[] bytes = Files.readAllBytes(tempDir.resolve("backups").resolve(original.name()));
+
+    BackupInfo imported =
+        backupService.importArchive(new java.io.ByteArrayInputStream(bytes), original.name());
+
+    assertThat(imported.name()).startsWith("opnl-backup-").endsWith(".zip");
+    assertThat(imported.name()).isNotEqualTo(original.name());
+    assertThat(tempDir.resolve("backups").resolve(imported.name())).exists();
+  }
+
+  @Test
+  void importArchiveRenamesNonConformingName() throws Exception {
+    BackupInfo original = backupService.createBackup();
+    byte[] bytes = Files.readAllBytes(tempDir.resolve("backups").resolve(original.name()));
+
+    BackupInfo imported =
+        backupService.importArchive(
+            new java.io.ByteArrayInputStream(bytes), "../malicious/name.zip");
+
+    assertThat(imported.name()).startsWith("imported-").endsWith(".zip");
+    assertThat(imported.name()).doesNotContain("../");
+  }
+
+  @Test
+  void importArchiveRejectsJunkWithoutMarker() throws Exception {
+    java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+    try (var zip = new java.util.zip.ZipOutputStream(buffer)) {
+      zip.putNextEntry(new java.util.zip.ZipEntry("random.txt"));
+      zip.write("hello".getBytes());
+      zip.closeEntry();
+    }
+
+    assertThatThrownBy(
+            () ->
+                backupService.importArchive(
+                    new java.io.ByteArrayInputStream(buffer.toByteArray()), "junk.zip"))
+        .isInstanceOf(ApiException.class);
+  }
+
+  @Test
+  void restoreCreatesRollbackCopyBeforeSwappingDatabase() throws Exception {
+    BackupInfo info = backupService.createBackup();
+    try (Connection conn = dataSource.getConnection();
+        Statement st = conn.createStatement()) {
+      st.executeUpdate("INSERT INTO widgets (name) VALUES ('widget-2')");
+    }
+
+    RestoreResult result = backupService.restore(info.name());
+
+    assertThat(result.restartRequired()).isTrue();
+    assertThat(result.message()).contains("pre-restore");
+    try (var stream = Files.list(tempDir.resolve("rollback"))) {
+      assertThat(stream.map(p -> p.getFileName().toString()).toList())
+          .hasSize(1)
+          .allMatch(n -> n.startsWith("opnl.db.pre-restore-"));
+    }
+    verify(auditLogService)
+        .record(eq("BACKUP_RESTORE"), eq(AuditLogService.CAT_BACKUP), any(), any(), any());
+  }
+
+  @Test
+  void restoreRejectsSnapshotWithSchemaMismatch() throws Exception {
+    BackupInfo info = backupService.createBackup();
+    // Stamp the live database as schema v9 while the backup snapshot has none; the restore must
+    // refuse before touching anything.
+    try (Connection conn = dataSource.getConnection();
+        Statement st = conn.createStatement()) {
+      st.executeUpdate(
+          "CREATE TABLE flyway_schema_history (installed_rank INTEGER PRIMARY KEY, version TEXT)");
+      st.executeUpdate(
+          "INSERT INTO flyway_schema_history (installed_rank, version) VALUES (1, '9')");
+    }
+
+    assertThatThrownBy(() -> backupService.restore(info.name()))
+        .isInstanceOf(ApiException.class)
+        .extracting(e -> ((ApiException) e).getStatus())
+        .isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST);
+    // No rollback copy should exist since the swap never happened.
+    assertThat(tempDir.resolve("rollback")).doesNotExist();
+  }
+
+  @Test
+  void restoreRejectsCorruptSnapshot() throws Exception {
+    // A zip that carries a database entry which is not a valid SQLite file must be refused by the
+    // snapshot validation before anything is swapped.
+    java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+    try (var zip = new java.util.zip.ZipOutputStream(buffer)) {
+      zip.putNextEntry(new java.util.zip.ZipEntry("opnl.db"));
+      zip.write(new byte[4096]);
+      java.util.Arrays.fill(new byte[4096], (byte) 0x42);
+      zip.closeEntry();
+    }
+    Files.createDirectories(tempDir.resolve("backups"));
+    Files.write(tempDir.resolve("backups/bad-db.zip"), buffer.toByteArray());
+
+    assertThatThrownBy(() -> backupService.restore("bad-db.zip")).isInstanceOf(ApiException.class);
+    // The live database must be untouched.
+    try (Connection conn = java.sql.DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM widgets")) {
+      rs.next();
+      assertThat(rs.getInt(1)).isEqualTo(1);
+    }
   }
 
   @Test

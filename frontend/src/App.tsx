@@ -25,6 +25,7 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { BrandingPage } from "@/pages/BrandingPage";
 import { ConfigReportPage } from "@/pages/ConfigReportPage";
 import { BackupsPage } from "@/pages/BackupsPage";
+import { MaintenancePage } from "@/pages/MaintenancePage";
 import { AuditLogsPage } from "@/pages/AuditLogsPage";
 import { ApiTokensPage } from "@/pages/ApiTokensPage";
 import { PortalPage } from "@/pages/PortalPage";
@@ -135,6 +136,10 @@ function ThemedApp() {
                     <Route
                       path="/backups"
                       element={<RoleRoute roles={["ADMIN"]}><BackupsPage /></RoleRoute>}
+                    />
+                    <Route
+                      path="/maintenance"
+                      element={<RoleRoute roles={["ADMIN"]}><MaintenancePage /></RoleRoute>}
                     />
                     <Route
                       path="/audit-logs"

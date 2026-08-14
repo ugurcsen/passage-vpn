@@ -56,6 +56,16 @@ public class MgmtClientManager {
     return false;
   }
 
+  /**
+   * Sends a management {@code signal} command to a single daemon by index. Returns whether the
+   * daemon acknowledged it; {@code false} also when the daemon is unreachable or in its reconnect
+   * cooldown.
+   */
+  public synchronized boolean signal(int daemonIndex, String signal) {
+    MgmtClient client = clientFor(daemonIndex);
+    return client != null && client.signal(signal);
+  }
+
   private MgmtClient clientFor(int daemonIndex) {
     MgmtClient existing = clients.get(daemonIndex);
     if (existing != null && existing.isConnected()) {

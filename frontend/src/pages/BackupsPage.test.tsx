@@ -92,4 +92,48 @@ describe("BackupsPage", () => {
     });
     expect(await screen.findByText(/must be restarted/i)).toBeInTheDocument();
   });
+
+  it("imports an archive and offers to restore it", async () => {
+    const imported = {
+      name: "imported-20260813-110000.zip",
+      sizeBytes: 2048,
+      createdAt: "2026-08-13T11:00:00Z",
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/import") && init?.method === "POST") {
+        return Promise.resolve(json(imported));
+      }
+      if (url.includes("/restore") && init?.method === "POST") {
+        return Promise.resolve(json({ restartRequired: true, message: "Restored" }));
+      }
+      return Promise.resolve(json([backup]));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+    await screen.findByText(backup.name);
+
+    const file = new File(["archive-bytes"], imported.name, { type: "application/zip" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(input, file);
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find((c) => String(c[0]).includes("/import"));
+      expect(call).toBeTruthy();
+      expect(String(call?.[1]?.method)).toBe("POST");
+      expect(call?.[1]?.body).toBeInstanceOf(FormData);
+    });
+    expect(await screen.findByText(/imported successfully/i)).toBeInTheDocument();
+    expect(await screen.findByText("Restore imported backup")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Restore" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) => String(c[0]).includes("/restore") && String(c[0]).includes(imported.name),
+      );
+      expect(call).toBeTruthy();
+    });
+    expect(await screen.findByText(/must be restarted/i)).toBeInTheDocument();
+  });
 });

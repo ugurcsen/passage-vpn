@@ -465,6 +465,53 @@ export interface RestoreResult {
   message: string;
 }
 
+/** One result line of a preflight run. */
+export interface PreflightCheck {
+  name: string;
+  status: "PASS" | "WARN" | "FAIL";
+  detail: string;
+}
+
+/** Result of a preflight run: passed only when every check is green (FAIL blocks actions). */
+export interface PreflightResult {
+  passed: boolean;
+  checks: PreflightCheck[];
+}
+
+/** Result of a backend restart request; the response returns before the shutdown happens. */
+export interface RestartResult {
+  message: string;
+}
+
+/** Result of a daemon reload: how many acknowledged the signal and which could not be verified. */
+export interface ReloadResult {
+  signaled: number;
+  total: number;
+  failed: number[];
+}
+
+/** Uploads a backup archive; the server validates and stores it under the backups directory. */
+export function importBackup(file: File): Promise<BackupInfo> {
+  const form = new FormData();
+  form.append("file", file);
+  return api<BackupInfo>(`${endpoints.backups}/import`, { method: "POST", body: form });
+}
+
+/** Runs the preflight safety checks before a restart or daemon reload. */
+export function runPreflight(): Promise<PreflightResult> {
+  return api<PreflightResult>(`${endpoints.system}/preflight`, { method: "POST" });
+}
+
+/** Gracefully restarts the backend (container restart policy brings it back up). */
+export function restartBackend(): Promise<RestartResult> {
+  return api<RestartResult>(`${endpoints.system}/restart-backend`, { method: "POST" });
+}
+
+/** Reloads every enabled OpenVPN daemon config via SIGHUP. */
+export function reloadDaemons(): Promise<ReloadResult> {
+  return api<ReloadResult>(`${endpoints.system}/reload-daemons`, { method: "POST" });
+}
+
 /** Triggers a browser download for a backend-generated profile file. */
 export function downloadOvpn(file: OvpnFile) {
   const blob = new Blob([file.content], { type: "application/x-openvpn-profile" });

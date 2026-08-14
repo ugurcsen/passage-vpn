@@ -164,6 +164,70 @@ class MgmtClientTest {
   }
 
   @Test
+  void signalAcknowledgesSuccess() throws Exception {
+    try (ServerSocket listener = new ServerSocket(0)) {
+      int port = listener.getLocalPort();
+      Thread daemon =
+          new Thread(
+              () -> {
+                try (Socket s = listener.accept()) {
+                  BufferedReader r =
+                      new BufferedReader(
+                          new InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8));
+                  String command = r.readLine();
+                  BufferedWriter w =
+                      new BufferedWriter(
+                          new OutputStreamWriter(s.getOutputStream(), StandardCharsets.UTF_8));
+                  if ("signal SIGHUP".equals(command)) {
+                    w.write("SUCCESS: signal SIGHUP sent\n");
+                  } else {
+                    w.write("ERROR: unknown command\n");
+                  }
+                  w.flush();
+                } catch (IOException ignored) {
+                  // test teardown
+                }
+              });
+      daemon.start();
+
+      MgmtClient client = new MgmtClient("127.0.0.1", port, 0);
+      assertThat(client.signal("SIGHUP")).isTrue();
+      daemon.join(3_000);
+      client.close();
+    }
+  }
+
+  @Test
+  void signalReportsFailureForUnknownSignal() throws Exception {
+    try (ServerSocket listener = new ServerSocket(0)) {
+      int port = listener.getLocalPort();
+      Thread daemon =
+          new Thread(
+              () -> {
+                try (Socket s = listener.accept()) {
+                  BufferedReader r =
+                      new BufferedReader(
+                          new InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8));
+                  r.readLine();
+                  BufferedWriter w =
+                      new BufferedWriter(
+                          new OutputStreamWriter(s.getOutputStream(), StandardCharsets.UTF_8));
+                  w.write("ERROR: signal SIGHUP failed\n");
+                  w.flush();
+                } catch (IOException ignored) {
+                  // test teardown
+                }
+              });
+      daemon.start();
+
+      MgmtClient client = new MgmtClient("127.0.0.1", port, 0);
+      assertThat(client.signal("SIGHUP")).isFalse();
+      daemon.join(3_000);
+      client.close();
+    }
+  }
+
+  @Test
   void statusReturnsNullWhenUnreachable() {
     // Find a port that is certainly closed.
     int closedPort;
