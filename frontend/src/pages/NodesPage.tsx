@@ -178,13 +178,14 @@ export function NodesPage() {
         return (
           <Stack direction="row">
             <Tooltip title="Edit">
-              <IconButton size="small" onClick={() => openEdit(row)}>
+              <IconButton size="small" aria-label="Edit node" onClick={() => openEdit(row)}>
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Remove">
               <IconButton
                 size="small"
+                aria-label="Remove node"
                 onClick={() =>
                   setConfirm({
                     title: "Remove VPN node",

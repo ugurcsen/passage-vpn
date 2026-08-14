@@ -21,7 +21,8 @@ public record OpenVpnNodeDto(
   public static OpenVpnNodeDto from(OpenVpnNode node, Instant now) {
     boolean online =
         node.getLastSeenAt() != null
-            && now.getEpochSecond() - node.getLastSeenAt().getEpochSecond() <= ONLINE_WINDOW_SECONDS;
+            && now.getEpochSecond() - node.getLastSeenAt().getEpochSecond()
+                <= ONLINE_WINDOW_SECONDS;
     return new OpenVpnNodeDto(
         node.getId(),
         node.getName(),

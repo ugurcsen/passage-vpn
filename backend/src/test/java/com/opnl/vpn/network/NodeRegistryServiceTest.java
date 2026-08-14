@@ -62,7 +62,8 @@ class NodeRegistryServiceTest {
     assertThat(captor.getValue().isEnabled()).isTrue();
     assertThat(result.name()).isEqualTo("edge-eu");
     verify(auditLogService)
-        .record(eq("NODE_CREATE"), eq(AuditLogService.CAT_NODE), anyString(), eq("vpn_node"), any());
+        .record(
+            eq("NODE_CREATE"), eq(AuditLogService.CAT_NODE), anyString(), eq("vpn_node"), any());
   }
 
   @Test
@@ -98,11 +99,14 @@ class NodeRegistryServiceTest {
 
   @Test
   void updateChangesFieldsAndAudits() {
-    when(nodeRepository.findById("n1")).thenReturn(Optional.of(node("n1", "edge-eu", "old.example.com", 7505)));
+    when(nodeRepository.findById("n1"))
+        .thenReturn(Optional.of(node("n1", "edge-eu", "old.example.com", 7505)));
     when(nodeRepository.findByNameIgnoreCase("edge-us")).thenReturn(Optional.empty());
 
     var result =
-        service.update("n1", new NodeRegistryService.NodeRequest("edge-us", "vpn-us.example.com", 7506, null, true));
+        service.update(
+            "n1",
+            new NodeRegistryService.NodeRequest("edge-us", "vpn-us.example.com", 7506, null, true));
 
     assertThat(result.name()).isEqualTo("edge-us");
     assertThat(result.mgmtHost()).isEqualTo("vpn-us.example.com");
@@ -113,21 +117,25 @@ class NodeRegistryServiceTest {
 
   @Test
   void updateRejectsRenamingToExistingName() {
-    when(nodeRepository.findById("n1")).thenReturn(Optional.of(node("n1", "edge-eu", "old.example.com", 7505)));
+    when(nodeRepository.findById("n1"))
+        .thenReturn(Optional.of(node("n1", "edge-eu", "old.example.com", 7505)));
     when(nodeRepository.findByNameIgnoreCase("edge-us"))
         .thenReturn(Optional.of(node("n2", "edge-us", "other.example.com", 7505)));
 
     assertThatThrownBy(
             () ->
                 service.update(
-                    "n1", new NodeRegistryService.NodeRequest("edge-us", "vpn-us.example.com", 7506, null, true)))
+                    "n1",
+                    new NodeRegistryService.NodeRequest(
+                        "edge-us", "vpn-us.example.com", 7506, null, true)))
         .isInstanceOf(ApiException.class);
     verify(nodeRepository, never()).save(any());
   }
 
   @Test
   void deleteRemovesNodeAndAudits() {
-    when(nodeRepository.findById("n1")).thenReturn(Optional.of(node("n1", "edge-eu", "vpn-eu.example.com", 7505)));
+    when(nodeRepository.findById("n1"))
+        .thenReturn(Optional.of(node("n1", "edge-eu", "vpn-eu.example.com", 7505)));
 
     service.delete("n1");
 
@@ -143,12 +151,14 @@ class NodeRegistryServiceTest {
 
   @Test
   void setEnabledFlipsFlagAndAudits() {
-    when(nodeRepository.findById("n1")).thenReturn(Optional.of(node("n1", "edge-eu", "vpn-eu.example.com", 7505)));
+    when(nodeRepository.findById("n1"))
+        .thenReturn(Optional.of(node("n1", "edge-eu", "vpn-eu.example.com", 7505)));
 
     var result = service.setEnabled("n1", false);
 
     assertThat(result.enabled()).isFalse();
-    verify(auditLogService).record("NODE_DISABLE", AuditLogService.CAT_NODE, "n1", "vpn_node", null);
+    verify(auditLogService)
+        .record("NODE_DISABLE", AuditLogService.CAT_NODE, "n1", "vpn_node", null);
   }
 
   @Test

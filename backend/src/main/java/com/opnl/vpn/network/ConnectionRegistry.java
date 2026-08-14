@@ -92,14 +92,7 @@ public class ConnectionRegistry {
         existing != null
             ? existing
             : new VpnSession(
-                commonName,
-                commonName,
-                address,
-                null,
-                null,
-                null,
-                null,
-                Instant.now());
+                commonName, commonName, address, null, null, null, null, Instant.now());
     byVirtualIp.put(key(null, address), session);
     if (commonName != null && !commonName.isBlank()) {
       byCommonName.put(key(null, commonName), session);
@@ -134,9 +127,7 @@ public class ConnectionRegistry {
       return;
     }
     byCommonName.entrySet().removeIf(e -> !liveCommonNames.contains(e.getValue().commonName()));
-    byVirtualIp
-        .entrySet()
-        .removeIf(e -> !liveCommonNames.contains(e.getValue().commonName()));
+    byVirtualIp.entrySet().removeIf(e -> !liveCommonNames.contains(e.getValue().commonName()));
   }
 
   /** Snapshot of all active sessions, ordered by connection time ascending. */

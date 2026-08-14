@@ -16,7 +16,6 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,9 +33,7 @@ class AgentRegistrationServiceTest {
   void setUp() throws IOException {
     server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     server.setExecutor(Executors.newFixedThreadPool(2));
-    server.createContext(
-        "/internal/node/",
-        this::handle);
+    server.createContext("/internal/node/", this::handle);
     server.start();
   }
 
@@ -62,15 +59,14 @@ class AgentRegistrationServiceTest {
   private AgentRegistrationService service() {
     AgentProperties properties =
         new AgentProperties(
-            "http://127.0.0.1:" + server.getAddress().getPort(), "edge-eu", "openvpn", 7505, null, 30);
+            "http://127.0.0.1:" + server.getAddress().getPort(),
+            "edge-eu",
+            "openvpn",
+            7505,
+            null,
+            30);
     OpnlProperties opnl =
-        new OpnlProperties(
-            "./data",
-            "OpenVPN Panel",
-            "secret-token",
-            null,
-            null,
-            null);
+        new OpnlProperties("./data", "OpenVPN Panel", "secret-token", null, null, null);
     return new AgentRegistrationService(
         properties, opnl, new ObjectMapper(), HttpClient.newHttpClient());
   }

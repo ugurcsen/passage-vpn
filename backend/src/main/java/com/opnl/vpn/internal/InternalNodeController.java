@@ -19,9 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequestMapping("/internal/node")
-@Tag(
-    name = "Node agent",
-    description = "Endpoints used by remote node agents (restricted network)")
+@Tag(name = "Node agent", description = "Endpoints used by remote node agents (restricted network)")
 public class InternalNodeController {
 
   private final NodeRegistryService nodeRegistryService;
@@ -33,8 +31,9 @@ public class InternalNodeController {
   /** Registers (or re-registers) the calling agent's gateway node and returns its id. */
   @PostMapping("/register")
   public RegisterResult register(@RequestBody RegisterRequest request) {
-    String nodeId = nodeRegistryService.upsertByAgent(
-        request.name(), request.mgmtHost(), request.mgmtPortBase(), request.adminIp());
+    String nodeId =
+        nodeRegistryService.upsertByAgent(
+            request.name(), request.mgmtHost(), request.mgmtPortBase(), request.adminIp());
     log.info("Node agent registered node '{}' ({})", request.name(), nodeId);
     return new RegisterResult(nodeId);
   }
@@ -46,8 +45,7 @@ public class InternalNodeController {
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public record RegisterRequest(
-      String name, String mgmtHost, int mgmtPortBase, String adminIp) {}
+  public record RegisterRequest(String name, String mgmtHost, int mgmtPortBase, String adminIp) {}
 
   public record HeartbeatRequest(String nodeId) {}
 

@@ -71,8 +71,7 @@ class InternalNodeControllerTest {
 
   @Test
   void registerPropagatesBadRequest() throws Exception {
-    org.mockito.Mockito.when(
-            nodeRegistryService.upsertByAgent(any(), any(), eq(0), any()))
+    org.mockito.Mockito.when(nodeRegistryService.upsertByAgent(any(), any(), eq(0), any()))
         .thenThrow(
             new com.opnl.vpn.common.ApiException(
                 HttpStatus.BAD_REQUEST,

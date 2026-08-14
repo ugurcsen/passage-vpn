@@ -84,8 +84,10 @@ public class DaemonService {
         .orElseGet(() -> repository.save(toEntity(legacyNetworkConfig(), 0)));
   }
 
-  /** Rewrites every local daemon config into the shared volume; disables remove their config file.
-   *  Daemons assigned to a remote node run on that gateway and never touch the local volume. */
+  /**
+   * Rewrites every local daemon config into the shared volume; disables remove their config file.
+   * Daemons assigned to a remote node run on that gateway and never touch the local volume.
+   */
   @Transactional
   public void writeAll() {
     ensurePrimary();

@@ -58,9 +58,7 @@ public class AgentRegistrationService {
     this.httpClient = httpClient;
   }
 
-  @Scheduled(
-      fixedDelayString = "${opnl.agent.heartbeat-seconds:30}s",
-      initialDelay = 5_000)
+  @Scheduled(fixedDelayString = "${opnl.agent.heartbeat-seconds:30}s", initialDelay = 5_000)
   public void tick() {
     try {
       validateConfig();
@@ -127,7 +125,9 @@ public class AgentRegistrationService {
     log.debug("Agent heartbeat sent for node {}", nodeId);
   }
 
-  /** POSTs JSON to a central /internal/node endpoint; returns the response body or null on error. */
+  /**
+   * POSTs JSON to a central /internal/node endpoint; returns the response body or null on error.
+   */
   private String post(String path, String body) throws IOException, InterruptedException {
     HttpRequest request =
         HttpRequest.newBuilder(URI.create(properties.centralBaseUrl() + path))

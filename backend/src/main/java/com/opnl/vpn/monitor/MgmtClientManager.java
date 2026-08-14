@@ -9,11 +9,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * Owns one {@link MgmtClient} per (node, daemon index). The local deployment uses {@code
- * mgmtPort + index} from {@code opnl.openvpn}; daemons assigned to a registered node use that
- * node's {@code mgmtHost} and {@code mgmtPortBase + index}. Connections are established lazily on
- * first use and transparently re-established after failures; a per-endpoint cooldown prevents
- * reconnect storms while a daemon is down.
+ * Owns one {@link MgmtClient} per (node, daemon index). The local deployment uses {@code mgmtPort +
+ * index} from {@code opnl.openvpn}; daemons assigned to a registered node use that node's {@code
+ * mgmtHost} and {@code mgmtPortBase + index}. Connections are established lazily on first use and
+ * transparently re-established after failures; a per-endpoint cooldown prevents reconnect storms
+ * while a daemon is down.
  */
 @Slf4j
 @Component
@@ -27,7 +27,8 @@ public class MgmtClientManager {
   private final OpnlProperties properties;
   private final NodeRegistryService nodeRegistryService;
   private final ConcurrentHashMap<MgmtEndpoint, MgmtClient> clients = new ConcurrentHashMap<>();
-  private final ConcurrentHashMap<MgmtEndpoint, MgmtStatus> cachedStatus = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<MgmtEndpoint, MgmtStatus> cachedStatus =
+      new ConcurrentHashMap<>();
   private final ConcurrentHashMap<MgmtEndpoint, Long> lastAttemptAt = new ConcurrentHashMap<>();
 
   public MgmtClientManager(OpnlProperties properties, NodeRegistryService nodeRegistryService) {

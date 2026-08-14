@@ -89,8 +89,7 @@ class MgmtClientManagerTest {
     try (ServerSocket listener = new ServerSocket(0)) {
       int portBase = listener.getLocalPort() - 0;
       NodeRegistryService nodes = mock(NodeRegistryService.class);
-      when(nodes.findNode("n1"))
-          .thenReturn(Optional.of(node("n1", "127.0.0.1", portBase, true)));
+      when(nodes.findNode("n1")).thenReturn(Optional.of(node("n1", "127.0.0.1", portBase, true)));
 
       MgmtStatus status = manager(properties(7505), nodes).status("n1", 0);
       // The listener never speaks the management protocol, so the poll yields null,

@@ -25,7 +25,8 @@ public class NodeRegistryService {
   private final OpenVpnNodeRepository nodeRepository;
   private final AuditLogService auditLogService;
 
-  public NodeRegistryService(OpenVpnNodeRepository nodeRepository, AuditLogService auditLogService) {
+  public NodeRegistryService(
+      OpenVpnNodeRepository nodeRepository, AuditLogService auditLogService) {
     this.nodeRepository = nodeRepository;
     this.auditLogService = auditLogService;
   }
@@ -112,11 +113,7 @@ public class NodeRegistryService {
     OpenVpnNode node = requireNode(id);
     node.setEnabled(enabled);
     auditLogService.record(
-        enabled ? "NODE_ENABLE" : "NODE_DISABLE",
-        AuditLogService.CAT_NODE,
-        id,
-        "vpn_node",
-        null);
+        enabled ? "NODE_ENABLE" : "NODE_DISABLE", AuditLogService.CAT_NODE, id, "vpn_node", null);
     return OpenVpnNodeDto.from(nodeRepository.save(node), Instant.now());
   }
 
