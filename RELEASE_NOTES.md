@@ -8,6 +8,47 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.14 — 2026-08-14
+
+Fourteenth tagged milestone (SemVer pre-release): mandatory MFA. A server-wide
+`require_mfa` policy setting forces every user to enroll TOTP and to present a
+code at both web login and VPN connect; users who have not enrolled are
+redirected to a QR-enrollment flow right after login, and MFA can no longer be
+disabled while the policy is in force. Includes everything from
+`v0.1.0-alpha.13` plus the changes below. Tag: `v0.1.0-alpha.14`.
+
+### Phase P4.1 — Mandatory MFA (server-wide policy)
+- [x] `require_mfa` server setting (existing settings hierarchy): when
+      effective for a user, the account must be MFA-enrolled to sign in or
+      connect
+- [x] Forced enrollment at login: `POST /api/auth/login` returns
+      `mustEnrollMfa: true` plus a short-lived single-use enroll challenge
+      token when MFA is required but the user has no secret;
+      `POST /api/auth/mfa/enroll` provisions the TOTP secret (QR + secret,
+      idempotent) and `POST /api/auth/mfa/enroll/confirm` verifies the code,
+      marks the account enrolled and issues the session tokens
+- [x] Frontend — new `MfaEnrollPage` at `/login/enroll` (QR, secret, verify
+      code, "Enable and sign in"); `LoginPage` auto-redirects when the server
+      returns `mustEnrollMfa`
+- [x] Enforcement: web `mfa()` gate relaxed to secret-based so a
+      provisioned-but-unconfirmed secret still verifies; VPN
+      `verifyVpnLogin`/`verifyVpnOtp` deny with `mfa_required`/`invalid_code`
+      when the policy applies and no code was given
+- [x] Disable-MFA blocked under policy (admin `UserAdminService` + portal
+      `PortalAccountService`); `UserDto.mfaRequired` (policy-only, so
+      self-enabled MFA stays user-manageable) drives the frontend: AccountPage
+      shows a warning banner and disables "Disable MFA", UsersPage shows a
+      "Required" chip in the MFA column
+
+### Verified
+- Backend suite green (spotless clean), `make test` green; frontend suite
+  green (28 files / 137 tests, lint 0 errors, `tsc -b` clean).
+- Live on `65.21.108.250`: forced-enrollment flow verified end-to-end — set
+  `require_mfa`, log in as an unenrolled user, confirm QR enrollment page
+  appears, verify a valid code signs in.
+
+---
+
 ## v0.1.0-alpha.13 — 2026-08-14
 
 Thirteenth tagged milestone (SemVer pre-release): backup import with restore
