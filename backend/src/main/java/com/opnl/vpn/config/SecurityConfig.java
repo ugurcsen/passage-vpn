@@ -69,6 +69,8 @@ public class SecurityConfig {
     "/api/auth/login",
     "/api/auth/refresh",
     "/api/auth/mfa",
+    "/api/auth/mfa/enroll",
+    "/api/auth/mfa/enroll/confirm",
     "/api/setup/**",
     "/api/public/**",
     "/internal/**",

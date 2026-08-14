@@ -8,6 +8,18 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.14.1 — 2026-08-14
+
+Patch release fixing forced-MFA enrollment on the live deployment: the new
+`/api/auth/mfa/enroll` and `/api/auth/mfa/enroll/confirm` endpoints were missing
+from the security permit list, so a first-time login returned `mustEnrollMfa`
+but the enrollment calls were rejected with `401 Authentication required`. They
+are now public like the other pre-auth login endpoints, guarded by a new
+`MfaEnrollEndpointSecurityTest` that asserts a blank `preAuthToken` yields a
+validation 400 (not 401). Tag: `v0.1.0-alpha.14.1`.
+
+---
+
 ## v0.1.0-alpha.14 — 2026-08-14
 
 Fourteenth tagged milestone (SemVer pre-release): mandatory MFA. A server-wide
