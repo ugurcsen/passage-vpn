@@ -90,7 +90,7 @@ public class UserAdminService {
                       settingsService
                           .userSettings(user.getId())
                           .get(SettingKeys.MUST_CHANGE_PASSWORD));
-              return UserDto.from(user, mustChange, names);
+              return UserDto.from(user, mfaRequired(user), mustChange, names);
             })
         .sorted(java.util.Comparator.comparing(UserDto::username, String.CASE_INSENSITIVE_ORDER))
         .toList();
@@ -120,7 +120,7 @@ public class UserAdminService {
             .toList();
     boolean mustChange =
         Boolean.TRUE.equals(settingsService.userSettings(id).get(SettingKeys.MUST_CHANGE_PASSWORD));
-    return UserDto.from(user, mustChange, names);
+    return UserDto.from(user, mfaRequired(user), mustChange, names);
   }
 
   @Transactional
@@ -406,6 +406,10 @@ public class UserAdminService {
   @Transactional
   public UserDto disableMfa(String id) {
     User user = requireUser(id);
+    if (mfaRequired(user)) {
+      throw ApiException.forbidden(
+          "mfa_required", "Two-factor authentication is required by policy and cannot be disabled");
+    }
     user.setMfaEnabled(false);
     user.setMfaSecret(null);
     userRepository.save(user);
@@ -474,6 +478,12 @@ public class UserAdminService {
 
   private long countAdmins() {
     return userRepository.countByRole(User.Role.ADMIN);
+  }
+
+  /** True when the server/group policy mandates MFA for this account. */
+  private boolean mfaRequired(User user) {
+    Map<String, Object> settings = settingsService.effectiveForUser(user.getId());
+    return settings != null && Boolean.TRUE.equals(settings.get(SettingKeys.REQUIRE_MFA));
   }
 
   /** RESELLER accounts cannot create or promote other accounts to ADMIN. */

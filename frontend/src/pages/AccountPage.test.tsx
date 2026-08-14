@@ -10,6 +10,7 @@ import { ToastProvider } from "@/hooks/useToast";
 import { AccountPage } from "@/pages/AccountPage";
 
 let mfaEnabled = false;
+let mfaRequired = false;
 
 function me() {
   return {
@@ -19,6 +20,7 @@ function me() {
     email: "alice@example.com",
     role: "USER",
     mfaEnabled,
+    mfaRequired,
     banned: false,
     mustChangePassword: false,
     groups: [],
@@ -62,6 +64,7 @@ function renderPage() {
 describe("AccountPage", () => {
   beforeEach(() => {
     mfaEnabled = false;
+    mfaRequired = false;
     localStorage.clear();
     localStorage.setItem("opnl.access", "test-token");
     vi.stubGlobal(
@@ -199,5 +202,16 @@ describe("AccountPage", () => {
       currentPassword: "supersecret1",
       newPassword: "brandnewpassword1",
     });
+  });
+
+  it("blocks disabling MFA when required by policy", async () => {
+    mfaEnabled = true;
+    mfaRequired = true;
+    renderPage();
+
+    expect(
+      await screen.findByText(/required by your organization policy/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /disable mfa/i })).toBeDisabled();
   });
 });

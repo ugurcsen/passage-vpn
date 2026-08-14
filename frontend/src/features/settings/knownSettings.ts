@@ -98,6 +98,13 @@ export const KNOWN_SETTINGS: KnownSetting[] = [
     type: "boolean",
   },
   {
+    key: "require_mfa",
+    label: "Require MFA",
+    description:
+      "Force all users to set up two-factor authentication and to enter a TOTP code at login and VPN connect. Users without MFA are prompted to enroll at their next login.",
+    type: "boolean",
+  },
+  {
     key: "tunnel_mode",
     label: "Tunnel mode",
     description: "Full tunnel routes all traffic through the VPN; split tunnel routes only the configured networks.",

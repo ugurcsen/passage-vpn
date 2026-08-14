@@ -1,5 +1,6 @@
 package com.opnl.vpn.auth;
 
+import com.opnl.vpn.api.portal.PortalAccountService;
 import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.auth.spi.AuthProvider;
 import com.opnl.vpn.auth.spi.AuthProviderManager;
@@ -64,10 +65,16 @@ public class AuthService {
 
   /**
    * Result of the first login factor. When MFA is required, {@code preAuthToken} must be redeemed
-   * via {@link #mfa}; otherwise access/refresh tokens are issued directly.
+   * via {@link #mfa}; when the account has no TOTP yet, {@code mustEnrollMfa} directs the client to
+   * {@link #enrollStart}/{@link #enrollConfirm} first. Otherwise access/refresh tokens are issued
+   * directly.
    */
   public record MfaChallengeResponse(
-      boolean mfaRequired, String preAuthToken, String accessToken, String refreshToken) {}
+      boolean mfaRequired,
+      boolean mustEnrollMfa,
+      String preAuthToken,
+      String accessToken,
+      String refreshToken) {}
 
   /** First login factor. Returns an MFA challenge when the account has TOTP enabled. */
   @Transactional
@@ -87,15 +94,21 @@ public class AuthService {
     user.setLockedUntil(null);
     user.setLastLoginAt(Instant.now());
     userRepository.save(user);
-    if (user.isMfaEnabled()) {
+    if (requiresMfa(user)) {
       auditLogService.record(
           "LOGIN_MFA_REQUIRED", AuditLogService.CAT_AUTH, user.getId(), "user", auditCtx(user));
-      return new MfaChallengeResponse(true, jwtService.issueMfaChallenge(user.getId()), null, null);
+      if (user.getMfaSecret() == null) {
+        return new MfaChallengeResponse(
+            false, true, jwtService.issueMfaEnrollChallenge(user.getId()), null, null);
+      }
+      return new MfaChallengeResponse(
+          true, false, jwtService.issueMfaChallenge(user.getId()), null, null);
     }
     TokenResponse tokens = issueTokens(user);
     auditLogService.record(
         "LOGIN_SUCCESS", AuditLogService.CAT_AUTH, user.getId(), "user", auditCtx(user));
-    return new MfaChallengeResponse(false, null, tokens.accessToken(), tokens.refreshToken());
+    return new MfaChallengeResponse(
+        false, false, null, tokens.accessToken(), tokens.refreshToken());
   }
 
   /** Second login factor: redeem the MFA challenge for a full session. */
@@ -105,12 +118,7 @@ public class AuthService {
     if (claims == null || !jwtService.isMfaChallenge(claims)) {
       throw ApiException.unauthorized("mfa_challenge_invalid", "MFA challenge expired");
     }
-    long now = Instant.now().getEpochSecond();
-    pruneExpiredChallenges(now);
-    String challengeKey = claims.getId() != null ? claims.getId() : JwtService.hash(preAuthToken);
-    if (redeemedChallenges.putIfAbsent(challengeKey, now) != null) {
-      throw ApiException.unauthorized("mfa_challenge_invalid", "MFA challenge already used");
-    }
+    redeemChallenge(preAuthToken, claims);
     User user =
         userRepository
             .findById(claims.getSubject())
@@ -119,11 +127,62 @@ public class AuthService {
                     ApiException.unauthorized(
                         "invalid_credentials", "Invalid username or password"));
     assertAccountUsable(user, Instant.now());
-    if (!user.isMfaEnabled() || !totpService.verify(user.getMfaSecret(), code)) {
+    if (user.getMfaSecret() == null || !totpService.verify(user.getMfaSecret(), code)) {
       throw ApiException.unauthorized("invalid_code", "Invalid or expired code");
     }
     user.setLastLoginAt(Instant.now());
     userRepository.save(user);
+    auditLogService.record(
+        "LOGIN_SUCCESS", AuditLogService.CAT_AUTH, user.getId(), "user", auditCtx(user));
+    return issueTokens(user);
+  }
+
+  /**
+   * Starts TOTP enrollment for an account that must enable MFA before first sign-in. The secret is
+   * stored (not yet active) and the QR shown; {@link #enrollConfirm} activates it.
+   */
+  @Transactional
+  public PortalAccountService.MfaSetup enrollStart(String preAuthToken) {
+    User user = requireEnrollUser(preAuthToken);
+    String secret = totpService.generateSecret();
+    user.setMfaSecret(secret);
+    user.setMfaEnabled(false);
+    userRepository.save(user);
+    String uri = totpService.otpAuthUri(secret, user.getUsername());
+    return new PortalAccountService.MfaSetup(
+        secret, uri, totpService.qrPngDataUrl(secret, user.getUsername()));
+  }
+
+  /** Confirms TOTP enrollment and issues the final session tokens. */
+  @Transactional
+  public TokenResponse enrollConfirm(String preAuthToken, String code) {
+    var claims = jwtService.parse(preAuthToken);
+    if (claims == null || !jwtService.isMfaEnrollChallenge(claims)) {
+      throw ApiException.unauthorized("mfa_challenge_invalid", "MFA challenge expired");
+    }
+    redeemChallenge(preAuthToken, claims);
+    User user =
+        userRepository
+            .findById(claims.getSubject())
+            .orElseThrow(
+                () ->
+                    ApiException.unauthorized(
+                        "invalid_credentials", "Invalid username or password"));
+    assertAccountUsable(user, Instant.now());
+    if (user.getMfaSecret() == null || !totpService.verify(user.getMfaSecret(), code)) {
+      throw ApiException.unauthorized("invalid_code", "Invalid or expired code");
+    }
+    user.setMfaEnabled(true);
+    user.setFailedAttempts(0);
+    user.setLockedUntil(null);
+    user.setLastLoginAt(Instant.now());
+    userRepository.save(user);
+    auditLogService.record(
+        "MFA_ENABLE",
+        AuditLogService.CAT_USER,
+        user.getId(),
+        "user",
+        Map.of("username", user.getUsername()));
     auditLogService.record(
         "LOGIN_SUCCESS", AuditLogService.CAT_AUTH, user.getId(), "user", auditCtx(user));
     return issueTokens(user);
@@ -204,12 +263,17 @@ public class AuthService {
       return new VpnVerification(false, "invalid_credentials");
     }
     boolean mfaRequired =
-        user.isMfaEnabled()
+        requiresMfa(user)
             || Boolean.TRUE.equals(effective(user, SettingKeys.REQUIRE_MFA_ON_CONNECT));
-    if (mfaRequired && !totpService.verify(user.getMfaSecret(), otp)) {
-      recordFailure(user);
-      return new VpnVerification(
-          false, otp == null || otp.isBlank() ? "mfa_required" : "invalid_code");
+    if (mfaRequired) {
+      if (user.getMfaSecret() == null) {
+        return new VpnVerification(false, "mfa_required");
+      }
+      if (!totpService.verify(user.getMfaSecret(), otp)) {
+        recordFailure(user);
+        return new VpnVerification(
+            false, otp == null || otp.isBlank() ? "mfa_required" : "invalid_code");
+      }
     }
     user.setFailedAttempts(0);
     user.setLockedUntil(null);
@@ -236,12 +300,15 @@ public class AuthService {
       return new VpnVerification(false, "account_locked");
     }
     boolean mfaRequired =
-        user.isMfaEnabled()
+        requiresMfa(user)
             || Boolean.TRUE.equals(effective(user, SettingKeys.REQUIRE_MFA_ON_CONNECT));
     if (!mfaRequired) {
       return new VpnVerification(false, "mfa_not_required");
     }
-    if (otp == null || otp.isBlank() || !totpService.verify(user.getMfaSecret(), otp)) {
+    if (user.getMfaSecret() == null
+        || otp == null
+        || otp.isBlank()
+        || !totpService.verify(user.getMfaSecret(), otp)) {
       recordFailure(user);
       return new VpnVerification(false, "invalid_code");
     }
@@ -256,6 +323,28 @@ public class AuthService {
 
   private void pruneExpiredChallenges(long now) {
     redeemedChallenges.entrySet().removeIf(e -> now - e.getValue() > MFA_CHALLENGE_TTL_SECONDS);
+  }
+
+  /** Marks a pre-auth challenge single-use; concurrent/replayed use is rejected. */
+  private void redeemChallenge(String preAuthToken, io.jsonwebtoken.Claims claims) {
+    long now = Instant.now().getEpochSecond();
+    pruneExpiredChallenges(now);
+    String challengeKey = claims.getId() != null ? claims.getId() : JwtService.hash(preAuthToken);
+    if (redeemedChallenges.putIfAbsent(challengeKey, now) != null) {
+      throw ApiException.unauthorized("mfa_challenge_invalid", "MFA challenge already used");
+    }
+  }
+
+  /** Resolves the account behind a valid MFA enrollment challenge. */
+  private User requireEnrollUser(String preAuthToken) {
+    var claims = jwtService.parse(preAuthToken);
+    if (claims == null || !jwtService.isMfaEnrollChallenge(claims)) {
+      throw ApiException.unauthorized("mfa_challenge_invalid", "MFA challenge expired");
+    }
+    return userRepository
+        .findById(claims.getSubject())
+        .orElseThrow(
+            () -> ApiException.unauthorized("invalid_credentials", "Invalid username or password"));
   }
 
   private TokenResponse issueTokens(User user) {
@@ -299,7 +388,13 @@ public class AuthService {
   }
 
   private Object effective(User user, String key) {
-    return settingsService.effectiveForUser(user.getId()).getOrDefault(key, Boolean.FALSE);
+    Map<String, Object> map = settingsService.effectiveForUser(user.getId());
+    return map == null ? null : map.get(key);
+  }
+
+  /** True when the account must present a TOTP code at login (self-enabled or policy-mandated). */
+  private boolean requiresMfa(User user) {
+    return user.isMfaEnabled() || Boolean.TRUE.equals(effective(user, SettingKeys.REQUIRE_MFA));
   }
 
   private String currentRemoteIp() {

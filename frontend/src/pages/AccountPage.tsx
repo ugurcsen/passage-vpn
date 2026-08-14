@@ -151,8 +151,19 @@ export function AccountPage() {
             Two-factor authentication is disabled.
           </Alert>
         )}
+        {user?.mfaRequired && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Two-factor authentication is required by your organization policy and cannot be
+            disabled.
+          </Alert>
+        )}
         {user?.mfaEnabled ? (
-          <Button variant="outlined" color="error" onClick={() => setDisableOpen(true)}>
+          <Button
+            variant="outlined"
+            color="error"
+            disabled={user.mfaRequired}
+            onClick={() => setDisableOpen(true)}
+          >
             Disable MFA
           </Button>
         ) : (

@@ -37,7 +37,9 @@ export function LoginPage() {
     setLoading(true);
     try {
       const res = await login(username, password);
-      if (res.mfaRequired) {
+      if (res.mustEnrollMfa) {
+        navigate("/login/enroll", { state: { username, preAuthToken: res.preAuthToken } });
+      } else if (res.mfaRequired) {
         navigate("/login/mfa", { state: { username, preAuthToken: res.preAuthToken } });
       } else {
         navigate("/");

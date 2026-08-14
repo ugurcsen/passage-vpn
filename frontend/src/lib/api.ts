@@ -209,6 +209,8 @@ export const endpoints = {
   me: "/auth/me",
   login: "/auth/login",
   mfa: "/auth/mfa",
+  mfaEnroll: "/auth/mfa/enroll",
+  mfaEnrollConfirm: "/auth/mfa/enroll/confirm",
   refresh: "/auth/refresh",
   logout: "/auth/logout",
   setupState: "/setup/state",

@@ -47,6 +47,9 @@ public final class SettingKeys {
   /** Require TOTP code at VPN connect time even when user auth is enabled. */
   public static final String REQUIRE_MFA_ON_CONNECT = "require_mfa_on_connect";
 
+  /** True when the account must use TOTP MFA: forced enrollment and second factor at login. */
+  public static final String REQUIRE_MFA = "require_mfa";
+
   /** Days of closed VPN session history kept before the periodic purge. */
   public static final String CONNECTION_LOGS_RETENTION_DAYS = "connection_logs_retention_days";
 

@@ -107,8 +107,109 @@ class AuthServiceTest {
         .thenReturn(Optional.of(user("alice", true, "JBSWY3DPEHPK3PXP")));
     var result = service.login("alice", "supersecret1");
     assertThat(result.mfaRequired()).isTrue();
+    assertThat(result.mustEnrollMfa()).isFalse();
     assertThat(result.preAuthToken()).isNotBlank();
     assertThat(result.accessToken()).isNull();
+  }
+
+  @Test
+  void loginWithoutSecretButPolicyRequiresMfaForcesEnrollment() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    when(settingsService.effectiveForUser(anyString()))
+        .thenReturn(Map.of(SettingKeys.REQUIRE_MFA, true));
+    var result = service.login("alice", "supersecret1");
+    assertThat(result.mfaRequired()).isFalse();
+    assertThat(result.mustEnrollMfa()).isTrue();
+    assertThat(result.preAuthToken()).isNotBlank();
+    assertThat(result.accessToken()).isNull();
+  }
+
+  @Test
+  void enrollStartStoresSecretAndReturnsQr() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    when(settingsService.effectiveForUser(anyString()))
+        .thenReturn(Map.of(SettingKeys.REQUIRE_MFA, true));
+    var login = service.login("alice", "supersecret1");
+    assertThat(login.mustEnrollMfa()).isTrue();
+
+    when(userRepository.findById("u1")).thenReturn(Optional.of(user("alice", false, null)));
+    var setup = service.enrollStart(login.preAuthToken());
+    assertThat(setup.secret()).isNotBlank();
+    assertThat(setup.otpAuthUrl()).startsWith("otpauth://totp/");
+    assertThat(setup.qrDataUrl()).startsWith("data:image/png;base64,");
+  }
+
+  @Test
+  void enrollConfirmActivatesMfaAndIssuesTokens() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    when(settingsService.effectiveForUser(anyString()))
+        .thenReturn(Map.of(SettingKeys.REQUIRE_MFA, true));
+    var login = service.login("alice", "supersecret1");
+    assertThat(login.mustEnrollMfa()).isTrue();
+
+    User withSecret = user("alice", false, null);
+    withSecret.setMfaSecret(new TotpService().generateSecret());
+    when(userRepository.findById("u1")).thenReturn(Optional.of(withSecret));
+
+    var tokens = service.enrollConfirm(login.preAuthToken(), totpCode(withSecret.getMfaSecret()));
+    assertThat(tokens.accessToken()).isNotBlank();
+    assertThat(tokens.refreshToken()).isNotBlank();
+    assertThat(withSecret.isMfaEnabled()).isTrue();
+  }
+
+  @Test
+  void enrollConfirmRejectsInvalidCode() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    when(settingsService.effectiveForUser(anyString()))
+        .thenReturn(Map.of(SettingKeys.REQUIRE_MFA, true));
+    var login = service.login("alice", "supersecret1");
+
+    User withSecret = user("alice", false, null);
+    withSecret.setMfaSecret(new TotpService().generateSecret());
+    when(userRepository.findById("u1")).thenReturn(Optional.of(withSecret));
+
+    assertThatThrownBy(() -> service.enrollConfirm(login.preAuthToken(), "000000"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("invalid_code"));
+  }
+
+  @Test
+  void enrollChallengeIsSingleUse() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    when(settingsService.effectiveForUser(anyString()))
+        .thenReturn(Map.of(SettingKeys.REQUIRE_MFA, true));
+    var login = service.login("alice", "supersecret1");
+
+    User withSecret = user("alice", false, null);
+    withSecret.setMfaSecret(new TotpService().generateSecret());
+    when(userRepository.findById("u1")).thenReturn(Optional.of(withSecret));
+
+    service.enrollConfirm(login.preAuthToken(), totpCode(withSecret.getMfaSecret()));
+    assertThatThrownBy(
+            () -> service.enrollConfirm(login.preAuthToken(), totpCode(withSecret.getMfaSecret())))
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            e -> assertThat(((ApiException) e).getCode()).isEqualTo("mfa_challenge_invalid"));
+  }
+
+  @Test
+  void mfaAcceptsProvisionedButNotYetEnabledSecret() {
+    String secret = new TotpService().generateSecret();
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, secret)));
+    when(settingsService.effectiveForUser(anyString()))
+        .thenReturn(Map.of(SettingKeys.REQUIRE_MFA, true));
+    var challenge = service.login("alice", "supersecret1");
+    assertThat(challenge.mfaRequired()).isTrue();
+
+    when(userRepository.findById("u1")).thenReturn(Optional.of(user("alice", false, secret)));
+    var tokens = service.mfa(challenge.preAuthToken(), totpCode(secret));
+    assertThat(tokens.accessToken()).isNotBlank();
   }
 
   @Test
@@ -269,6 +370,28 @@ class AuthServiceTest {
     var withoutOtp = service.verifyVpnLogin("alice", "supersecret1", null, "1.2.3.4");
     assertThat(withoutOtp.allowed()).isFalse();
     assertThat(withoutOtp.reason()).isEqualTo("mfa_required");
+  }
+
+  @Test
+  void vpnVerifyDeniedWhenMfaRequiredButNotEnrolled() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    when(settingsService.effectiveForUser(anyString()))
+        .thenReturn(Map.of(SettingKeys.REQUIRE_MFA, true));
+    var result = service.verifyVpnLogin("alice", "supersecret1", "123456", "1.2.3.4");
+    assertThat(result.allowed()).isFalse();
+    assertThat(result.reason()).isEqualTo("mfa_required");
+  }
+
+  @Test
+  void vpnVerifyOtpDeniedWhenMfaRequiredButNotEnrolled() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    when(settingsService.effectiveForUser(anyString()))
+        .thenReturn(Map.of(SettingKeys.REQUIRE_MFA, true));
+    var result = service.verifyVpnOtp("alice", "123456", "1.2.3.4");
+    assertThat(result.allowed()).isFalse();
+    assertThat(result.reason()).isEqualTo("invalid_code");
   }
 
   @Test

@@ -1,6 +1,7 @@
 package com.opnl.vpn.auth;
 
 import com.opnl.vpn.api.admin.UserDto;
+import com.opnl.vpn.api.portal.PortalAccountService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
@@ -44,6 +45,8 @@ public class AuthController {
 
   public record MfaRequest(@NotBlank String preAuthToken, @NotBlank String code) {}
 
+  public record MfaEnrollRequest(@NotBlank String preAuthToken) {}
+
   public record RefreshRequest(String refreshToken) {}
 
   public record LogoutRequest(String refreshToken) {}
@@ -70,6 +73,27 @@ public class AuthController {
               + "accessToken/refreshToken pair.")
   public AuthService.TokenResponse mfa(@Valid @RequestBody MfaRequest request) {
     return authService.mfa(request.preAuthToken(), request.code());
+  }
+
+  @PostMapping("/mfa/enroll")
+  @Operation(
+      summary = "Start forced TOTP enrollment",
+      description =
+          "Begins TOTP provisioning for an account that must enable MFA before first sign-in. "
+              + "Accepts the preAuthToken returned by /login with mustEnrollMfa=true and returns "
+              + "the shared secret plus QR data URL; /mfa/enroll/confirm then activates MFA.")
+  public PortalAccountService.MfaSetup mfaEnroll(@Valid @RequestBody MfaEnrollRequest request) {
+    return authService.enrollStart(request.preAuthToken());
+  }
+
+  @PostMapping("/mfa/enroll/confirm")
+  @Operation(
+      summary = "Confirm forced TOTP enrollment",
+      description =
+          "Activates MFA after the user scanned the QR code and returned a valid TOTP code, then "
+              + "issues the final accessToken/refreshToken pair.")
+  public AuthService.TokenResponse mfaEnrollConfirm(@Valid @RequestBody MfaRequest request) {
+    return authService.enrollConfirm(request.preAuthToken(), request.code());
   }
 
   @PostMapping("/refresh")
@@ -106,6 +130,9 @@ public class AuthController {
     boolean mustChangePassword =
         Boolean.TRUE.equals(
             settingsService.userSettings(user.getId()).get(SettingKeys.MUST_CHANGE_PASSWORD));
-    return UserDto.from(user, mustChangePassword);
+    java.util.Map<String, Object> effective = settingsService.effectiveForUser(user.getId());
+    boolean mfaRequired =
+        effective != null && Boolean.TRUE.equals(effective.get(SettingKeys.REQUIRE_MFA));
+    return UserDto.from(user, mfaRequired, mustChangePassword);
   }
 }

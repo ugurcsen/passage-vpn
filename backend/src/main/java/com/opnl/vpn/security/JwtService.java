@@ -22,6 +22,7 @@ public class JwtService {
 
   private static final String ISSUER = "opnl";
   private static final String MFA_CLAIM = "mfa";
+  private static final String MFA_ENROLL_CLAIM = "mfa_enroll";
 
   private final OpnlProperties properties;
   private final SecretKey key;
@@ -50,12 +51,21 @@ public class JwtService {
 
   /** Short-lived token proving the first password factor succeeded. */
   public String issueMfaChallenge(String userId) {
+    return issuePreAuthToken(userId, MFA_CLAIM);
+  }
+
+  /** Short-lived token proving the first factor succeeded and that TOTP enrollment is required. */
+  public String issueMfaEnrollChallenge(String userId) {
+    return issuePreAuthToken(userId, MFA_ENROLL_CLAIM);
+  }
+
+  private String issuePreAuthToken(String userId, String purposeClaim) {
     Instant now = Instant.now();
     return Jwts.builder()
         .issuer(ISSUER)
         .subject(userId)
         .id(UUID.randomUUID().toString())
-        .claim(MFA_CLAIM, true)
+        .claim(purposeClaim, true)
         .issuedAt(Date.from(now))
         .expiration(Date.from(now.plusSeconds(300)))
         .signWith(key)
@@ -82,6 +92,11 @@ public class JwtService {
   /** True when this token is an MFA challenge (not usable as an access token). */
   public boolean isMfaChallenge(Claims claims) {
     return claims != null && Boolean.TRUE.equals(claims.get(MFA_CLAIM, Boolean.class));
+  }
+
+  /** True when this token is an MFA enrollment challenge (not usable as an access token). */
+  public boolean isMfaEnrollChallenge(Claims claims) {
+    return claims != null && Boolean.TRUE.equals(claims.get(MFA_ENROLL_CLAIM, Boolean.class));
   }
 
   /** SHA-256 hex hash for storing refresh tokens server-side. */

@@ -12,6 +12,7 @@ public record UserDto(
     String email,
     User.Role role,
     boolean mfaEnabled,
+    boolean mfaRequired,
     boolean banned,
     boolean mustChangePassword,
     List<String> groups,
@@ -20,7 +21,8 @@ public record UserDto(
     String staticIp,
     String staticIpv6) {
 
-  public static UserDto from(User user, boolean mustChangePassword, List<String> groupNames) {
+  public static UserDto from(
+      User user, boolean mfaRequired, boolean mustChangePassword, List<String> groupNames) {
     return new UserDto(
         user.getId(),
         user.getUsername(),
@@ -28,6 +30,7 @@ public record UserDto(
         user.getEmail(),
         user.getRole(),
         user.isMfaEnabled(),
+        mfaRequired,
         user.isBanned(),
         mustChangePassword,
         groupNames,
@@ -37,7 +40,7 @@ public record UserDto(
         user.getStaticIpv6());
   }
 
-  public static UserDto from(User user, boolean mustChangePassword) {
-    return from(user, mustChangePassword, List.of());
+  public static UserDto from(User user, boolean mfaRequired, boolean mustChangePassword) {
+    return from(user, mfaRequired, mustChangePassword, List.of());
   }
 }

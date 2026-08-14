@@ -80,13 +80,14 @@ public class PortalAccountService {
         user.getId(),
         "user",
         Map.of("username", user.getUsername()));
-    return UserDto.from(user, false);
+    return UserDto.from(user, mfaRequired(user), false);
   }
 
-  /** Disables MFA after re-verifying the current password. */
+  /** Disables MFA after re-verifying the current password. Blocked while MFA is policy-required. */
   @Transactional
   public UserDto disableMfa(String userId, String currentPassword) {
     User user = requireUser(userId);
+    assertMfaDisableAllowed(user);
     verifyPassword(user, currentPassword);
     user.setMfaEnabled(false);
     user.setMfaSecret(null);
@@ -97,7 +98,7 @@ public class PortalAccountService {
         user.getId(),
         "user",
         Map.of("username", user.getUsername()));
-    return UserDto.from(user, false);
+    return UserDto.from(user, mfaRequired(user), false);
   }
 
   /**
@@ -132,6 +133,20 @@ public class PortalAccountService {
     if (password == null || !authProvider.verifyCredentials(user.getUsername(), password)) {
       throw ApiException.unauthorized("invalid_credentials", "Current password is incorrect");
     }
+  }
+
+  /** Rejects disabling MFA when the server/group policy requires it for this account. */
+  private void assertMfaDisableAllowed(User user) {
+    if (mfaRequired(user)) {
+      throw ApiException.forbidden(
+          "mfa_required", "Two-factor authentication is required by policy and cannot be disabled");
+    }
+  }
+
+  /** True when the server/group policy mandates MFA for this account. */
+  private boolean mfaRequired(User user) {
+    Map<String, Object> settings = settingsService.effectiveForUser(user.getId());
+    return settings != null && Boolean.TRUE.equals(settings.get(SettingKeys.REQUIRE_MFA));
   }
 
   private User requireUser(String userId) {

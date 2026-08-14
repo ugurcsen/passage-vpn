@@ -18,6 +18,7 @@ export interface CurrentUser {
   email?: string;
   role: Role;
   mfaEnabled: boolean;
+  mfaRequired?: boolean;
   banned: boolean;
   mustChangePassword: boolean;
   groups: string[];
@@ -29,6 +30,7 @@ export interface LoginResult {
   accessToken: string | null;
   refreshToken: string | null;
   mfaRequired: boolean;
+  mustEnrollMfa?: boolean;
   preAuthToken?: string;
 }
 
@@ -37,6 +39,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (username: string, password: string) => Promise<LoginResult>;
   submitMfa: (preAuthToken: string, code: string) => Promise<void>;
+  submitMfaEnroll: (preAuthToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
 }
@@ -93,6 +96,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await loadMe());
   }, []);
 
+  const submitMfaEnroll = useCallback(async (preAuthToken: string, code: string) => {
+    const res = await apiPublic<LoginResult>(endpoints.mfaEnrollConfirm, {
+      method: "POST",
+      body: JSON.stringify({ preAuthToken, code }),
+    });
+    tokenStore.set(res.accessToken, res.refreshToken);
+    setUser(await loadMe());
+  }, []);
+
   const logout = useCallback(async () => {
     const refresh = tokenStore.refresh;
     try {
@@ -109,8 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, submitMfa, logout, refreshMe }),
-    [user, loading, login, submitMfa, logout, refreshMe],
+    () => ({ user, loading, login, submitMfa, submitMfaEnroll, logout, refreshMe }),
+    [user, loading, login, submitMfa, submitMfaEnroll, logout, refreshMe],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

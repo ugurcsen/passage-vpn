@@ -76,6 +76,22 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       the TOTP second factor. CLI clients keep the inline `password\nOTP`
       static-challenge path (backend `verifyVpnLogin` unchanged).
 
+**P4.1 — Mandatory MFA (server-wide policy)**
+- [x] `require_mfa` server setting (existing settings hierarchy): when effective,
+      every user must enroll TOTP and present a code at web login and VPN connect
+- [x] Forced enrollment at login: `/api/auth/login` returns `mustEnrollMfa` +
+      short-lived single-use enroll challenge; `/api/auth/mfa/enroll` (QR/secret)
+      and `/api/auth/mfa/enroll/confirm` (verify code, issue tokens); frontend
+      `MfaEnrollPage` at `/login/enroll`
+- [x] Enforcement: web `mfa()` relaxed to secret-based so provisioned-but-unconfirmed
+      secrets verify; VPN `verifyVpnLogin`/`verifyVpnOtp` deny with
+      `mfa_required`/`invalid_code` when policy requires
+- [x] Disable-MFA blocked under policy (admin `UserAdminService` + portal
+      `PortalAccountService`); `UserDto.mfaRequired` (policy-only) drives the
+      frontend (AccountPage banner + disabled button, UsersPage "Required" chip)
+- [x] Tests: backend `AuthServiceTest` (enroll/login/VPN enforcement) + frontend
+      (MfaEnrollPage, LoginPage redirect, AccountPage policy state) — `make test` green
+
 **P1.5 — Status / Settings / Dashboard phase (live E2E finding 2.5)** — DONE
 > Scoped from live E2E testing (`docs/test-findings.md` §2.5): the frontend defined
 > `/admin/status`, `/admin/settings`, `/admin/dashboard` but no backend controller existed.

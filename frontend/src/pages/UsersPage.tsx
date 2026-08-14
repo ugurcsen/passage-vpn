@@ -49,6 +49,7 @@ interface UserRow {
   email?: string;
   role: Role;
   mfaEnabled: boolean;
+  mfaRequired?: boolean;
   banned: boolean;
   mustChangePassword: boolean;
   groups: string[];
@@ -493,9 +494,18 @@ export function UsersPage() {
     {
       field: "mfaEnabled",
       headerName: "MFA",
-      width: 70,
-      renderCell: (params) =>
-        params.value ? <Chip label="On" size="small" color="success" /> : <Chip label="Off" size="small" />,
+      width: 100,
+      renderCell: (params) => {
+        const row = params.row as UserRow;
+        if (row.mfaEnabled) {
+          return <Chip label="On" size="small" color="success" />;
+        }
+        return row.mfaRequired ? (
+          <Chip label="Required" size="small" color="warning" />
+        ) : (
+          <Chip label="Off" size="small" />
+        );
+      },
     },
     {
       field: "banned",
@@ -789,6 +799,12 @@ export function UsersPage() {
           {mfaTarget?.mfaEnabled && !mfaSetup ? (
             <Stack spacing={2} sx={{ mt: 1 }}>
               <Alert severity="success">Two-factor authentication is enabled.</Alert>
+              {mfaTarget.mfaRequired && (
+                <Alert severity="warning">
+                  MFA is required by policy; it cannot be disabled for this user while the setting
+                  is active.
+                </Alert>
+              )}
               {mfaDisableConfirm ? (
                 <>
                   <Alert severity="warning">
@@ -805,7 +821,12 @@ export function UsersPage() {
                   </Button>
                 </>
               ) : (
-                <Button color="error" variant="outlined" onClick={() => setMfaDisableConfirm(true)}>
+                <Button
+                  color="error"
+                  variant="outlined"
+                  disabled={mfaTarget.mfaRequired}
+                  onClick={() => setMfaDisableConfirm(true)}
+                >
                   Disable MFA
                 </Button>
               )}

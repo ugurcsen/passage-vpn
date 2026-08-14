@@ -11,6 +11,7 @@ import { canAccess, homePathFor } from "@/lib/roles";
 import { AppLayout } from "@/components/AppLayout";
 import { LoginPage } from "@/pages/LoginPage";
 import { MfaLoginPage } from "@/pages/MfaLoginPage";
+import { MfaEnrollPage } from "@/pages/MfaEnrollPage";
 import { SetupWizardPage } from "@/pages/SetupWizardPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { UsersPage } from "@/pages/UsersPage";
@@ -80,6 +81,7 @@ function ThemedApp() {
                 <Routes>
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/login/mfa" element={<MfaLoginPage />} />
+                  <Route path="/login/enroll" element={<MfaEnrollPage />} />
                   <Route path="/setup" element={<SetupWizardPage />} />
                   <Route path="/share/:token" element={<SharePage />} />
                   <Route element={<AppLayout darkMode={darkMode} onToggleDarkMode={toggleDarkMode} />}>
@@ -174,7 +176,11 @@ function AuthGate({ children }: { children: ReactNode }) {
   }
 
   if (user) {
-    if (window.location.pathname === "/login" || window.location.pathname === "/login/mfa") {
+    if (
+      window.location.pathname === "/login" ||
+      window.location.pathname === "/login/mfa" ||
+      window.location.pathname === "/login/enroll"
+    ) {
       return <Navigate to={homePathFor(user.role)} replace />;
     }
     return <>{children}</>;
@@ -182,7 +188,12 @@ function AuthGate({ children }: { children: ReactNode }) {
 
   // Not authenticated: allow the wizard and auth pages through.
   const path = window.location.pathname;
-  if (path === "/login" || path === "/login/mfa" || path === "/setup") {
+  if (
+    path === "/login" ||
+    path === "/login/mfa" ||
+    path === "/login/enroll" ||
+    path === "/setup"
+  ) {
     return <>{children}</>;
   }
   return <Navigate to="/login" replace />;

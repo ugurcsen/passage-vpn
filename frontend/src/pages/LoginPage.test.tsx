@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -18,6 +19,7 @@ function renderLogin() {
             <MemoryRouter initialEntries={["/login"]}>
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/login/enroll" element={<div>enroll page</div>} />
                 <Route path="/setup" element={<div>wizard page</div>} />
               </Routes>
             </MemoryRouter>
@@ -96,5 +98,41 @@ describe("LoginPage", () => {
     const password = screen.getByLabelText(/password/i);
     expect(password).toHaveAttribute("id", "password");
     expect(password).toHaveAttribute("name", "password");
+  });
+
+  it("redirects to forced MFA enrollment when the account must enroll", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url === "/api/auth/login") {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                mfaRequired: false,
+                mustEnrollMfa: true,
+                preAuthToken: "enroll-token",
+                accessToken: null,
+                refreshToken: null,
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            ),
+          );
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ state: "COMPLETE" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }),
+    );
+
+    renderLogin();
+    await user.type(screen.getByLabelText(/username/i), "alice");
+    await user.type(screen.getByLabelText(/password/i), "supersecret1");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(await screen.findByText("enroll page")).toBeInTheDocument();
   });
 });
