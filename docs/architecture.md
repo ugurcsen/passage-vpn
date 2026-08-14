@@ -205,3 +205,9 @@ authorization via `@PreAuthorize("hasRole('ADMIN')")` etc. and the Swagger
 - Secrets come from `.env` (see `.env.example`): JWT secret, internal token,
   admin password, DB URL. Never commit real secrets.
 - Backups: `make backup` produces an archive via `BackupService`.
+- **Never run a full-tunnel VPN client on the VPN server host itself.** A
+  full-tunnel profile installs default routes via the tunnel; on the server
+  host that redirects the host's own egress (SSH/panel/ICMP replies) into the
+  VPN and black-holes it — the host becomes unreachable and requires
+  out-of-band console recovery (`pkill -f "openvpn --config ..."` or a reboot;
+  the client is not persisted). Clients must run on a separate host/VM.

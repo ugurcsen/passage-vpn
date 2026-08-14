@@ -56,7 +56,25 @@ public class CertService {
     List<Certificate> valid =
         certificateRepository.findByUserIdAndStatus(userId, Certificate.Status.VALID);
     if (!valid.isEmpty()) {
-      return valid.get(0);
+      Certificate certificate = valid.get(0);
+      if (easyRsaService.hasClientCert(certificate.getCommonName())) {
+        return certificate;
+      }
+      // Bookkeeping row exists but the on-disk artifact is missing (e.g. demo-seeded rows or a
+      // partially purged PKI): issue the real certificate on demand so profile downloads work.
+      String cn = user.getUsername();
+      easyRsaService.issueClientCert(cn);
+      certificate.setCommonName(cn);
+      certificate.setSerial(serialFor(cn));
+      certificate.setExpiresAt(expiryFor(cn));
+      certificate.setIssuedAt(Instant.now());
+      auditLogService.record(
+          "CERT_ISSUE",
+          AuditLogService.CAT_CERT,
+          certificate.getId(),
+          "certificate",
+          Map.of("commonName", cn));
+      return certificateRepository.save(certificate);
     }
     String cn = user.getUsername();
     if (!easyRsaService.hasClientCert(cn)) {

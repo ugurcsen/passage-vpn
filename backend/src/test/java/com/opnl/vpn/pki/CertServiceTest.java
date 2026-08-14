@@ -77,11 +77,45 @@ class CertServiceTest {
     when(userRepository.findById("u1")).thenReturn(Optional.of(user()));
     when(certificateRepository.findByUserIdAndStatus("u1", Status.VALID))
         .thenReturn(List.of(existing));
+    when(easyRsa.hasClientCert("alice")).thenReturn(true);
 
     Certificate cert = service.ensureUserCert("u1");
 
     assertThat(cert).isSameAs(existing);
     verify(easyRsa, never()).issueClientCert("alice");
+  }
+
+  @Test
+  void ensureUserCertIssuesArtifactWhenValidRowHasNoFile() {
+    Certificate existing =
+        Certificate.builder()
+            .id("c1")
+            .commonName("alice")
+            .userId("u1")
+            .status(Status.VALID)
+            .serial("11")
+            .build();
+    when(userRepository.findById("u1")).thenReturn(Optional.of(user()));
+    when(certificateRepository.findByUserIdAndStatus("u1", Status.VALID))
+        .thenReturn(List.of(existing));
+    when(easyRsa.hasClientCert("alice")).thenReturn(false);
+    when(easyRsa.index())
+        .thenReturn(
+            List.of(
+                new CertIndexEntry(
+                    CertIndexEntry.Status.VALID,
+                    Instant.now().plusSeconds(86400),
+                    "AB",
+                    "alice.crt",
+                    "alice")));
+    when(certificateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    Certificate cert = service.ensureUserCert("u1");
+
+    assertThat(cert).isSameAs(existing);
+    assertThat(cert.getSerial()).isEqualTo("AB");
+    assertThat(cert.getIssuedAt()).isNotNull();
+    verify(easyRsa).issueClientCert("alice");
   }
 
   @Test

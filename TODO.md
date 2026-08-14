@@ -54,10 +54,12 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       re-create → 400 (finding 2.7 holds)
 
 **P0.5 — Follow-up sweep (M6 fresh-install E2E, `docs/test-findings.md` 2.13–2.14)**
-- [ ] 2.13 MED — demo-seeded cert rows have no backing PKI files: profile download for a
+- [x] 2.13 MED — demo-seeded cert rows have no backing PKI files: profile download for a
       demo user returns `pki_missing`; either issue the real cert on demand or return a
-      clearer demo-capped error
-- [ ] 2.14 HIGH — docs: never run a full-tunnel VPN client on the VPN server host
+      clearer demo-capped error. Fix: `CertService.ensureUserCert` issues the real
+      artifact on demand when a VALID row has no backing file (refreshes serial/expiry),
+      so demo users' profiles download with real certs.
+- [x] 2.14 HIGH — docs: never run a full-tunnel VPN client on the VPN server host
       (black-holes host routing, requires OOB recovery); add an operational note to
       `README`/`docs/architecture.md`
 

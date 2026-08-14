@@ -414,8 +414,10 @@ Easy-RSA artifacts, and profile download reads the physical `issued/<cn>.crt`. B
 working profile (verified: real Easy-RSA cert issued, valid `.ovpn` with the configured
 `remote` endpoint).
 
-**Fix** Either issue the real cert on demand during profile download for demo certs, or
-return a friendlier `demo_cert`-style error pointing at the demo limitation.
+**Fix** `[FIXED]` — `CertService.ensureUserCert` now issues the real artifact on demand
+when a VALID bookkeeping row has no backing file (refreshing serial/expiry/issued-at from
+the Easy-RSA index), so demo users' profiles download with real certs. REVOKED demo rows
+fall through to the normal "issue a fresh cert" path, matching real re-issue behavior.
 
 ### 2.14 HIGH — Full-tunnel VPN client on the server host black-holes host routing
 
@@ -440,6 +442,9 @@ hosts.
 For the E2E harness, run the connect test from a separate client host/VM. Consider, as
 future hardening, pushing a `route-nopull`-style warning when the client's local address
 equals the server host.
+
+**Resolved (docs)** — `[FIXED]` README "Operational note" and `docs/architecture.md`
+§8 now warn against running a full-tunnel client on the server host.
 
 ---
 

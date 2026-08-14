@@ -33,6 +33,11 @@ Alternatively bootstrap non-interactively with `make seed-admin` and try the
 sample dataset with `make seed-demo` (or set `OPNL_DEMO_MODE=true` in `.env`
 to auto-load it on first boot). Demo users use the password `demo-password-1`.
 
+> **Operational note:** never run a full-tunnel VPN client on the VPN server
+> host itself — it redirects the host's own egress into the tunnel and locks
+> the host out (SSH/panel unreachable until a console `pkill` or reboot).
+> Always connect from a separate machine or VM.
+
 ## Features
 
 | Area | Capabilities |
