@@ -8,6 +8,45 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-alpha.15 — 2026-08-14
+
+Fifteenth tagged milestone (SemVer pre-release): M4 completion — generated API
+reference, Makefile polish and a full CRUD audit. `docs/api.md` is now committed
+(regenerated live from the production backend via `make api-docs`, 110 endpoint
+sections plus schemas), the Makefile gains a backend-reachability guard for
+`api-docs` and split `test-backend`/`test-frontend`/`lint-backend`/
+`lint-frontend` targets, and the admin/portal namespaces were audited against
+the live OpenAPI document. Includes everything from `v0.1.0-alpha.14.2` plus
+the changes below. Tag: `v0.1.0-alpha.15`.
+
+### Phase M4 — M4 leftovers (docs/api.md, Makefile polish, CRUD audit)
+- [x] `docs/api.md` generation — `make api-docs` renders the API reference
+      from the live `/v3/api-docs` document; the document is committed to the
+      repo and was regenerated live in this milestone (110 endpoint sections +
+      schemas)
+- [x] Makefile polish — the `api-docs` target fails fast with a friendly
+      message when the backend is unreachable (previously a raw `urllib`
+      failure); new split quality targets `test-backend`/`test-frontend`/
+      `lint-backend`/`lint-frontend` on top of the combined `test`/`lint`;
+      `help` refreshed
+- [x] Full CRUD API completion audit — admin + portal namespaces cross-checked
+      against the live OpenAPI document: users full CRUD; groups/rules/daemons/
+      dns-overrides list+create+update+delete; certs lifecycle ops
+      (issue/revoke/restore/rotate/reconcile); settings/api-tokens/
+      profile-tokens/backups complete; connections list + kill; portal
+      self-service complete (account MFA + password, profiles download/QR,
+      share). The named M4.4 gaps are done (daemon management, connection
+      kill); node lifecycle rolls into the M5 multi-node milestone.
+
+### Verified
+- Backend suite green on the production checkout (`./gradlew test
+  spotlessCheck` → BUILD SUCCESSFUL in 2m 1s); frontend suite green
+  (28 files / 137 tests, lint 0 errors).
+- `make api-docs` regenerates `docs/api.md` against the live backend and the
+  new guard prints the friendly error when the backend is unreachable.
+
+---
+
 ## v0.1.0-alpha.14.2 — 2026-08-14
 
 Patch release recording the live verification of mandatory MFA on
