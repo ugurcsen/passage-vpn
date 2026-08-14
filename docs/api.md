@@ -1360,6 +1360,20 @@ Exchanges the current refreshToken for a fresh accessToken/refreshToken pair. A 
 
 ---
 
+### `GET /share/{token}`
+
+Downloads the profile a token resolves to; serves the .ovpn file as an attachment; invalid/expired tokens return a small HTML error page.
+
+**Tags**: Share
+
+| Parameter | In | Type | Required |
+|---|---|---|---|
+| `token` | path | string | yes |
+
+**Responses**: 200
+
+---
+
 ## Schemas
 
 ### AccessRuleDto

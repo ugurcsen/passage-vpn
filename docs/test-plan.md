@@ -80,7 +80,6 @@ cd frontend && npm run lint && npm run test
 | `pages/AccessRulesPage.test.tsx` | Rule render, global/user create payload, enable toggle | [x] |
 | `pages/GroupsPage.test.tsx` | Grid render, create POST payload, members dialog PUT | [x] |
 | `pages/ProfilesPage.test.tsx` | Share-link table, token create payload, copy-link clipboard | [x] |
-| `pages/SharePage.test.tsx` | Token download (blob), error state | [x] |
 | `pages/SetupWizardPage.test.tsx` | Full flow: admin POST, server config POST, PKI provision gate, finish | [x] |
 | `components/ProfileCard.test.tsx` | Download blob, QR render | [x] |
 | `pages/PortalPage.test.tsx` | Profile list render, download endpoint | [x] |
@@ -162,7 +161,8 @@ cd frontend && npm run lint && npm run test
 4. `AccessRulesPage` — create/edit dialog, target-type switching, enable toggle. ✅
 5. `ProfilesPage` — download for user, create token dialog, copy-link. ⬜
 6. `PortalPage` + `ProfileCard` — download + QR toggle. ✅
-7. `SharePage` — token download + error state. ⬜
+7. Share downloads — moved to the backend (`GET /share/{token}` serves the raw
+   `.ovpn`; `ShareControllerTest` covers attachment + HTML error page). ✅
 8. `GroupsPage`, `DashboardPage`, `SetupWizardPage`, `LoginPage` (already partial). ⬜
 
 ### 6.2 Coverage checklist
@@ -175,7 +175,9 @@ cd frontend && npm run lint && npm run test
 - [x] Rules: GLOBAL hides target select; USER lists options; save payload shape; enable toggle.
 - [ ] Profiles: token creation payload (expires/uses), copy-link clipboard.
 - [x] Portal: fetches profile list, download + QR actions.
-- [x] Share: valid token downloads, error message on failure.
+- [x] Share: `ShareControllerTest` — valid token serves `.ovpn` as attachment
+      (`application/x-openvpn-profile` + Content-Disposition); missing/expired tokens
+      return the HTML error page with the right status.
 - [x] SetupWizard: admin/server/pki POST payloads, PKI gate before Continue, Finish
       redirect; LoginPage redirects to `/setup` when state ≠ `COMPLETE`.
 

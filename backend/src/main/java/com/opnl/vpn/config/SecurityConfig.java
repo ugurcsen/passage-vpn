@@ -75,6 +75,7 @@ public class SecurityConfig {
     "/api/public/**",
     "/internal/**",
     "/api/portal/share/**",
+    "/share/**",
     "/actuator/health",
     "/actuator/info",
     "/v3/api-docs/**",

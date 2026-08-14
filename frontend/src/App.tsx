@@ -34,7 +34,6 @@ const AuditLogsPage = lazy(() => import("@/pages/AuditLogsPage").then((m) => ({ 
 const ApiTokensPage = lazy(() => import("@/pages/ApiTokensPage").then((m) => ({ default: m.ApiTokensPage })));
 const PortalPage = lazy(() => import("@/pages/PortalPage").then((m) => ({ default: m.PortalPage })));
 const AccountPage = lazy(() => import("@/pages/AccountPage").then((m) => ({ default: m.AccountPage })));
-const SharePage = lazy(() => import("@/pages/SharePage").then((m) => ({ default: m.SharePage })));
 
 const THEME_KEY = "opnl.theme";
 
@@ -87,7 +86,6 @@ function ThemedApp() {
                   <Route path="/login/mfa" element={<MfaLoginPage />} />
                   <Route path="/login/enroll" element={<MfaEnrollPage />} />
                   <Route path="/setup" element={<SetupWizardPage />} />
-                  <Route path="/share/:token" element={<SharePage />} />
                   <Route element={<AppLayout darkMode={darkMode} onToggleDarkMode={toggleDarkMode} />}>
                     <Route path="/" element={<RoleRoute roles={["ADMIN"]}><DashboardPage /></RoleRoute>} />
                     <Route path="/users" element={<RoleRoute roles={["ADMIN", "RESELLER"]}><UsersPage /></RoleRoute>} />

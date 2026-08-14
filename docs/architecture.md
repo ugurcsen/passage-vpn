@@ -154,7 +154,8 @@ Package root `com.opnl.vpn` (`backend/src/main/java/com/opnl/vpn`):
   `X-Internal-Token` shared secret (`InternalTokenFilter`), and the node-agent
   endpoints (`/internal/node/*`) additionally run on a **mutual-TLS connector**
   (port 9443) that requires a client certificate whose `CN = agent-<nodeName>`.
-- `/api/setup/**`, `/api/public/**`, `/api/portal/share/**`, auth endpoints,
+- `/api/setup/**`, `/api/public/**`, `/api/portal/share/**`, `/share/**` (public
+  token-based `.ovpn` downloads), auth endpoints,
   `/ws/**`, Swagger and health paths are public by design
   (`PUBLIC_PATHS` in `SecurityConfig`).
 

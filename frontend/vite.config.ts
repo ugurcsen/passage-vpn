@@ -14,6 +14,10 @@ export default defineConfig({
         target: process.env.OPNL_VITE_PROXY_TARGET ?? "http://localhost:8080",
         changeOrigin: true,
       },
+      "/share": {
+        target: process.env.OPNL_VITE_PROXY_TARGET ?? "http://localhost:8080",
+        changeOrigin: true,
+      },
       "/ws": {
         target: process.env.OPNL_VITE_PROXY_TARGET ?? "http://localhost:8080",
         ws: true,
