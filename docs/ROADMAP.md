@@ -155,9 +155,9 @@ Work started under M3 has been split: completed items shipped in
 
 ## M6 — Release Hardening — TARGET `v0.1.0-beta.1`
 
-- [ ] **6.1 Demo/seed mode** — `make seed-demo` / `OPNL_DEMO_MODE`: sample users,
+- [x] **6.1 Demo/seed mode** — `make seed-demo` / `OPNL_DEMO_MODE`: sample users,
       groups, access rules, certs and connection history.
-- [ ] **6.2 CI docker build job** — docker build job in `.github/workflows/ci.yml`
+- [x] **6.2 CI docker build job** — docker build job in `.github/workflows/ci.yml`
       (`docker compose build` for backend/frontend/openvpn images).
 - [ ] **6.3 Fresh-install E2E test pass** — `install.sh` clean install → wizard →
       login → full UI → VPN connect flow; findings into `docs/test-findings.md`.

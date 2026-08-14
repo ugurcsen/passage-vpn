@@ -11,6 +11,7 @@ import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.setup.SetupService;
+import com.opnl.vpn.system.DemoSeedService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,6 +47,7 @@ public class InternalController {
   private final SettingsService settingsService;
   private final ConnectionLogService connectionLogService;
   private final DaemonService daemonService;
+  private final DemoSeedService demoSeedService;
 
   public InternalController(
       UserRepository userRepository,
@@ -56,7 +58,8 @@ public class InternalController {
       ConnectionRegistry connectionRegistry,
       SettingsService settingsService,
       ConnectionLogService connectionLogService,
-      DaemonService daemonService) {
+      DaemonService daemonService,
+      DemoSeedService demoSeedService) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.setupService = setupService;
@@ -66,6 +69,7 @@ public class InternalController {
     this.settingsService = settingsService;
     this.connectionLogService = connectionLogService;
     this.daemonService = daemonService;
+    this.demoSeedService = demoSeedService;
   }
 
   /**
@@ -92,6 +96,17 @@ public class InternalController {
             .build());
     log.info("Seeded admin user '{}'", request.username());
     return new SeedResult(true, request.username());
+  }
+
+  /**
+   * Loads the demo dataset (sample users, groups, access rules, DNS overrides, certificate rows and
+   * connection history). Used by {@code make seed-demo}. Idempotent: returns 409 when demo data is
+   * already loaded unless {@code force} is set, which wipes and re-seeds.
+   */
+  @PostMapping("/seed-demo")
+  public DemoSeedResult seedDemo(@RequestBody(required = false) SeedDemoRequest request) {
+    int users = demoSeedService.seed(request != null && request.force());
+    return new DemoSeedResult(users);
   }
 
   /**
@@ -234,6 +249,10 @@ public class InternalController {
   public record SeedRequest(String username, String password) {}
 
   public record SeedResult(boolean created, String username) {}
+
+  public record SeedDemoRequest(boolean force) {}
+
+  public record DemoSeedResult(int users) {}
 
   public record VerifyRequest(
       String username, String password, String otp, String commonName, String remoteIp) {}

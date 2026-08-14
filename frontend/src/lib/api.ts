@@ -240,6 +240,7 @@ export const endpoints = {
   publicBrand: "/public/brand",
   configReport: "/admin/config-report",
   backups: "/admin/backups",
+  demoSeed: "/admin/demo/seed",
 };
 
 export type ProfileType = "USER_LOCKED" | "AUTO_LOGIN" | "SERVER_LOCKED" | "GENERIC";
@@ -522,6 +523,15 @@ export function importBackup(file: File): Promise<BackupInfo> {
   return api<BackupInfo>(`${endpoints.backups}/import`, { method: "POST", body: form });
 }
 
+/** Seeds sample demo data (users, groups, rules, DNS overrides, certs, connection history).
+ *  Throws ApiError with code "demo_seeded" when demo data is already loaded. */
+export function demoSeed(force = false): Promise<{ users: number }> {
+  return api<{ users: number }>(endpoints.demoSeed, {
+    method: "POST",
+    body: JSON.stringify({ force }),
+  });
+}
+
 /** Runs the preflight safety checks before a restart or daemon reload. */
 export function runPreflight(): Promise<PreflightResult> {
   return api<PreflightResult>(`${endpoints.system}/preflight`, { method: "POST" });
@@ -550,8 +560,7 @@ export function downloadOvpn(file: OvpnFile) {
   URL.revokeObjectURL(url);
 }
 
-/** Downloads a backup archive to disk, honoring the backend's attachment filename. */
-export async function downloadBackup(name: string): Promise<void> {
+/** Downloads a backup archive to disk, honoring the backend's attachment filename. */export async function downloadBackup(name: string): Promise<void> {
   const res = await fetch(`${API_BASE}${endpoints.backups}/${encodeURIComponent(name)}/download`, {
     headers: { Authorization: `Bearer ${tokenStore.access}` },
   });

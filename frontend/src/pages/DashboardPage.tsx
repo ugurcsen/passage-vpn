@@ -2,6 +2,7 @@ import {
   Alert,
   Avatar,
   Box,
+  Button,
   Chip,
   Grid,
   LinearProgress,
@@ -16,8 +17,9 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LineChart } from "@mui/x-charts/LineChart";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import GroupsIcon from "@mui/icons-material/Groups";
 import LanIcon from "@mui/icons-material/Lan";
 import MemoryIcon from "@mui/icons-material/Memory";
@@ -25,8 +27,10 @@ import PeopleIcon from "@mui/icons-material/People";
 import SpeedIcon from "@mui/icons-material/Speed";
 import StorageIcon from "@mui/icons-material/Storage";
 import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
-import type { ReactNode } from "react";
-import { api, endpoints, type DashboardStats, type DaemonHealth, type SystemInfo } from "@/lib/api";
+import { useState, type ReactNode } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useToast } from "@/hooks/useToast";
+import { api, demoSeed, endpoints, type DashboardStats, type DaemonHealth, type SystemInfo } from "@/lib/api";
 import { useLiveStatus } from "@/hooks/useLiveStatus";
 
 function StatCard({
@@ -327,12 +331,27 @@ function DaemonChip({ daemon }: { daemon: DaemonHealth }) {
 
 /** Dashboard: live stat cards, real-time traffic chart, host system card and daemon health. */
 export function DashboardPage() {
+  const queryClient = useQueryClient();
+  const { success, error: toastError } = useToast();
+  const [seedOpen, setSeedOpen] = useState(false);
   const { data, isLoading, error } = useQuery<DashboardStats>({
     queryKey: ["admin-dashboard"],
     queryFn: () => api<DashboardStats>(endpoints.dashboard),
     refetchInterval: 15_000,
   });
   const { snapshot, connected } = useLiveStatus();
+  const seedMutation = useMutation({
+    mutationFn: () => demoSeed(false),
+    onSuccess: (result) => {
+      setSeedOpen(false);
+      success(`Demo data loaded: ${result.users} sample users`);
+      void queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+    },
+    onError: (err) => {
+      setSeedOpen(false);
+      toastError((err as Error).message);
+    },
+  });
 
   const history = snapshot?.history ?? [];
   const daemons = snapshot?.daemons ?? [];
@@ -363,6 +382,16 @@ export function DashboardPage() {
           color={connected ? "success" : snapshot ? "warning" : "error"}
           label={connected ? "Live" : snapshot ? "Polling" : "Offline"}
         />
+        <Button
+          size="small"
+          variant="outlined"
+          color="info"
+          startIcon={<AutoAwesomeIcon />}
+          onClick={() => setSeedOpen(true)}
+          sx={{ ml: "auto" }}
+        >
+          Load demo data
+        </Button>
       </Box>
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -481,6 +510,16 @@ export function DashboardPage() {
           </Paper>
         </Grid>
       </Grid>
+      <ConfirmDialog
+        open={seedOpen}
+        title="Load demo data"
+        message="This creates sample users (alice, bob, carol, dave), groups with static IP pools, access rules, DNS overrides and connection history for trying out the panel. Real client certificates are not issued."
+        confirmLabel="Load"
+        danger={false}
+        loading={seedMutation.isPending}
+        onConfirm={() => seedMutation.mutate()}
+        onCancel={() => setSeedOpen(false)}
+      />
     </Box>
   );
 }

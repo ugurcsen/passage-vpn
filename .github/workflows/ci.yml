@@ -38,3 +38,13 @@ jobs:
           npm run lint
           npm run build
           npm run test
+
+  docker-build:
+    name: Docker image build (backend/frontend/openvpn)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build service images
+        run: docker compose build backend frontend openvpn

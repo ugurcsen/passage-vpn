@@ -23,6 +23,7 @@ import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.setup.SetupService;
+import com.opnl.vpn.system.DemoSeedService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
@@ -48,6 +49,7 @@ class InternalControllerTest {
   private SettingsService settingsService;
   private ConnectionLogService connectionLogService;
   private DaemonService daemonService;
+  private DemoSeedService demoSeedService;
   private MockMvc mvc;
 
   private User user(boolean banned, boolean locked) {
@@ -72,6 +74,7 @@ class InternalControllerTest {
     settingsService = mock(SettingsService.class);
     connectionLogService = mock(ConnectionLogService.class);
     daemonService = mock(DaemonService.class);
+    demoSeedService = mock(DemoSeedService.class);
     when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user(false, false)));
     when(settingsService.effectiveForUser("u1")).thenReturn(Map.of());
     when(daemonService.ipv6Enabled(anyInt())).thenReturn(false);
@@ -94,7 +97,8 @@ class InternalControllerTest {
                     connectionRegistry,
                     settingsService,
                     connectionLogService,
-                    daemonService))
+                    daemonService,
+                    demoSeedService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -256,6 +260,27 @@ class InternalControllerTest {
   }
 
   @Test
+  void seedDemoSeedsWithForceFromBody() throws Exception {
+    when(demoSeedService.seed(true)).thenReturn(4);
+    mvc.perform(
+            post("/internal/seed-demo")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"force\":true}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.users").value(4));
+    verify(demoSeedService).seed(true);
+  }
+
+  @Test
+  void seedDemoDefaultsToNonForceWithoutBody() throws Exception {
+    when(demoSeedService.seed(false)).thenReturn(4);
+    mvc.perform(post("/internal/seed-demo").contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.users").value(4));
+    verify(demoSeedService).seed(false);
+  }
+
+  @Test
   void internalTokenFilterRejectsMissingHeader() throws Exception {
     com.opnl.vpn.config.OpnlProperties props = mock(com.opnl.vpn.config.OpnlProperties.class);
     when(props.internalToken()).thenReturn("secret");
@@ -271,7 +296,8 @@ class InternalControllerTest {
                     connectionRegistry,
                     settingsService,
                     connectionLogService,
-                    daemonService))
+                    daemonService,
+                    demoSeedService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .addFilters(filter)
             .build();

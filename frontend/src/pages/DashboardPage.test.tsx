@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
+import { ToastProvider } from "@/hooks/useToast";
 import { DashboardPage } from "@/pages/DashboardPage";
 
 const dashboard = {
@@ -36,7 +37,9 @@ function renderPage() {
   return render(
     <ThemeProvider theme={darkTheme}>
       <QueryClientProvider client={queryClient}>
-        <DashboardPage />
+        <ToastProvider>
+          <DashboardPage />
+        </ToastProvider>
       </QueryClientProvider>
     </ThemeProvider>,
   );
@@ -151,5 +154,29 @@ describe("DashboardPage", () => {
       expect(text).toContain("Upload");
       expect(text).toMatch(/B\/s/);
     }
+  });
+
+  it("loads demo data through the confirmation dialog and shows a success toast", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/admin/demo/seed") && init?.method === "POST") {
+        return Promise.resolve(json({ users: 4 }));
+      }
+      return Promise.resolve(json(dashboard));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+
+    await screen.findByText("12");
+    fireEvent.click(screen.getByRole("button", { name: /load demo data/i }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Load" }));
+
+    expect(await screen.findByText("Demo data loaded: 4 sample users")).toBeInTheDocument();
+    await waitFor(() => {
+      const seedCall = fetchMock.mock.calls.find(
+        (c) => String(c[0]).includes("/admin/demo/seed") && c[1]?.method === "POST",
+      );
+      expect(seedCall).toBeTruthy();
+    });
   });
 });

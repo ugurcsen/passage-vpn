@@ -152,8 +152,8 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] PostgreSQL docker profile validation (Phase 4.7)
 
 **M6 — v0.1.0-beta.1 — Release Hardening** (detail: `docs/ROADMAP.md` M6)
-- [ ] Demo/seed mode (Phase 4.7)
-- [ ] CI docker build job (Phase 4.7)
+- [x] Demo/seed mode (Phase 4.7)
+- [x] CI docker build job (Phase 4.7)
 - [ ] Fresh-install E2E test pass, README/docs finalization (Phase 4.7)
 - [ ] Cross-cutting sweep
 
@@ -319,10 +319,10 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] `install.sh` full installer (preflight, env, build, up, wizard)
 - [x] First-run wizard UI (frontend) — admin → VPN server → PKI → complete; login gated on `COMPLETE`
 - [x] PostgreSQL profile validation — `db/migration-postgresql` set (V1–V17 minus V13), `application-postgres.yml`, `MigrationParityTest`
-- [ ] Seed data + demo mode
+- [x] Seed data + demo mode
 - [ ] E2E test pass (backend unit+integration, frontend unit)
 - [ ] README + docs finalization
-- [~] CI workflow (backend test + spotless, frontend lint + build + test; docker build job pending)
+- [x] CI workflow (backend test + spotless, frontend lint + build + test, docker image build job)
 
 ---
 

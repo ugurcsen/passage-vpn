@@ -13,7 +13,7 @@ ENV_FILE     := .env
         backend-dev frontend-dev \
         test test-backend test-frontend \
         lint lint-backend lint-frontend format \
-        migrate seed-admin backup \
+        migrate seed-admin seed-demo backup \
         api-docs pki-init clean reset install
 
 help: ## Show this help
@@ -84,6 +84,13 @@ seed-admin: ## Create initial admin user (non-wizard path)
 	curl -sS -X POST http://localhost:8080/internal/seed-admin \
 		-H 'Content-Type: application/json' \
 		-d "{\"username\":\"admin\",\"password\":\"$${OPNL_ADMIN_PASSWORD:-change-me}\"}"
+
+seed-demo: ## Load demo data (sample users/groups/rules); needs setup complete
+	@code=$$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/internal/seed-demo \
+		-H 'Content-Type: application/json' \
+		-H "X-Internal-Token: $${OPNL_INTERNAL_TOKEN:-change-me-internal-token}" \
+		-d '{"force":false}'); \
+	[ "$$code" = "200" ] && echo "Demo data loaded" || { echo "seed-demo failed (HTTP $$code)"; exit 1; }
 
 backup: ## Produce backup archive (config + PKI + DB dump)
 	@test -d data || { echo "No data dir"; exit 1; }
