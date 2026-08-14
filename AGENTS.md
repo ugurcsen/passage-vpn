@@ -143,13 +143,15 @@ npm run test
 
 ## Environment Variables
 
-See `.env.example`. Key ones:
+Full reference in `docs/configuration.md`; template in `.env.example`. Key ones:
 
 | Variable | Purpose |
 |---|---|
 | `OPNL_DB_URL` / `OPNL_DB_USER` / `OPNL_DB_PASSWORD` | JDBC connection (SQLite file URL by default) |
 | `OPNL_JWT_SECRET` | JWT signing secret (min 32 bytes) |
 | `OPNL_OPENVPN_MGMT_HOST` / `OPNL_OPENVPN_MGMT_PORT` | Management interface endpoint |
+| `OPNL_OPENVPN_MGMT_PASSWORD` | Management interface password (mandatory; backend refuses to start without it) |
+| `OPNL_INTERNAL_TOKEN` | Shared token guarding `/internal/**` (mandatory; placeholder rejected) |
 | `OPNL_OPENVPN_ADMIN_HOST` | VPN server admin hostname/IP (pushed to clients) |
 | `OPNL_DATA_DIR` | shared volume: PKI, CCD, configs, db |
 | `OPNL_BRAND_NAME` | default product name |

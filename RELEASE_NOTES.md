@@ -8,6 +8,31 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.3 — 2026-08-15
+
+Third **beta** milestone (SemVer pre-release): on-demand portal share downloads
+and QR codes plus a complete environment-variable reference. Includes
+everything from `v0.1.0-beta.2` plus the changes below. Tag: `v0.1.0-beta.3`.
+
+### Changes
+- **Portal share downloads served by the backend** — new `ShareController`
+  (`/share/**`) validates the share token and streams the `.ovpn` file, so QR
+  codes no longer redirect to login; nginx and the Vite dev server proxy
+  `/share/` to the backend; the SPA share page is gone.
+- **On-demand share QR codes** — portal profile cards generate share QRs with a
+  5-minute expiry and a live countdown; expired codes are disabled.
+- **Environment-variable documentation** — new `docs/configuration.md`
+  documents every `OPNL_*` variable (default, allowed values, where it is
+  consumed); `.env.example` is in full sync; unused `OPNL_OPENVPN_PROTO`,
+  `OPNL_ADMIN_USERNAME` and `OPNL_MGMT_BASE_PORT` removed; README and AGENTS.md
+  link the new reference.
+
+### Verified
+- Backend suite green (`./gradlew test` + `spotlessCheck` BUILD SUCCESSFUL);
+  frontend 142 tests green.
+
+---
+
 ## v0.1.0-beta.2 — 2026-08-15
 
 Second **beta** milestone (SemVer pre-release): node & internal security

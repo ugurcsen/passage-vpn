@@ -80,7 +80,7 @@ ${GREEN}Installation complete.${NC}
   Swagger   : http://localhost:${OPNL_SERVER_PORT:-8080}/swagger-ui.html
 
 First-run: open the panel and complete the setup wizard (/setup).
-Admin credentials are in .env (OPNL_ADMIN_USERNAME / OPNL_ADMIN_PASSWORD).
+Admin credentials: OPNL_ADMIN_PASSWORD in .env (username "admin").
 
 Useful: make logs | make down | make up | make backup
 EOF

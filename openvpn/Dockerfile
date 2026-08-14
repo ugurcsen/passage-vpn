@@ -21,8 +21,7 @@ RUN apk add --no-cache \
 ENV OPNL_CONFIG_DIR=/etc/opnl/config \
     OPNL_CCD_DIR=/etc/opnl/ccd \
     OPNL_PKI_DIR=/etc/opnl/pki \
-    OPNL_LOG_DIR=/var/log/opnl \
-    OPNL_MGMT_BASE_PORT=7505
+    OPNL_LOG_DIR=/var/log/opnl
 
 RUN mkdir -p "$OPNL_CONFIG_DIR" "$OPNL_CCD_DIR" "$OPNL_PKI_DIR" "$OPNL_LOG_DIR" \
     && mkdir -p /etc/openvpn/scripts

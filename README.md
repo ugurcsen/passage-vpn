@@ -16,6 +16,7 @@ See `AGENTS.md` for the agent/developer guide, `TODO.md` for the phased roadmap,
 | `docs/architecture.md` | Component topology, backend module map, VPN/management integration, security model |
 | `docs/access-rules.md` | Firewall + DNS control: rule model, iptables rendering, domain pinning, dual-stack |
 | `docs/api.md` | REST API reference (regenerated with `make api-docs`) |
+| `docs/configuration.md` | Environment variables reference (all `OPNL_*` settings) |
 | `docs/ROADMAP.md` | Milestone status for the current release cycle |
 
 ## Quick start
@@ -56,6 +57,7 @@ to auto-load it on first boot). Demo users use the password `demo-password-1`.
 - **Architecture** — `docs/architecture.md`
 - **Access rules & DNS control** — `docs/access-rules.md`
 - **API reference** — `docs/api.md` (Swagger UI at `/swagger-ui.html` on the backend)
+- **Configuration & environment variables** — `docs/configuration.md`
 - **Roadmap** — `docs/ROADMAP.md`
 
 ## Development
