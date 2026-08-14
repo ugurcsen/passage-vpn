@@ -149,7 +149,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 **M5 — v0.1.0-alpha.9 — Multi-node & Ops** (detail: `docs/ROADMAP.md` M5)
 - [x] `openvpn_nodes` registry + node-aware status/kill/monitoring routing (Phase 4.6)
 - [x] Backend `agent` Spring profile (Phase 4.6)
-- [ ] PostgreSQL docker profile validation (Phase 4.7)
+- [x] PostgreSQL docker profile validation (Phase 4.7)
 
 **M6 — v0.1.0-beta.1 — Release Hardening** (detail: `docs/ROADMAP.md` M6)
 - [ ] Demo/seed mode (Phase 4.7)
