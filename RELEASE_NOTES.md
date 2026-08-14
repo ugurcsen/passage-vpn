@@ -8,6 +8,62 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.1 — 2026-08-14
+
+First **beta** milestone (SemVer pre-release): release hardening of the OpenVPN
+Access Server–style panel — demo/seed mode, CI container build, docs
+finalization, cross-cutting sweep and a full fresh-install E2E pass on a clean
+production deployment. Includes everything from `v0.1.0-alpha.16` plus the
+changes below. Tag: `v0.1.0-beta.1`.
+
+### Phase M6 — Release hardening
+- [x] **6.1 Demo/seed mode** — `make seed-demo` / `OPNL_DEMO_MODE`: sample users
+      (admin/ALICE/Bob/Carol/Dave), groups, GLOBAL/GROUP/USER access rules,
+      DNS overrides, certificate rows and connection history; dashboard "Load
+      demo data" button; `/api/admin/demo/seed` (admin) +
+      `/internal/seed-demo` (script-facing, network-restricted).
+- [x] **6.2 CI docker build job** — docker-build job in
+      `.github/workflows/ci.yml` (`docker compose build` backend/frontend/openvpn
+      images) so broken Dockerfiles fail CI.
+- [x] **6.3 Fresh-install E2E test pass** — clean `install.sh --reset` install
+      on the production host: setup wizard (admin → VPN server → PKI
+      provisioning), login, full dashboard, demo-data loading, real Easy-RSA
+      cert issuance, `.ovpn` profile generation and an end-to-end VPN connect
+      flow (TLS + user/pass auth, virtual IP allocation, DNS override + upstream
+      resolution through the tunnel, default-deny firewall enforcement, session
+      cleanup on disconnect). Findings recorded in `docs/test-findings.md`
+      (§2.13 demo certs without backing PKI files, §2.14 do not run a client on
+      the server host).
+- [x] **6.4 README/docs finalization** — `docs/architecture.md` (design,
+      openvpn integration, PKI/firewall model) and `docs/access-rules.md`
+      (rule-engine semantics, iptables mapping, worked examples) added; README
+      rewritten (deployment modes, feature matrix, release flow); `docs/api.md`
+      regenerated to cover the new demo/seed endpoints.
+- [x] **6.5 Cross-cutting sweep** — env-var-driven config audit, secret scan,
+      English-only verification, Spotless/ESLint clean, full test suites green.
+- [x] **6.6 Release** — this entry.
+
+### Verified
+- Backend suite green: 492 tests, 0 failures; `./gradlew test` +
+  `spotlessCheck` BUILD SUCCESSFUL. Frontend: ESLint 0 errors, 142 tests green,
+  production build passes.
+- Fresh-install E2E on `65.21.108.250` (`install.sh --reset`, clean volumes,
+  `.env` preserved): wizard completed, setup state COMPLETE, CA + server
+  certificate + CRL provisioned; login and dashboard render; demo data loads
+  through the UI (5 users / 2 groups / 2 certs) with all 4 access rules and 2
+  DNS overrides confirmed via API.
+- VPN connect flow verified end-to-end from a separate client: fresh user →
+  real cert → `.ovpn` (`remote <adminHost> 1194`) → UDP connect with auth →
+  virtual IP `10.8.0.2`, AES-256-GCM data channel, session visible in the panel
+  Live Status with byte counters, `git.internal`/`docs.internal` DNS overrides
+  and upstream resolution through the tunnel, default-deny firewall block
+  confirmed, and full cleanup (session + iptables chain) after an abrupt client
+  kill via the server inactivity timeout.
+- Production deploy: backend/frontend/openvpn images rebuilt and running
+  healthy on the prod host after the fresh install.
+
+---
+
 ## v0.1.0-alpha.16 — 2026-08-14
 
 Sixteenth tagged milestone (SemVer pre-release): the full M5 multi-node
