@@ -27,6 +27,9 @@ public class ProfileService {
   /** Short-lived single-use token used to build the QR-code sharing payload. */
   public record QrPayload(String token, Instant expiresAt) {}
 
+  /** Validity of a QR share link. The backend enforces expiry on download (409 after this). */
+  public static final Duration QR_TOKEN_TTL = Duration.ofMinutes(5);
+
   private final OvpnGenerator generator;
   private final CertService certService;
   private final EasyRsaService easyRsa;
@@ -95,7 +98,7 @@ public class ProfileService {
   /** Creates a short-lived single-use token for QR-code sharing of the user's own profile. */
   @Transactional
   public QrPayload createQrPayload(String userId, ProfileType type) {
-    ProfileToken token = createToken(userId, type, Instant.now().plus(Duration.ofHours(1)), 1);
+    ProfileToken token = createToken(userId, type, Instant.now().plus(QR_TOKEN_TTL), 1);
     return new QrPayload(token.getToken(), token.getExpiresAt());
   }
 

@@ -178,6 +178,9 @@ cd frontend && npm run lint && npm run test
 - [x] Share: `ShareControllerTest` — valid token serves `.ovpn` as attachment
       (`application/x-openvpn-profile` + Content-Disposition); missing/expired tokens
       return the HTML error page with the right status.
+- [x] Share QR: 5-minute TTL (`ProfileServiceTest` asserts `expiresAt ≈ now + 5 min`,
+      single use); `ProfileCard` shows the expiry countdown, flips to "Share link expired"
+      with a "Generate new code" action at zero.
 - [x] SetupWizard: admin/server/pki POST payloads, PKI gate before Continue, Finish
       redirect; LoginPage redirects to `/setup` when state ≠ `COMPLETE`.
 

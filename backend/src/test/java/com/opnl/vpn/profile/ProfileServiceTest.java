@@ -3,6 +3,7 @@ package com.opnl.vpn.profile;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.common.ApiException;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class ProfileServiceTest {
 
@@ -211,6 +213,13 @@ class ProfileServiceTest {
 
     assertThat(payload.token()).isEqualTo("qr-tok");
     assertThat(payload.expiresAt()).isNotNull();
+    ArgumentCaptor<ProfileToken> saved = ArgumentCaptor.forClass(ProfileToken.class);
+    verify(tokenRepository).save(saved.capture());
+    assertThat(saved.getValue().getUsesLeft()).isEqualTo(1);
+    assertThat(saved.getValue().getExpiresAt())
+        .isBetween(
+            Instant.now().minusSeconds(2),
+            Instant.now().plus(ProfileService.QR_TOKEN_TTL).plusSeconds(2));
   }
 
   @Test

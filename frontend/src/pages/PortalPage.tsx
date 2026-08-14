@@ -17,11 +17,10 @@ const TYPE_HINTS: Record<ProfileType, string> = {
   GENERIC: "No certificate; username and password only.",
 };
 
-/** Builds a compact OpenVPN Connect import XML referencing the share URL (fits in a QR code). */
-function qrPayload(type: ProfileType, token: string): string {
-  const name = type.replaceAll("_", " ");
-  const uri = `${window.location.origin}/share/${token}`;
-  return `<openvpn-connect-profile>\n  <name>${name}</name>\n  <uri>${uri}</uri>\n</openvpn-connect-profile>`;
+/** Encodes the share URL directly: a plain camera opens it and downloads the .ovpn, and OpenVPN
+ *  Connect imports it by fetching the profile from that URL (same as Access Server QR codes). */
+function qrPayload(token: string): string {
+  return `${window.location.origin}/share/${token}`;
 }
 
 export function PortalPage() {
@@ -49,8 +48,13 @@ export function PortalPage() {
               subtitle={TYPE_HINTS[t.type]}
               fetch={() => api(`/portal/profiles/${t.type}/download`)}
               qrFetch={async () => {
-                const { token } = await api<{ token: string }>(`/portal/profiles/${t.type}/qr`);
-                return qrPayload(t.type, token);
+                const { token, expiresAt } = await api<{ token: string; expiresAt: string }>(
+                  `/portal/profiles/${t.type}/qr`,
+                );
+                return {
+                  payload: qrPayload(token),
+                  expiresAt: Date.parse(expiresAt),
+                };
               }}
             />
           </Grid2>

@@ -62,7 +62,11 @@ describe("PortalPage", () => {
       "fetch",
       vi.fn().mockImplementation((url: string) => {
         if (url === "/api/auth/me") return Promise.resolve(json(meBody));
-        if (url.endsWith("/qr")) return Promise.resolve(json({ token: "qr-tok", expiresAt: null }));
+        if (url.endsWith("/qr")) {
+          return Promise.resolve(
+            json({ token: "qr-tok", expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() }),
+          );
+        }
         if (url.startsWith("/api/portal/profiles/"))
           return Promise.resolve(
             json({ filename: "user-locked-alice.ovpn", content: "client\nremote vpn.example.com" }),
