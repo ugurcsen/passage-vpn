@@ -48,6 +48,9 @@ public class ConnectionLog {
   @Column(name = "daemon_name")
   private String daemonName;
 
+  @Column(name = "node_id")
+  private String nodeId;
+
   @Column(name = "connected_at", nullable = false)
   private Instant connectedAt;
 

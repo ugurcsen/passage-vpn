@@ -78,6 +78,9 @@ public class Daemon {
   @Column(name = "admin_host")
   private String adminHost;
 
+  @Column(name = "node_id")
+  private String nodeId;
+
   @Column(name = "ipv6_enabled", nullable = false)
   @Builder.Default
   private boolean ipv6Enabled = false;

@@ -39,3 +39,4 @@ logs/
 
 # TS incremental builds
 *.tsbuildinfo
+._*

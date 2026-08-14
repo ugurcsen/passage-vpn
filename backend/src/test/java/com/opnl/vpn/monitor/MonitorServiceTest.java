@@ -149,7 +149,7 @@ class MonitorServiceTest {
 
   @Test
   void pollReconcilesOpenSessionsAgainstCompleteLiveView() {
-    when(clientManager.status(0))
+    when(clientManager.status(null, 0))
         .thenReturn(
             new MgmtStatus(
                 Instant.now(),
@@ -159,7 +159,7 @@ class MonitorServiceTest {
                     new MgmtClientStatus(
                         "alice", "203.0.113.5", "10.8.0.2", null, 1, 1, Instant.now(), 1)),
                 false));
-    when(clientManager.status(1))
+    when(clientManager.status(null, 1))
         .thenReturn(
             new MgmtStatus(
                 Instant.now(),
@@ -177,9 +177,9 @@ class MonitorServiceTest {
 
   @Test
   void pollReconcilesEvenWhenNoClientIsConnected() {
-    when(clientManager.status(0))
+    when(clientManager.status(null, 0))
         .thenReturn(new MgmtStatus(Instant.now(), "OpenVPN 2.6.20", 0, List.of(), false));
-    when(clientManager.status(1))
+    when(clientManager.status(null, 1))
         .thenReturn(new MgmtStatus(Instant.now(), "OpenVPN 2.6.20", 0, List.of(), false));
 
     service.poll();
@@ -190,8 +190,8 @@ class MonitorServiceTest {
 
   @Test
   void pollSkipsReconciliationWhenAnyDaemonIsUnreachable() {
-    when(clientManager.status(0)).thenReturn(null);
-    when(clientManager.status(1))
+    when(clientManager.status(null, 0)).thenReturn(null);
+    when(clientManager.status(null, 1))
         .thenReturn(
             new MgmtStatus(
                 Instant.now(),
@@ -211,7 +211,7 @@ class MonitorServiceTest {
   void pollDropsStaleRegistrySessionsNotInLiveView() {
     registry.register("alice", "alice", "10.8.0.2", null, "203.0.113.5", "daemon-0");
     registry.register("carol", "carol", "10.8.0.4", null, "203.0.113.7", "daemon-1");
-    when(clientManager.status(0))
+    when(clientManager.status(null, 0))
         .thenReturn(
             new MgmtStatus(
                 Instant.now(),
@@ -221,7 +221,7 @@ class MonitorServiceTest {
                     new MgmtClientStatus(
                         "alice", "203.0.113.5", "10.8.0.2", null, 1, 1, Instant.now(), 1)),
                 false));
-    when(clientManager.status(1))
+    when(clientManager.status(null, 1))
         .thenReturn(new MgmtStatus(Instant.now(), "OpenVPN 2.6.20", 0, List.of(), false));
 
     service.poll();

@@ -36,26 +36,26 @@ public class DaemonAdminController {
 
   @GetMapping
   public List<DaemonDto> list() {
-    return daemonService.list().stream().map(d -> withDco(d.getDaemonIndex(), d)).toList();
+    return daemonService.list().stream().map(d -> withDco(d)).toList();
   }
 
   /** Preview: which daemon currently serves the given profile type. */
   @GetMapping("/resolve/{profileType}")
   public DaemonDto resolve(@PathVariable ProfileType profileType) {
     var daemon = daemonService.entityForProfile(profileType);
-    return withDco(daemon.getDaemonIndex(), daemon);
+    return withDco(daemon);
   }
 
   @PostMapping
   public DaemonDto create(@Valid @RequestBody DaemonRequest request) {
     var daemon = daemonService.create(request);
-    return withDco(daemon.getDaemonIndex(), daemon);
+    return withDco(daemon);
   }
 
   @PutMapping("/{id}")
   public DaemonDto update(@PathVariable String id, @Valid @RequestBody DaemonRequest request) {
     var daemon = daemonService.update(id, request);
-    return withDco(daemon.getDaemonIndex(), daemon);
+    return withDco(daemon);
   }
 
   @DeleteMapping("/{id}")
@@ -66,11 +66,11 @@ public class DaemonAdminController {
   @PostMapping("/{id}/enabled")
   public DaemonDto setEnabled(@PathVariable String id, @RequestParam boolean enabled) {
     var daemon = daemonService.setEnabled(id, enabled);
-    return withDco(daemon.getDaemonIndex(), daemon);
+    return withDco(daemon);
   }
 
-  private DaemonDto withDco(int daemonIndex, Daemon daemon) {
-    var cached = mgmtClientManager.cachedStatus(daemonIndex);
+  private DaemonDto withDco(Daemon daemon) {
+    var cached = mgmtClientManager.cachedStatus(daemon.getNodeId(), daemon.getDaemonIndex());
     return DaemonDto.from(daemon, cached != null ? cached.dco() : null);
   }
 }

@@ -79,7 +79,7 @@ class DaemonAdminControllerTest {
   @Test
   void listSurfacesCachedDcoWhenKnown() throws Exception {
     when(daemonService.list()).thenReturn(List.of(daemon(0, "Primary", 1194, false)));
-    when(mgmtClientManager.cachedStatus(0))
+    when(mgmtClientManager.cachedStatus(null, 0))
         .thenReturn(
             new MgmtStatus(Instant.now(), "OpenVPN 2.6.12 x86_64 [DCO] [SSL]", 0, List.of(), true));
 
@@ -87,7 +87,7 @@ class DaemonAdminControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].dco").value(true));
 
-    when(mgmtClientManager.cachedStatus(0)).thenReturn(null);
+    when(mgmtClientManager.cachedStatus(null, 0)).thenReturn(null);
     mvc.perform(get("/api/admin/daemons"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].dco").doesNotExist());

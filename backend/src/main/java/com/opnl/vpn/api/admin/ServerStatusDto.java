@@ -22,5 +22,6 @@ public record ServerStatusDto(
       boolean enabled,
       boolean configPresent,
       boolean mgmtReachable,
-      Boolean dco) {}
+      Boolean dco,
+      String nodeId) {}
 }

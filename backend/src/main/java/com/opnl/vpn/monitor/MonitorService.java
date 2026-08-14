@@ -73,7 +73,7 @@ public class MonitorService {
         if (!daemon.isEnabled()) {
           continue;
         }
-        MgmtStatus status = clientManager.status(daemon.getDaemonIndex());
+        MgmtStatus status = clientManager.status(daemon.getNodeId(), daemon.getDaemonIndex());
         if (status != null) {
           anyDaemonVisible = true;
           aggregator.update(status.clients(), Instant.now());
@@ -156,19 +156,25 @@ public class MonitorService {
   }
 
   private DaemonStatus toDaemonStatus(Daemon daemon) {
-    MgmtStatus cached = clientManager.cachedStatus(daemon.getDaemonIndex());
+    MgmtStatus cached = clientManager.cachedStatus(daemon.getNodeId(), daemon.getDaemonIndex());
     boolean reachable = cached != null;
     Boolean dco = reachable ? cached.dco() : null;
+    // Config presence is only meaningful for the local deployment: remote nodes
+    // generate and serve their own configs, which are not in the local volume.
+    boolean configPresent =
+        daemon.getNodeId() == null
+            && Files.exists(
+                Path.of(properties.openvpn().configDir())
+                    .resolve("daemon-" + daemon.getDaemonIndex() + ".conf"));
     return new DaemonStatus(
         daemon.getDaemonIndex(),
         daemon.getName(),
         daemon.getPort(),
         daemon.getProto().name().toLowerCase(),
         daemon.isEnabled(),
-        Files.exists(
-            Path.of(properties.openvpn().configDir())
-                .resolve("daemon-" + daemon.getDaemonIndex() + ".conf")),
+        configPresent,
         reachable,
-        dco);
+        dco,
+        daemon.getNodeId());
   }
 }

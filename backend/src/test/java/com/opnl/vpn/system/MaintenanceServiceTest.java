@@ -261,16 +261,16 @@ class MaintenanceServiceTest {
     when(settingsService.serverSettings()).thenReturn(Map.of());
     when(configSmokeTester.test(any(Path.class)))
         .thenReturn(new ConfigSmokeTester.Result(ConfigSmokeTester.Result.Status.PASS, "ok"));
-    when(mgmtClientManager.signal(0, "SIGHUP")).thenReturn(true);
+    when(mgmtClientManager.signal(null, 0, "SIGHUP")).thenReturn(true);
     MgmtStatus status = mock(MgmtStatus.class);
-    when(mgmtClientManager.status(0)).thenReturn(status);
+    when(mgmtClientManager.status(null, 0)).thenReturn(status);
 
     ReloadResult result = maintenanceService.reloadDaemons();
 
     assertThat(result.signaled()).isEqualTo(1);
     assertThat(result.total()).isEqualTo(1);
     assertThat(result.failed()).isEmpty();
-    verify(mgmtClientManager).signal(0, "SIGHUP");
+    verify(mgmtClientManager).signal(null, 0, "SIGHUP");
     verify(auditLogService)
         .record(eq("SYSTEM_RELOAD"), eq(AuditLogService.CAT_SYSTEM), any(), any(), any());
   }
@@ -280,8 +280,8 @@ class MaintenanceServiceTest {
     when(settingsService.serverSettings()).thenReturn(Map.of());
     when(configSmokeTester.test(any(Path.class)))
         .thenReturn(new ConfigSmokeTester.Result(ConfigSmokeTester.Result.Status.PASS, "ok"));
-    when(mgmtClientManager.signal(0, "SIGHUP")).thenReturn(true);
-    when(mgmtClientManager.status(0)).thenReturn(null);
+    when(mgmtClientManager.signal(null, 0, "SIGHUP")).thenReturn(true);
+    when(mgmtClientManager.status(null, 0)).thenReturn(null);
 
     ReloadResult result = maintenanceService.reloadDaemons();
 

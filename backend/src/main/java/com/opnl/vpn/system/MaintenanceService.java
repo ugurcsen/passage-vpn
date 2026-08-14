@@ -89,7 +89,7 @@ public class MaintenanceService {
     int signaled = 0;
     List<Integer> failed = new ArrayList<>();
     for (Daemon daemon : enabled) {
-      if (mgmtClientManager.signal(daemon.getDaemonIndex(), "SIGHUP")) {
+      if (mgmtClientManager.signal(daemon.getNodeId(), daemon.getDaemonIndex(), "SIGHUP")) {
         signaled++;
       } else {
         failed.add(daemon.getDaemonIndex());
@@ -103,7 +103,7 @@ public class MaintenanceService {
       }
       boolean verified = false;
       for (int attempt = 0; attempt < 3 && !verified; attempt++) {
-        if (mgmtClientManager.status(daemon.getDaemonIndex()) != null) {
+        if (mgmtClientManager.status(daemon.getNodeId(), daemon.getDaemonIndex()) != null) {
           verified = true;
         } else {
           sleep(1000);

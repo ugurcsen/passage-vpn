@@ -30,19 +30,32 @@ public class MgmtClient implements Closeable {
   private final String host;
   private final int port;
   private final int daemonIndex;
+  private final String nodeId;
 
   private Socket socket;
   private BufferedReader reader;
   private BufferedWriter writer;
 
   public MgmtClient(String host, int port, int daemonIndex) {
+    this(host, port, daemonIndex, null);
+  }
+
+  /**
+   * @param nodeId id of the node owning the daemon, or {@code null} for the local deployment
+   */
+  public MgmtClient(String host, int port, int daemonIndex, String nodeId) {
     this.host = host;
     this.port = port;
     this.daemonIndex = daemonIndex;
+    this.nodeId = nodeId;
   }
 
   public int daemonIndex() {
     return daemonIndex;
+  }
+
+  public String nodeId() {
+    return nodeId;
   }
 
   public boolean isConnected() {
@@ -62,13 +75,27 @@ public class MgmtClient implements Closeable {
           new BufferedWriter(
               new OutputStreamWriter(fresh.getOutputStream(), StandardCharsets.UTF_8));
       this.socket = fresh;
-      log.info("Connected to management interface {}:{} (daemon {})", host, port, daemonIndex);
+      log.info(
+          "Connected to management interface {}:{} (node={}, daemon {})",
+          host,
+          port,
+          nodeLabel(),
+          daemonIndex);
       return true;
     } catch (IOException e) {
       log.debug(
-          "Management {}:{} unreachable (daemon {}): {}", host, port, daemonIndex, e.getMessage());
+          "Management {}:{} unreachable (node={}, daemon {}): {}",
+          host,
+          port,
+          nodeLabel(),
+          daemonIndex,
+          e.getMessage());
       return false;
     }
+  }
+
+  private String nodeLabel() {
+    return nodeId == null ? "local" : nodeId;
   }
 
   /** Polls {@code status 3} and returns the parsed snapshot, or {@code null} when unreachable. */

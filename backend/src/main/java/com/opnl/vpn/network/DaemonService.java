@@ -45,6 +45,7 @@ public class DaemonService {
   private final ConfigWriter configWriter;
   private final OpnlProperties properties;
   private final AuditLogService auditLogService;
+  private final NodeRegistryService nodeRegistryService;
 
   public DaemonService(
       DaemonRepository repository,
@@ -52,13 +53,15 @@ public class DaemonService {
       ServerConfigGenerator generator,
       ConfigWriter configWriter,
       OpnlProperties properties,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService,
+      NodeRegistryService nodeRegistryService) {
     this.repository = repository;
     this.settingRepository = settingRepository;
     this.generator = generator;
     this.configWriter = configWriter;
     this.properties = properties;
     this.auditLogService = auditLogService;
+    this.nodeRegistryService = nodeRegistryService;
   }
 
   /**
@@ -81,12 +84,16 @@ public class DaemonService {
         .orElseGet(() -> repository.save(toEntity(legacyNetworkConfig(), 0)));
   }
 
-  /** Rewrites every daemon config into the shared volume; disables remove their config file. */
+  /** Rewrites every local daemon config into the shared volume; disables remove their config file.
+   *  Daemons assigned to a remote node run on that gateway and never touch the local volume. */
   @Transactional
   public void writeAll() {
     ensurePrimary();
     String networkMode = networkMode();
     for (Daemon daemon : repository.findAllByOrderByDaemonIndexAsc()) {
+      if (daemon.getNodeId() != null) {
+        continue;
+      }
       if (daemon.isEnabled()) {
         configWriter.writeDaemon(toServerConfig(daemon), generator, properties, networkMode);
       } else {
@@ -98,6 +105,7 @@ public class DaemonService {
   @Transactional
   public Daemon create(DaemonRequest request) {
     validateUnique(request, null);
+    validateNode(request.nodeId());
     Daemon daemon =
         Daemon.builder()
             .id(UUID.randomUUID().toString())
@@ -114,6 +122,7 @@ public class DaemonService {
             .clientCertNotRequired(request.clientCertNotRequired())
             .authUserPass(request.authUserPass())
             .adminHost(blankToNull(request.adminHost()))
+            .nodeId(blankToNull(request.nodeId()))
             .ipv6Enabled(request.ipv6Enabled())
             .ipv6Subnet(blankToNull(request.ipv6Subnet()))
             .enabled(request.enabled())
@@ -135,6 +144,7 @@ public class DaemonService {
   public Daemon update(String id, DaemonRequest request) {
     Daemon daemon = require(id);
     validateUnique(request, id);
+    validateNode(request.nodeId());
     daemon.setDaemonIndex(request.daemonIndex());
     daemon.setName(blankToNull(request.name()));
     daemon.setPort(request.port());
@@ -148,6 +158,7 @@ public class DaemonService {
     daemon.setClientCertNotRequired(request.clientCertNotRequired());
     daemon.setAuthUserPass(request.authUserPass());
     daemon.setAdminHost(blankToNull(request.adminHost()));
+    daemon.setNodeId(blankToNull(request.nodeId()));
     daemon.setIpv6Enabled(request.ipv6Enabled());
     daemon.setIpv6Subnet(blankToNull(request.ipv6Subnet()));
     daemon.setEnabled(request.enabled());
@@ -171,7 +182,9 @@ public class DaemonService {
       throw ApiException.badRequest("primary_daemon", "The primary daemon cannot be deleted");
     }
     repository.delete(daemon);
-    configWriter.removeDaemon(daemon.getDaemonIndex());
+    if (daemon.getNodeId() == null) {
+      configWriter.removeDaemon(daemon.getDaemonIndex());
+    }
     log.info("Deleted daemon {} '{}'", daemon.getDaemonIndex(), daemon.getName());
     auditLogService.record(
         "DAEMON_DELETE",
@@ -303,6 +316,13 @@ public class DaemonService {
             });
   }
 
+  /** Rejects an unknown node id so daemons never point at a deleted node. */
+  private void validateNode(String nodeId) {
+    if (nodeId != null && !nodeId.isBlank()) {
+      nodeRegistryService.requireNode(nodeId);
+    }
+  }
+
   /** Reads the legacy single-daemon network setting, falling back to defaults. */
   private ServerConfig legacyNetworkConfig() {
     return settingRepository
@@ -371,6 +391,7 @@ public class DaemonService {
       boolean clientCertNotRequired,
       boolean authUserPass,
       String adminHost,
+      String nodeId,
       boolean ipv6Enabled,
       String ipv6Subnet,
       boolean enabled) {}

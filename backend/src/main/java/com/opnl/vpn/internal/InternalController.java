@@ -152,13 +152,15 @@ public class InternalController {
         request.virtualIp(),
         request.virtualIp6(),
         request.remoteIp(),
-        request.daemonName());
+        request.daemonName(),
+        request.nodeId());
     connectionLogService.sessionStarted(
         user.getUsername(),
         user.getUsername(),
         request.virtualIp(),
         request.remoteIp(),
-        request.daemonName());
+        request.daemonName(),
+        request.nodeId());
     IptablesResult result =
         ruleService.iptablesFor(
             user.getUsername(),
@@ -179,7 +181,7 @@ public class InternalController {
     if (user == null) {
       return new DisconnectResult(List.of(), List.of());
     }
-    connectionRegistry.unregister(user.getUsername());
+    connectionRegistry.unregister(user.getUsername(), request.nodeId());
     connectionLogService.sessionEnded(user.getUsername());
     IptablesResult result =
         ruleService.iptablesFor(
@@ -206,7 +208,8 @@ public class InternalController {
       String daemonName,
       String remoteIp,
       String virtualIp,
-      String virtualIp6) {}
+      String virtualIp6,
+      String nodeId) {}
 
   public record LearnAddressRequest(String operation, String address, String commonName) {}
 

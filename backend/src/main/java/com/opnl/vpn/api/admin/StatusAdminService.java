@@ -6,6 +6,8 @@ import com.opnl.vpn.monitor.MgmtStatus;
 import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.network.Daemon;
 import com.opnl.vpn.network.DaemonService;
+import com.opnl.vpn.network.NodeRegistryService;
+import com.opnl.vpn.network.OpenVpnNode;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.net.InetSocketAddress;
@@ -13,11 +15,13 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 /**
  * Builds the live server status: brand/version, per-daemon health (config file present, management
- * socket reachable) and the active connection count.
+ * socket reachable) and the active connection count. Daemons assigned to a registered node are
+ * probed against that node's management endpoint instead of the local socket.
  */
 @Service
 public class StatusAdminService {
@@ -28,16 +32,19 @@ public class StatusAdminService {
   private final DaemonService daemonService;
   private final ConnectionRegistry connectionRegistry;
   private final MgmtClientManager mgmtClientManager;
+  private final NodeRegistryService nodeRegistryService;
   private final OpnlProperties properties;
 
   public StatusAdminService(
       DaemonService daemonService,
       ConnectionRegistry connectionRegistry,
       MgmtClientManager mgmtClientManager,
+      NodeRegistryService nodeRegistryService,
       OpnlProperties properties) {
     this.daemonService = daemonService;
     this.connectionRegistry = connectionRegistry;
     this.mgmtClientManager = mgmtClientManager;
+    this.nodeRegistryService = nodeRegistryService;
     this.properties = properties;
   }
 
@@ -54,26 +61,38 @@ public class StatusAdminService {
   }
 
   private ServerStatusDto.DaemonStatus toDaemonStatus(Daemon daemon, Path configDir) {
-    MgmtStatus cached = mgmtClientManager.cachedStatus(daemon.getDaemonIndex());
+    MgmtStatus cached = mgmtClientManager.cachedStatus(daemon.getNodeId(), daemon.getDaemonIndex());
     Boolean dco = cached != null ? cached.dco() : null;
+    boolean configPresent =
+        daemon.getNodeId() == null
+            && Files.exists(configDir.resolve("daemon-" + daemon.getDaemonIndex() + ".conf"));
     return new ServerStatusDto.DaemonStatus(
         daemon.getDaemonIndex(),
         daemon.getName(),
         daemon.getPort(),
         daemon.getProto().name().toLowerCase(),
         daemon.isEnabled(),
-        Files.exists(configDir.resolve("daemon-" + daemon.getDaemonIndex() + ".conf")),
-        mgmtReachable(daemon.getDaemonIndex()),
-        dco);
+        configPresent,
+        mgmtReachable(daemon.getNodeId(), daemon.getDaemonIndex()),
+        dco,
+        daemon.getNodeId());
   }
 
   /** Opens a short-lived TCP connection to the daemon's management socket. */
-  boolean mgmtReachable(int daemonIndex) {
+  boolean mgmtReachable(String nodeId, int daemonIndex) {
+    Optional<OpenVpnNode> node =
+        nodeId == null ? Optional.empty() : nodeRegistryService.findNode(nodeId);
+    String host;
+    int port;
+    if (node.isEmpty()) {
+      host = properties.openvpn().mgmtHost();
+      port = properties.openvpn().mgmtPort() + daemonIndex;
+    } else {
+      host = node.get().getMgmtHost();
+      port = node.get().getMgmtPortBase() + daemonIndex;
+    }
     try (Socket socket = new Socket()) {
-      socket.connect(
-          new InetSocketAddress(
-              properties.openvpn().mgmtHost(), properties.openvpn().mgmtPort() + daemonIndex),
-          MGMT_PROBE_TIMEOUT_MS);
+      socket.connect(new InetSocketAddress(host, port), MGMT_PROBE_TIMEOUT_MS);
       return true;
     } catch (IOException e) {
       return false;

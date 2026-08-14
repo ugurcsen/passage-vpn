@@ -264,6 +264,8 @@ export interface Daemon {
   clientCertNotRequired: boolean;
   authUserPass: boolean;
   adminHost: string | null;
+  /** id of the VPN node owning this daemon; null = local deployment. */
+  nodeId: string | null;
   ipv6Enabled: boolean;
   ipv6Subnet: string | null;
   enabled: boolean;
@@ -284,6 +286,8 @@ export interface DaemonHealth {
   mgmtReachable: boolean;
   /** True when the daemon reports a DCO-capable data channel in its management TITLE. */
   dco?: boolean | null;
+  /** id of the VPN node owning this daemon; null = local deployment. */
+  nodeId?: string | null;
 }
 
 /** Snapshot returned by the live status endpoint. */
@@ -302,6 +306,8 @@ export interface VpnConnection {
   virtualIp: string | null;
   remoteIp: string | null;
   daemonName: string | null;
+  /** id of the VPN node the session runs on; null = local deployment. */
+  nodeId?: string | null;
   connectedAt: string;
   /** Cumulative byte counters from the management interface (present when live). */
   bytesIn?: number | null;
@@ -358,6 +364,8 @@ export interface ConnectionLog {
   virtualIp: string | null;
   remoteIp: string | null;
   daemonName: string | null;
+  /** id of the VPN node the session ran on; null = local deployment. */
+  nodeId?: string | null;
   connectedAt: string;
   disconnectedAt: string | null;
   bytesIn: number;

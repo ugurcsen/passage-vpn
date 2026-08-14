@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -47,6 +48,12 @@ public class NodeRegistryService {
     return nodeRepository
         .findById(id)
         .orElseThrow(() -> ApiException.notFound("node_not_found", "VPN node not found"));
+  }
+
+  /** Non-throwing lookup used by routing components (e.g. management endpoint resolution). */
+  @Transactional(readOnly = true)
+  public Optional<OpenVpnNode> findNode(String id) {
+    return nodeRepository.findById(id);
   }
 
   @Transactional

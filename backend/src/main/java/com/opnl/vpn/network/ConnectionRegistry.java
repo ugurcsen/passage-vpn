@@ -24,10 +24,22 @@ public class ConnectionRegistry {
       String virtualIpv6,
       String remoteIp,
       String daemonName,
+      String nodeId,
       Instant connectedAt) {}
 
   private final ConcurrentHashMap<String, VpnSession> byCommonName = new ConcurrentHashMap<>();
   private final ConcurrentHashMap<String, VpnSession> byVirtualIp = new ConcurrentHashMap<>();
+
+  /** Registers or refreshes a session after client-connect (local deployment). */
+  public void register(
+      String username,
+      String commonName,
+      String virtualIp,
+      String virtualIpv6,
+      String remoteIp,
+      String daemonName) {
+    register(username, commonName, virtualIp, virtualIpv6, remoteIp, daemonName, null);
+  }
 
   /** Registers or refreshes a session after client-connect. */
   public void register(
@@ -36,19 +48,27 @@ public class ConnectionRegistry {
       String virtualIp,
       String virtualIpv6,
       String remoteIp,
-      String daemonName) {
+      String daemonName,
+      String nodeId) {
     if (commonName == null || commonName.isBlank()) {
       return;
     }
     VpnSession session =
         new VpnSession(
-            username, commonName, virtualIp, virtualIpv6, remoteIp, daemonName, Instant.now());
-    byCommonName.put(commonName, session);
+            username,
+            commonName,
+            virtualIp,
+            virtualIpv6,
+            remoteIp,
+            daemonName,
+            nodeId,
+            Instant.now());
+    byCommonName.put(key(nodeId, commonName), session);
     if (virtualIp != null && !virtualIp.isBlank()) {
-      byVirtualIp.put(virtualIp, session);
+      byVirtualIp.put(key(nodeId, virtualIp), session);
     }
     if (virtualIpv6 != null && !virtualIpv6.isBlank()) {
-      byVirtualIp.put(virtualIpv6, session);
+      byVirtualIp.put(key(nodeId, virtualIpv6), session);
     }
   }
 
@@ -60,30 +80,43 @@ public class ConnectionRegistry {
     if (address == null || address.isBlank()) {
       return;
     }
-    VpnSession existing = byVirtualIp.get(address);
+    VpnSession existing = byVirtualIp.get(key(null, address));
     if ("delete".equalsIgnoreCase(operation)) {
-      byVirtualIp.remove(address);
+      byVirtualIp.remove(key(null, address));
       if (existing != null) {
-        byCommonName.remove(existing.commonName(), existing);
+        byCommonName.remove(key(null, existing.commonName()), existing);
       }
       return;
     }
     VpnSession session =
         existing != null
             ? existing
-            : new VpnSession(commonName, commonName, address, null, null, null, Instant.now());
-    byVirtualIp.put(address, session);
+            : new VpnSession(
+                commonName,
+                commonName,
+                address,
+                null,
+                null,
+                null,
+                null,
+                Instant.now());
+    byVirtualIp.put(key(null, address), session);
     if (commonName != null && !commonName.isBlank()) {
-      byCommonName.put(commonName, session);
+      byCommonName.put(key(null, commonName), session);
     }
   }
 
   /** Removes the session for a common name (client-disconnect). */
   public void unregister(String commonName) {
+    unregister(commonName, null);
+  }
+
+  /** Removes the session for a common name, scoped to a node when provided. */
+  public void unregister(String commonName, String nodeId) {
     if (commonName == null || commonName.isBlank()) {
       return;
     }
-    VpnSession removed = byCommonName.remove(commonName);
+    VpnSession removed = byCommonName.remove(key(nodeId, commonName));
     if (removed != null) {
       byVirtualIp.entrySet().removeIf(entry -> commonName.equals(entry.getValue().commonName()));
     }
@@ -100,10 +133,10 @@ public class ConnectionRegistry {
     if (liveCommonNames == null) {
       return;
     }
-    byCommonName.entrySet().removeIf(entry -> !liveCommonNames.contains(entry.getKey()));
+    byCommonName.entrySet().removeIf(e -> !liveCommonNames.contains(e.getValue().commonName()));
     byVirtualIp
         .entrySet()
-        .removeIf(entry -> !liveCommonNames.contains(entry.getValue().commonName()));
+        .removeIf(e -> !liveCommonNames.contains(e.getValue().commonName()));
   }
 
   /** Snapshot of all active sessions, ordered by connection time ascending. */
@@ -122,6 +155,11 @@ public class ConnectionRegistry {
   }
 
   public Optional<VpnSession> byVirtualIp(String virtualIp) {
-    return Optional.ofNullable(byVirtualIp.get(virtualIp));
+    return Optional.ofNullable(byVirtualIp.get(key(null, virtualIp)));
+  }
+
+  /** Namespaces an identity by node so equal common names/IPs can coexist across nodes. */
+  private static String key(String nodeId, String value) {
+    return nodeId == null ? value : nodeId + "!" + value;
   }
 }

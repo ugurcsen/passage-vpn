@@ -70,7 +70,8 @@ class DaemonServiceTest {
             new ServerConfigGenerator(new ObjectMapper()),
             configWriter,
             mock(OpnlProperties.class),
-            mock(com.opnl.vpn.audit.AuditLogService.class));
+            mock(com.opnl.vpn.audit.AuditLogService.class),
+            mock(com.opnl.vpn.network.NodeRegistryService.class));
   }
 
   @Test
@@ -187,6 +188,7 @@ class DaemonServiceTest {
                         false,
                         true,
                         null,
+                        null,
                         false,
                         null,
                         true)))
@@ -215,6 +217,7 @@ class DaemonServiceTest {
                         true,
                         false,
                         true,
+                        null,
                         null,
                         false,
                         null,
@@ -245,6 +248,7 @@ class DaemonServiceTest {
             true,
             true,
             true,
+            null,
             null,
             false,
             null,

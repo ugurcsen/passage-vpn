@@ -22,7 +22,7 @@ import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import { api, endpoints, type Daemon } from "@/lib/api";
+import { api, endpoints, type Daemon, type OpenVpnNode } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
@@ -40,6 +40,7 @@ interface DaemonForm {
   clientCertNotRequired: boolean;
   authUserPass: boolean;
   adminHost: string;
+  nodeId: string;
   ipv6Enabled: boolean;
   ipv6Subnet: string;
   enabled: boolean;
@@ -59,6 +60,7 @@ const EMPTY_FORM: DaemonForm = {
   clientCertNotRequired: false,
   authUserPass: true,
   adminHost: "",
+  nodeId: "",
   ipv6Enabled: false,
   ipv6Subnet: "fd00:1::/64",
   enabled: true,
@@ -97,6 +99,14 @@ export function DaemonsPage() {
     queryFn: () => api<Daemon[]>(endpoints.daemons),
   });
 
+  const { data: nodes } = useQuery<OpenVpnNode[]>({
+    queryKey: ["admin-nodes"],
+    queryFn: () => api<OpenVpnNode[]>(endpoints.nodes),
+  });
+
+  const nodeName = (nodeId: string | null): string =>
+    nodeId == null ? "Local" : (nodes?.find((n) => n.id === nodeId)?.name ?? nodeId);
+
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin-daemons"] });
 
   const save = useMutation({
@@ -115,6 +125,7 @@ export function DaemonsPage() {
         clientCertNotRequired: form.clientCertNotRequired,
         authUserPass: form.authUserPass,
         adminHost: form.adminHost || null,
+        nodeId: form.nodeId || null,
         ipv6Enabled: form.ipv6Enabled,
         ipv6Subnet: form.ipv6Enabled ? form.ipv6Subnet || null : null,
         enabled: form.enabled,
@@ -173,6 +184,7 @@ export function DaemonsPage() {
       clientCertNotRequired: row.clientCertNotRequired,
       authUserPass: row.authUserPass,
       adminHost: row.adminHost ?? "",
+      nodeId: row.nodeId ?? "",
       ipv6Enabled: row.ipv6Enabled,
       ipv6Subnet: row.ipv6Subnet ?? "fd00:1::/64",
       enabled: row.enabled,
@@ -227,6 +239,12 @@ export function DaemonsPage() {
       headerName: "Routing",
       width: 100,
       valueGetter: (_, row) => ((row as Daemon).fullTunnel ? "Full tunnel" : "Split tunnel"),
+    },
+    {
+      field: "node",
+      headerName: "Node",
+      width: 140,
+      valueGetter: (_, row) => nodeName((row as Daemon).nodeId),
     },
     {
       field: "enabled",
@@ -285,7 +303,9 @@ export function DaemonsPage() {
                 onClick={() =>
                   setConfirm({
                     title: "Delete daemon",
-                    text: `Delete "${row.name ?? row.daemonIndex}"? Its config file will be removed.`,
+                    text: `Delete "${row.name ?? row.daemonIndex}"?${
+                      row.nodeId ? "" : " Its config file will be removed."
+                    }`,
                     action: () => remove.mutate(row.id),
                   })
                 }
@@ -369,6 +389,7 @@ export function DaemonsPage() {
                 <MenuItem value="udp6">UDP6</MenuItem>
                 <MenuItem value="tcp6">TCP6</MenuItem>
               </TextField>
+            <Stack direction="row" spacing={2}>
               <TextField
                 label="Admin host"
                 value={form.adminHost}
@@ -376,6 +397,24 @@ export function DaemonsPage() {
                 placeholder="vpn.example.com"
                 sx={{ flex: 1 }}
               />
+              <TextField
+                select
+                label="VPN node"
+                value={form.nodeId}
+                onChange={(e) => setForm({ ...form, nodeId: e.target.value })}
+                helperText="Empty = local deployment"
+                sx={{ width: 220 }}
+              >
+                <MenuItem value="">Local (this server)</MenuItem>
+                {(nodes ?? [])
+                  .filter((n) => n.enabled)
+                  .map((n) => (
+                    <MenuItem key={n.id} value={n.id}>
+                      {n.name}
+                    </MenuItem>
+                  ))}
+              </TextField>
+            </Stack>
             </Stack>
             <Stack direction="row" spacing={2}>
               <TextField

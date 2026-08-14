@@ -41,9 +41,20 @@ public class ConnectionLogService {
     this.settingsService = settingsService;
   }
 
-  /** Opens a history row when a client connects. */
+  /** Opens a history row when a client connects (local deployment). */
   public void sessionStarted(
       String username, String commonName, String virtualIp, String remoteIp, String daemonName) {
+    sessionStarted(username, commonName, virtualIp, remoteIp, daemonName, null);
+  }
+
+  /** Opens a history row when a client connects. */
+  public void sessionStarted(
+      String username,
+      String commonName,
+      String virtualIp,
+      String remoteIp,
+      String daemonName,
+      String nodeId) {
     if (commonName == null || commonName.isBlank()) {
       return;
     }
@@ -56,6 +67,7 @@ public class ConnectionLogService {
               .virtualIp(virtualIp)
               .remoteIp(remoteIp)
               .daemonName(daemonName)
+              .nodeId(nodeId)
               .connectedAt(Instant.now())
               .createdAt(Instant.now())
               .build());

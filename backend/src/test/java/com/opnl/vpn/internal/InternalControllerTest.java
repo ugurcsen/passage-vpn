@@ -334,7 +334,7 @@ class InternalControllerTest {
                     "{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\",\"remoteIp\":\"1.2.3.4\",\"daemonName\":\"daemon-0\"}"))
         .andExpect(status().isOk());
     verify(connectionLogService)
-        .sessionStarted("alice", "alice", "10.8.0.9", "1.2.3.4", "daemon-0");
+        .sessionStarted("alice", "alice", "10.8.0.9", "1.2.3.4", "daemon-0", null);
   }
 
   @Test

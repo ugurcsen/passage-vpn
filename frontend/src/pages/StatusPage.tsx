@@ -19,6 +19,7 @@ import {
   api,
   endpoints,
   type ConnectionLog,
+  type OpenVpnNode,
   type ServerStatus,
   type VpnConnection,
 } from "@/lib/api";
@@ -95,6 +96,14 @@ export function StatusPage() {
   const connections = snapshot?.connections ?? connectionsQuery.data ?? [];
   const loadingConnections = connectionsQuery.isLoading && !snapshot;
 
+  const { data: nodes } = useQuery<OpenVpnNode[]>({
+    queryKey: ["admin-nodes"],
+    queryFn: () => api<OpenVpnNode[]>(endpoints.nodes),
+  });
+
+  const nodeName = (nodeId: string | null | undefined): string =>
+    nodeId == null ? "Local" : (nodes?.find((n) => n.id === nodeId)?.name ?? nodeId);
+
   const refreshAll = () => {
     void refetch();
     void connectionsQuery.refetch();
@@ -143,6 +152,7 @@ export function StatusPage() {
                 <TableCell>Index</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Endpoint</TableCell>
+                <TableCell>Node</TableCell>
                 <TableCell>Data channel</TableCell>
                 <TableCell>Enabled</TableCell>
                 <TableCell>Config</TableCell>
@@ -157,6 +167,7 @@ export function StatusPage() {
                   <TableCell>
                     {d.proto.toUpperCase()}:{d.port}
                   </TableCell>
+                  <TableCell>{nodeName(d.nodeId)}</TableCell>
                   <TableCell>
                     <StatusChip
                       ok={d.dco === true}
@@ -176,7 +187,7 @@ export function StatusPage() {
               ))}
               {daemons.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ color: "text.secondary" }}>
+                  <TableCell colSpan={8} align="center" sx={{ color: "text.secondary" }}>
                     No daemons configured yet.
                   </TableCell>
                 </TableRow>
@@ -201,6 +212,7 @@ export function StatusPage() {
                 <TableCell>VPN IP</TableCell>
                 <TableCell>Remote IP</TableCell>
                 <TableCell>Daemon</TableCell>
+                <TableCell>Node</TableCell>
                 <TableCell>Download</TableCell>
                 <TableCell>Upload</TableCell>
               </TableRow>
@@ -213,6 +225,7 @@ export function StatusPage() {
                   <TableCell>{c.virtualIp ?? "—"}</TableCell>
                   <TableCell>{c.remoteIp ?? "—"}</TableCell>
                   <TableCell>{c.daemonName ?? "—"}</TableCell>
+                  <TableCell>{nodeName(c.nodeId)}</TableCell>
                   <TableCell>{formatBytes(c.bytesOut)}</TableCell>
                   <TableCell>{formatBytes(c.bytesIn)}</TableCell>
                 </TableRow>
