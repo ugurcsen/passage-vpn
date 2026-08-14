@@ -83,9 +83,9 @@ Work started under M3 has been split: completed items shipped in
 - [x] **3.2 Brand settings + configuration report + backup/restore** — shipped in `v0.1.0-alpha.5`
 - [x] **3.4a `install.sh` full installer + first-run wizard UI** — shipped
 - [x] **3.1c `docs/api.md` generation** — shipped in M4 (4.3)
-- [ ] **3.3 Multi-node registry + node-aware routing + `agent` profile** — → M5
+- [x] **3.3 Multi-node registry + node-aware routing + `agent` profile** — shipped in M5
 - [ ] **3.4b Demo/seed mode** — → M6
-- [ ] **3.5 PostgreSQL profile validation** — → M5
+- [x] **3.5 PostgreSQL profile validation** — shipped in M5
 - [x] **3.6 Post-auth Python script hook** — shipped in M4 (4.1)
 - [ ] **3.7 E2E pass + docs finalization + CI docker job** — → M6
 
@@ -133,7 +133,7 @@ Work started under M3 has been split: completed items shipped in
       regenerated and dnsmasq reloaded per change.
 - [x] **4.8 Release** — `v0.1.0-alpha.8` tag + `RELEASE_NOTES.md` entry.
 
-## M5 — Multi-node & Ops — TARGET `v0.1.0-alpha.7`
+## M5 — Multi-node & Ops — shipped `v0.1.0-alpha.16`
 
 - [x] **5.1 `openvpn_nodes` registry** — Flyway V15 entity (name, mgmtHost,
       mgmtPortBase, adminIp, enabled); `NodeRegistryService` + admin CRUD API

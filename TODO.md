@@ -310,15 +310,15 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Maintenance: preflight checks (db, settings, daemon config, pki) + backend restart + daemon reload (Danger Zone)
 
 ### 4.6 Multi-node
-- [ ] `openvpn_nodes` registry (name, management endpoint, admin IP)
-- [ ] Node-aware status/kill/monitoring routing
-- [ ] Backend `agent` Spring profile (lightweight OpenVPN node agent) — stretch
+- [x] `openvpn_nodes` registry (name, mgmtHost, mgmtPortBase, adminIp, enabled) + admin CRUD + VPN Nodes page
+- [x] Node-aware status/kill/monitoring routing (per-node `MgmtClient`, node-scoped monitor/status, connection-log reconciliation)
+- [x] Backend `agent` Spring profile (lightweight OpenVPN node agent registering/heartbeating via `/internal/node/*`)
 
 ### 4.7 Deployment & polish
 - [x] Complete `Makefile` targets (api-docs guard, split test/lint targets)
 - [x] `install.sh` full installer (preflight, env, build, up, wizard)
 - [x] First-run wizard UI (frontend) — admin → VPN server → PKI → complete; login gated on `COMPLETE`
-- [ ] PostgreSQL docker profile + `application-postgres.yml` validation
+- [x] PostgreSQL profile validation — `db/migration-postgresql` set (V1–V17 minus V13), `application-postgres.yml`, `MigrationParityTest`
 - [ ] Seed data + demo mode
 - [ ] E2E test pass (backend unit+integration, frontend unit)
 - [ ] README + docs finalization

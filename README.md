@@ -3,7 +3,7 @@
 A production-ready OpenVPN management panel replicating OpenVPN Access Server
 features on top of open source components:
 
-- **Backend**: Java 21, Spring Boot 3.5, Gradle (Kotlin DSL), SQLite (PostgreSQL-ready)
+- **Backend**: Java 21, Spring Boot 3.5, Gradle (Kotlin DSL), SQLite (validated against a PostgreSQL profile)
 - **Frontend**: React 18 + TypeScript, Vite, MUI v6, TanStack Query
 - **VPN core**: OpenVPN Community Edition 2.6, Easy-RSA 3.1, OpenVPN Management Interface
 - **Deploy**: Docker Compose, Makefile, `install.sh`
@@ -31,7 +31,12 @@ make logs                    # follow logs; open http://localhost:8080
   token URLs, QR sharing, client self-service portal
 - Access control rules (IP/subnet, protocol/port, full/split tunnel) via iptables
 - Live monitoring: online users, traffic, session history, dashboard, WebSocket push
-- Branding, configuration report, backup/restore, multi-daemon, multi-node (stretch)
+- Branding, configuration report, backup/restore, multi-daemon
+- Multi-node: `openvpn_nodes` registry + admin VPN Nodes page; node-aware
+  status/kill/monitoring routing; backend `agent` Spring profile registers and
+  heartbeats remote gateway nodes to the central backend (`/internal/node/*`)
+- PostgreSQL profile (`OPNL_PROFILE=postgres`) with a dedicated
+  `db/migration-postgresql` migration set + parity test
 
 ## Development
 
