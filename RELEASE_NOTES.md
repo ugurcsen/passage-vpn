@@ -41,13 +41,16 @@ new Connection Logs page, API-token page) and docs mirror the same boundary.
       admins land on Users, get Groups + new **Connection Logs** page.
 - [x] Users page: role selector (admin-only) with managed-groups multi-select,
       "Manages" column, action hiding on admin rows.
-- [x] Groups page: no root-group creation/deletion for group admins.
+- [x] Groups page: no root-group creation/deletion for group admins; the Parent
+      column shows the parent group's name instead of the raw id; Delete is hidden
+      on managed root groups (kept on subgroups).
 - [x] ApiTokens page: ADMIN role only.
 
 ### Tests
 - [x] Backend 599 green (UserAdminService/GroupAdminService scope suites,
       ConnectionLogService scoping, DemoSeed assignments, token-role filter).
-- [x] Frontend 147 green (role-based routing/nav, Users/Groups role gating).
+- [x] Frontend 148 green (role-based routing/nav, Users/Groups role gating,
+      parent-name rendering, group-admin Delete visibility).
 
 ---
 
