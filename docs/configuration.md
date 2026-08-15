@@ -77,6 +77,7 @@ through `${VAR:-default}` substitutions for the rest.
 | `OPNL_LOG_LEVEL` | `INFO` | Root log level. |
 | `OPNL_TOMCAT_THREADS` | `50` | Max Tomcat request threads (bounded: the panel is a fleet admin tool, not a public API). |
 | `OPNL_TRUSTED_PROXIES` | `172.16.0.0/12` | CIDR ranges allowed to set `X-Forwarded-For` (reverse-proxy IPs). Default covers Docker's default bridge subnets. |
+| `OPNL_API_DOCS_ENABLED` | `true` | Swagger UI + OpenAPI docs (`/swagger-ui.html`, `/v3/api-docs`). Off by default in shipped `.env.example` so the API surface stays hidden in production; enable for development. |
 
 ## Frontend & compose ports
 
@@ -86,6 +87,21 @@ through `${VAR:-default}` substitutions for the rest.
 | `OPNL_VITE_PROXY_TARGET` | `http://localhost:8080` | Dev-only: backend target of the Vite dev-server proxy (`/api`, `/share`, `/ws`) in `frontend/vite.config.ts`. Not used by the production nginx image. |
 | `OPNL_OPENVPN_PORT` | `1194` | Host port mapped to the OpenVPN UDP listener. |
 | `OPNL_OPENVPN_TCP_PORT` | `1195` | Host port mapped to the OpenVPN TCP listener. |
+
+## Deployment images (release mode)
+
+When deploying from a release tarball (`install.sh --mode=release`), the images
+are pulled from a container registry instead of being built from source, so the
+server never needs the source tree or a build toolchain.
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPNL_IMAGE_REGISTRY` | `ghcr.io` | Container registry hosting the prebuilt images. |
+| `OPNL_IMAGE_NAMESPACE` | `ugurcsen/opnl-vpn` | Registry path (GitHub owner/repo). Images live at `<registry>/<namespace>/{backend,frontend,openvpn}:<tag>`. |
+| `OPNL_IMAGE_TAG` | `latest` | Image tag; `install.sh --tag=vX.Y.Z` sets this automatically. |
+
+The CI `release.yml` workflow builds and pushes these images on version tags and
+attaches the deploy tarball to the GitHub Release.
 
 ## Remote node gateway (`OPNL_PROFILE=agent`, compose profile `node`)
 

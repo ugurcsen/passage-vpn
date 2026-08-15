@@ -1,7 +1,11 @@
 # OpenVPN Management Panel
 
+[![CI](https://github.com/ugurcsen/opnl-vpn/actions/workflows/ci.yml/badge.svg)](https://github.com/ugurcsen/opnl-vpn/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ugurcsen/opnl-vpn?color=blue&label=release)](https://github.com/ugurcsen/opnl-vpn/releases)
+[![GHCR](https://img.shields.io/badge/images-ghcr.io/ugurcsen/opnl-vpn-blue)](https://github.com/ugurcsen/opnl-vpn/pkgs)
+
 A production-ready OpenVPN management panel replicating OpenVPN Access Server
-features on top of open source components:
+features on top of open source components. Source: **github.com/ugurcsen/opnl-vpn**.
 
 - **Backend**: Java 21, Spring Boot 3.5, Gradle (Kotlin DSL), SQLite (validated against a PostgreSQL profile)
 - **Frontend**: React 18 + TypeScript, Vite, MUI v6, TanStack Query
@@ -17,17 +21,39 @@ See `AGENTS.md` for the agent/developer guide, `TODO.md` for the phased roadmap,
 | `docs/access-rules.md` | Firewall + DNS control: rule model, iptables rendering, domain pinning, dual-stack |
 | `docs/api.md` | REST API reference (regenerated with `make api-docs`) |
 | `docs/configuration.md` | Environment variables reference (all `OPNL_*` settings) |
+| `docs/installation.md` | Deployment: dev build vs. source-free release tarball (`--mode=release`) |
 | `docs/ROADMAP.md` | Milestone status for the current release cycle |
 
-## Quick start
+## Quick start (development)
+
+Build everything locally from source — needs the repo and a build toolchain:
 
 ```bash
-./install.sh                 # single-command install (docker compose)
+git clone git@github.com:ugurcsen/opnl-vpn.git && cd opnl-vpn
+./install.sh                 # single-command install (docker compose up -d --build)
 # or manually:
 cp .env.example .env         # edit secrets
 make up                      # build + start all services
 make logs                    # follow logs; open http://localhost:8080
 ```
+
+## Production install (no source on the server)
+
+Deploy from the **deploy-only release tarball** (`opnl-vpn-<tag>.tar.gz`),
+which contains just the compose files, env template and installer. Prebuilt
+images are pulled from `ghcr.io/ugurcsen/opnl-vpn`, so the server never needs
+the source tree or a build toolchain:
+
+```bash
+curl -fsSL -o opnl-vpn.tar.gz https://github.com/ugurcsen/opnl-vpn/releases/download/<tag>/opnl-vpn-<tag>.tar.gz
+tar -xzf opnl-vpn.tar.gz && cd opnl-vpn-<tag>
+./install.sh --mode=release --tag=<tag>     # pulls images, starts services
+```
+
+`<tag>` is a release version such as `v0.1.0-beta.6` (see
+[Releases](https://github.com/ugurcsen/opnl-vpn/releases)). You can also build
+the same tarball locally from a tagged commit with `make release`. Full details
+in `docs/installation.md`.
 
 On first boot complete the setup wizard (admin account → VPN server → PKI).
 Alternatively bootstrap non-interactively with `make seed-admin` and try the
@@ -58,6 +84,7 @@ to auto-load it on first boot). Demo users use the password `demo-password-1`.
 - **Access rules & DNS control** — `docs/access-rules.md`
 - **API reference** — `docs/api.md` (Swagger UI at `/swagger-ui.html` on the backend)
 - **Configuration & environment variables** — `docs/configuration.md`
+- **Installation & deployment** — `docs/installation.md`
 - **Roadmap** — `docs/ROADMAP.md`
 
 ## Development
@@ -69,3 +96,10 @@ make backend-dev     # Spring Boot on :8080 (expects env)
 make frontend-dev    # Vite dev server on :5173 (proxies /api + /ws)
 make test            # backend + frontend tests
 ```
+
+## GitHub resources
+
+- **Repository** — https://github.com/ugurcsen/opnl-vpn
+- **Releases** (tarball + changelog) — https://github.com/ugurcsen/opnl-vpn/releases
+- **Issues / feature requests** — https://github.com/ugurcsen/opnl-vpn/issues
+- **Container images** (backend / frontend / openvpn) — https://github.com/ugurcsen/opnl-vpn/pkgs/container

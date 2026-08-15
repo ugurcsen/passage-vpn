@@ -92,3 +92,24 @@ jobs:
             ghcr.io/${{ github.repository }}/openvpn:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  package:
+    name: Package deploy tarball
+    needs: images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage deploy-only files and build tarball
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          mkdir -p "release/opnl-vpn-${TAG}"
+          cp docker-compose.yml docker-compose.postgres.yml .env.example install.sh "release/opnl-vpn-${TAG}/"
+          cp docs/installation.md "release/opnl-vpn-${TAG}/README.md"
+          tar -czf "opnl-vpn-${TAG}.tar.gz" -C release "opnl-vpn-${TAG}"
+          echo "Built opnl-vpn-${TAG}.tar.gz"
+      - name: Attach tarball to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: opnl-vpn-${{ github.ref_name }}.tar.gz

@@ -2,3 +2,7 @@ node_modules
 dist
 coverage
 npm-debug.log*
+tsconfig.tsbuildinfo
+.env
+.env.development
+eslint.config.js

@@ -14,7 +14,7 @@ ENV_FILE     := .env
         test test-backend test-frontend \
         lint lint-backend lint-frontend format \
         migrate seed-admin seed-demo backup \
-        api-docs pki-init clean reset install
+        api-docs pki-init clean reset install release
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -122,7 +122,7 @@ pki-init: ## Re-run PKI init (CA + server cert) via setup API
 
 clean: ## Remove build artifacts (keep data)
 	cd $(BACKEND_DIR) && ./gradlew clean
-	rm -rf $(FRONTEND_DIR)/dist $(FRONTEND_DIR)/node_modules
+	rm -rf $(FRONTEND_DIR)/dist $(FRONTEND_DIR)/node_modules release
 
 reset: ## Stop services and wipe runtime data (danger!)
 	$(COMPOSE) down -v
@@ -131,3 +131,12 @@ reset: ## Stop services and wipe runtime data (danger!)
 
 install: ## Single-command install (see install.sh)
 	./install.sh
+
+release: ## Build deploy-only tarball release/opnl-vpn-<git-tag>.tar.gz (requires a tag on HEAD)
+	@tag="$$(git describe --tags --exact-match 2>/dev/null)" || { echo "error: no git tag on HEAD — tag the commit first"; exit 1; }
+	@rm -rf release
+	@mkdir -p "release/opnl-vpn-$$tag"
+	@cp docker-compose.yml docker-compose.postgres.yml .env.example install.sh "release/opnl-vpn-$$tag/"
+	@cp docs/installation.md "release/opnl-vpn-$$tag/README.md"
+	@cd release && tar -czf "opnl-vpn-$$tag.tar.gz" "opnl-vpn-$$tag"
+	@echo "Wrote release/opnl-vpn-$$tag.tar.gz (deploy-only files, no source)"

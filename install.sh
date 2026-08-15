@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # =========================================================
 # OpenVPN management panel — single-command installer
-# Usage: ./install.sh [--reset] [--profile postgres]
+# Usage: ./install.sh [--mode=build|release] [--tag=vX.Y.Z] [--profile=sqlite|postgres] [--reset]
+#
+#   build   (default) build images locally from source (needs the full repo)
+#   release           pull prebuilt images from the container registry (no source needed)
 # =========================================================
 set -euo pipefail
 
@@ -14,14 +17,29 @@ warn()  { echo -e "${YELLOW}[warn]${NC} $*"; }
 fail()  { echo -e "${RED}[error]${NC} $*"; exit 1; }
 
 RESET=0
+MODE=build
+TAG=latest
 PROFILE=sqlite
 
 for arg in "$@"; do
   case "$arg" in
     --reset) RESET=1 ;;
+    --mode=*) MODE="${arg#*=}" ;;
+    --tag=*) TAG="${arg#*=}" ;;
     --profile=*) PROFILE="${arg#*=}" ;;
   esac
 done
+
+case "$MODE" in
+  build|release) ;;
+  *) fail "Unknown mode '$MODE' (expected build or release)." ;;
+esac
+
+if [ "$MODE" = "release" ]; then
+  # Deployed from the release tarball; the .env lives alongside install.sh.
+  info "Release mode: pulling prebuilt images (tag=$TAG)."
+  export OPNL_IMAGE_TAG="$TAG"
+fi
 
 # ---------- preflight ----------
 command -v docker >/dev/null 2>&1 || fail "docker is not installed."
@@ -52,12 +70,17 @@ if [ "$RESET" = "1" ]; then
 fi
 
 # ---------- build & start ----------
-info "Building and starting services (profile=$PROFILE) ..."
-if [ "$PROFILE" = "postgres" ]; then
-  export OPNL_PROFILE=postgres
-  docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d --build
+info "Starting services (mode=$MODE, profile=$PROFILE) ..."
+COMPOSE_CMD="docker compose"
+[ "$PROFILE" = "postgres" ] && export OPNL_PROFILE=postgres && COMPOSE_CMD="$COMPOSE_CMD -f docker-compose.yml -f docker-compose.postgres.yml"
+
+if [ "$MODE" = "release" ]; then
+  info "Pulling images from registry..."
+  $COMPOSE_CMD pull
+  $COMPOSE_CMD up -d
 else
-  docker compose up -d --build
+  info "Building images locally..."
+  $COMPOSE_CMD up -d --build
 fi
 
 # ---------- wait for backend ----------
@@ -77,7 +100,6 @@ ${GREEN}Installation complete.${NC}
 
   Web panel : http://localhost:${OPNL_FRONTEND_PORT:-80}
   Backend   : http://localhost:${OPNL_SERVER_PORT:-8080}
-  Swagger   : http://localhost:${OPNL_SERVER_PORT:-8080}/swagger-ui.html
 
 First-run: open the panel and complete the setup wizard (/setup).
 Admin credentials: OPNL_ADMIN_PASSWORD in .env (username "admin").

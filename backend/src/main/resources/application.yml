@@ -56,8 +56,10 @@ springdoc:
     path: /swagger-ui.html
     try-it-out-enabled: true
     persist-authorization: true
+    enabled: ${OPNL_API_DOCS_ENABLED:true}
   api-docs:
     path: /v3/api-docs
+    enabled: ${OPNL_API_DOCS_ENABLED:true}
 
 opnl:
   data-dir: ${OPNL_DATA_DIR:./data}

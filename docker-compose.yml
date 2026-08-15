@@ -4,6 +4,7 @@ services:
   # --- OpenVPN daemon(s) + management interface ---
   openvpn:
     build: ./openvpn
+    image: ${OPNL_IMAGE_REGISTRY:-ghcr.io}/${OPNL_IMAGE_NAMESPACE:-ugurcsen/opnl-vpn}/openvpn:${OPNL_IMAGE_TAG:-latest}
     container_name: opnl-openvpn
     restart: unless-stopped
     mem_limit: 256m
@@ -38,6 +39,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    image: ${OPNL_IMAGE_REGISTRY:-ghcr.io}/${OPNL_IMAGE_NAMESPACE:-ugurcsen/opnl-vpn}/backend:${OPNL_IMAGE_TAG:-latest}
     container_name: opnl-backend
     restart: unless-stopped
     mem_limit: 1g
@@ -76,6 +78,7 @@ services:
   # --- Frontend (nginx: static React + reverse proxy to backend) ---
   frontend:
     build: ./frontend
+    image: ${OPNL_IMAGE_REGISTRY:-ghcr.io}/${OPNL_IMAGE_NAMESPACE:-ugurcsen/opnl-vpn}/frontend:${OPNL_IMAGE_TAG:-latest}
     container_name: opnl-frontend
     restart: unless-stopped
     mem_limit: 128m
@@ -96,6 +99,7 @@ services:
   opnl-node-openvpn:
     profiles: ["node"]
     build: ./openvpn
+    image: ${OPNL_IMAGE_REGISTRY:-ghcr.io}/${OPNL_IMAGE_NAMESPACE:-ugurcsen/opnl-vpn}/openvpn:${OPNL_IMAGE_TAG:-latest}
     container_name: opnl-node-openvpn
     restart: unless-stopped
     mem_limit: 256m
@@ -133,6 +137,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    image: ${OPNL_IMAGE_REGISTRY:-ghcr.io}/${OPNL_IMAGE_NAMESPACE:-ugurcsen/opnl-vpn}/backend:${OPNL_IMAGE_TAG:-latest}
     container_name: opnl-node-agent
     restart: unless-stopped
     mem_limit: 512m
