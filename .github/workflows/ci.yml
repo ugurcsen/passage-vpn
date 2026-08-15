@@ -20,7 +20,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Backend test
         working-directory: backend
-        run: ./gradlew test spotlessCheck
+        run: ./gradlew test jacocoTestCoverageVerification spotlessCheck
 
   frontend:
     name: Frontend build + test
@@ -35,12 +35,12 @@ jobs:
       - name: Frontend deps
         working-directory: frontend
         run: npm ci
-      - name: Frontend lint + build + test
+      - name: Frontend lint + build + test (with coverage gate)
         working-directory: frontend
         run: |
           npm run lint
           npm run build
-          npm run test
+          npm run test:coverage
 
   docker-build:
     name: Docker image build (backend/frontend/openvpn)

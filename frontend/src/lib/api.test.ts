@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, tokenStore } from "@/lib/api";
+import { api, ApiError, tokenStore, copyToClipboard, downloadOvpn, downloadBackup } from "@/lib/api";
 
 /** Builds a JWT-shaped token carrying the given `exp` claim (seconds). */
 function makeJwt(exp: number): string {
@@ -246,5 +246,103 @@ describe("api token refresh", () => {
     expect(auth).toBe(`Bearer ${secondAccess}`);
     const refreshCalls = fetchMock.mock.calls.filter(([url]) => url === "/api/auth/refresh");
     expect(refreshCalls).toHaveLength(1);
+  });
+});
+
+describe("download helpers", () => {
+  beforeEach(() => {
+    Object.defineProperty(URL, "createObjectURL", {
+      value: vi.fn(),
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      value: vi.fn(),
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it("copyToClipboard falls back to execCommand without the async API", async () => {
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    (HTMLDocument.prototype as unknown as { execCommand: () => boolean }).execCommand = () => true;
+    const exec = vi.spyOn(document, "execCommand").mockReturnValue(true);
+
+    const ok = await copyToClipboard("hello");
+
+    expect(ok).toBe(true);
+    expect(exec).toHaveBeenCalledWith("copy");
+    expect(document.querySelector("textarea")).toBeNull();
+  });
+
+  it("copyToClipboard falls back when the async API rejects", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: vi.fn().mockRejectedValue(new Error("denied")),
+      },
+      configurable: true,
+    });
+    (HTMLDocument.prototype as unknown as { execCommand: () => boolean }).execCommand = () => true;
+    const exec = vi.spyOn(document, "execCommand").mockReturnValue(true);
+
+    const ok = await copyToClipboard("hello");
+
+    expect(ok).toBe(true);
+    expect(exec).toHaveBeenCalledWith("copy");
+  });
+
+  it("downloadOvpn triggers a browser download", () => {
+    const create = vi.mocked(URL.createObjectURL).mockReturnValue("blob:ovpn");
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    downloadOvpn({ filename: "client.ovpn", content: "client\n" });
+
+    expect(create).toHaveBeenCalledWith(expect.any(Blob));
+    expect(click).toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:ovpn");
+  });
+
+  it("downloadBackup downloads the archive with the attachment filename", async () => {
+    localStorage.setItem("opnl.access", "tok-1");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(new Blob(["data"]), {
+        status: 200,
+        headers: { "Content-Disposition": 'attachment; filename="backup-1.zip"' },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const create = vi.mocked(URL.createObjectURL).mockReturnValue("blob:backup");
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    await downloadBackup("backup-1");
+
+    const call = fetchMock.mock.calls[0] as [string, RequestInit | undefined];
+    expect(call[0]).toBe("/api/admin/backups/backup-1/download");
+    expect((call[1]?.headers as Record<string, string> | undefined)?.Authorization).toBe(
+      "Bearer tok-1",
+    );
+    expect(create).toHaveBeenCalled();
+    expect(click).toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:backup");
+  });
+
+  it("downloadBackup throws ApiError on failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(null, {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    await expect(downloadBackup("backup-1")).rejects.toBeInstanceOf(ApiError);
   });
 });

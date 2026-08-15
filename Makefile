@@ -59,7 +59,7 @@ coverage: ## Backend + frontend tests with coverage reports
 	$(MAKE) coverage-backend coverage-frontend
 
 coverage-backend: ## Backend coverage (jacoco; report in backend/build/reports/jacoco)
-	cd $(BACKEND_DIR) && ./gradlew test jacocoTestReport
+	cd $(BACKEND_DIR) && ./gradlew test jacocoTestCoverageVerification jacocoTestReport
 
 coverage-frontend: ## Frontend coverage (vitest v8; report in frontend/coverage)
 	cd $(FRONTEND_DIR) && npm run test:coverage

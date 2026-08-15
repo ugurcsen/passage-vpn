@@ -416,6 +416,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [ ] E2E test pass (backend unit+integration, frontend unit)
 - [x] README + docs finalization
 - [x] CI workflow (backend test + spotless, frontend lint + build + test, docker image build job)
+- [x] Coverage gates — backend JaCoCo instruction ≥ 80% (measured 88.9%), frontend vitest thresholds 90/80/90 (measured 95.1/85.6/95.1), enforced via `jacocoTestCoverageVerification` + `npm run test:coverage` in CI
 
 ---
 
