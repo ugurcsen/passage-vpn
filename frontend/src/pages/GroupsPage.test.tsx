@@ -83,6 +83,34 @@ describe("GroupsPage", () => {
     expect(screen.getByText("Engineering")).toBeInTheDocument();
   });
 
+  it("hides Delete on managed root groups for group admins but keeps it on subgroups", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url.startsWith("/api/auth/me"))
+          return Promise.resolve(
+            json({ ...me, id: "ga1", username: "devops_lead", role: "GROUP_ADMIN" }),
+          );
+        if (url === "/api/admin/users") return Promise.resolve(json(users));
+        if (url === "/api/admin/groups") return Promise.resolve(json(groups));
+        if (url.endsWith("/members")) return Promise.resolve(json(["u1"]));
+        if (url.endsWith("/settings")) return Promise.resolve(json({}));
+        return Promise.resolve(json([]));
+      }),
+    );
+
+    renderPage();
+    await screen.findByText("devs");
+
+    const rootRow = screen.getByRole("row", { name: /devs/i });
+    expect(
+      within(rootRow).queryByRole("button", { name: /^delete$/i }),
+    ).not.toBeInTheDocument();
+
+    const subRow = screen.getByRole("row", { name: /ops/i });
+    expect(within(subRow).getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
+  });
+
   it("creates a group", async () => {
     const user = userEvent.setup();
     renderPage();

@@ -235,7 +235,7 @@ export function GroupsPage() {
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            {(!row.parentId || isAdmin) && (
+            {(row.parentId || isAdmin) && (
               <Tooltip title="Delete">
                 <IconButton size="small" onClick={() => setConfirm(row)}>
                   <DeleteIcon fontSize="small" color="error" />
