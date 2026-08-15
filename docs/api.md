@@ -1,7 +1,7 @@
 # API Reference — OpenVPN Panel
 
 > Generated from the live OpenAPI document. Endpoints under `/api/admin/**`
-> require an `ADMIN` (or scoped `RESELLER`) role; `/api/portal/**` endpoints are
+> require an `ADMIN` (or scoped `GROUP_ADMIN`) role; `/api/portal/**` endpoints are
 > self-service. `docs/api.md` is regenerated with `make api-docs`.
 
 - **Version**: v1

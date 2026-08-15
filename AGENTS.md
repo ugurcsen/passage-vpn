@@ -121,7 +121,7 @@ npm run test
 
 - Never commit secrets. All secrets via `.env` (see `.env.example`) or runtime injection.
 - Passwords hashed (Argon2id preferred); TOTP via `dev.samstevens.totp`.
-- JWT: short-lived access + rotating refresh token; RBAC via `ADMIN`/`RESELLER`/`USER`.
+- JWT: short-lived access + rotating refresh token; RBAC via `ADMIN`/`GROUP_ADMIN`/`USER`.
 - Endpoints that write data require admin role unless explicitly `@Anonymous`/portal-scoped.
 - The openvpn container requires `NET_ADMIN` for iptables-based access control — document, don't ignore.
 

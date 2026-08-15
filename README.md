@@ -44,7 +44,7 @@ to auto-load it on first boot). Demo users use the password `demo-password-1`.
 | Area | Capabilities |
 |---|---|
 | Users & groups | Accounts, groups with parent/subgroup inheritance, per-user/per-group settings, lock/ban |
-| Auth | Local auth + TOTP MFA, brute-force lockout, JWT access/refresh tokens, RBAC (Admin/Reseller/User), API tokens for automation |
+| Auth | Local auth + TOTP MFA, brute-force lockout, JWT access/refresh tokens, RBAC (Admin/Group Admin/User), API tokens for automation |
 | PKI | Built-in CA via Easy-RSA; issue / revoke / restore / rotate certificates; CRL |
 | Connection profiles | User-locked, auto-login, server-locked, generic; `.ovpn` download, token URLs, QR sharing, client self-service portal |
 | Access control | Rules per user/group/global (IP/subnet, protocol/port, group subnet, domain), full/split tunnel, DNS overrides with scoped access, dual-stack iptables/ip6tables enforcement |

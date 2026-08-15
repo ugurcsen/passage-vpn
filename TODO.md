@@ -235,6 +235,21 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       stale certs left by a deleted account (revoke → CRL rejects, purge on-disk
       artifacts, drop bookkeeping row) before issuing a fresh certificate
 
+**P6 — Scoped GROUP_ADMIN RBAC (`RESELLER` → `GROUP_ADMIN`)**
+- [x] Data model: Flyway `V20__group_admin` (SQLite + Postgres) — `group_admin_assignments`
+      join table + `RESELLER` → `USER` demotion; `GroupAdminAssignment` entity/repository;
+      `User.Role` = `ADMIN`/`GROUP_ADMIN`/`USER`
+- [x] `GroupScope` scope resolution (managed root groups + descendants, scoped user
+      ids/usernames) applied across `UserAdminService`, `GroupAdminService`,
+      `ConnectionLogService`; group-admin restricted to USER accounts in scope
+- [x] Controllers: users/groups/connection-logs open to `GROUP_ADMIN` with actor
+      plumbing; group admins cannot create new root groups or delete managed roots
+- [x] API tokens ADMIN-only (`invalid_role` otherwise); demo seed binds `dave` → `devops`
+- [x] Frontend: roles/routing/nav, Users page managed-groups picker + "Manages" column,
+      Groups page root-group guards, new Connection Logs page, ApiTokens ADMIN-only
+- [x] Tests: backend 599 green, frontend 147 green; docs (architecture, README,
+      AGENTS, test-plan, api.md, RELEASE_NOTES) updated
+
 ---
 
 ## Phase 0 — Project Scaffolding
@@ -290,7 +305,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Flyway migrations (V3: groups, group_members, user/group settings, refresh_tokens)
 
 ### 2.2 User/Group administration
-- [x] User CRUD: create, edit, delete, ban/unban, admin grant (RESELLER-scoped restrictions)
+- [x] User CRUD: create, edit, delete, ban/unban, admin grant (GROUP_ADMIN-scoped restrictions)
 - [x] Group CRUD + assignment, nested groups
 - [x] Per-user and per-group settings (inheritance resolution)
 - [x] User search (server-side), status filter, bulk operations (UI)
@@ -298,7 +313,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 ### 2.3 Authentication (web UI)
 - [x] JWT access + refresh tokens, rotation, logout (hash-stored refresh tokens)
-- [x] RBAC: `ADMIN` / `RESELLER` / `USER`
+- [x] RBAC: `ADMIN` / `GROUP_ADMIN` / `USER`
 - [x] Local password auth (BCrypt)
 - [x] TOTP MFA (Google Authenticator compatible) — enable/disable/reset (admin API)
 - [x] Brute-force lockout policy (attempts + lock duration)

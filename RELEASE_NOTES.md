@@ -8,6 +8,49 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## Unreleased — Scoped GROUP_ADMIN RBAC
+
+Replaces the flat `RESELLER` role with a scoped `GROUP_ADMIN` role bound to one
+or more **root groups**. A group admin can manage only what an administrator
+delegates to it: the assigned root groups (and every subgroup beneath them),
+their member accounts, per-user/group settings and static-IP pools, and the
+connection logs of users in scope. The frontend (navigation, Users/Groups pages,
+new Connection Logs page, API-token page) and docs mirror the same boundary.
+
+### RBAC model
+- [x] `RESELLER` removed — migration `V20__group_admin.sql` (SQLite + Postgres)
+      creates `group_admin_assignments (user_id, group_id)` and demotes existing
+      `RESELLER` accounts to `USER`.
+- [x] `GroupScope` (`com.opnl.vpn.group`) resolves the managed scope: root group +
+      descendants (BFS), scoped user ids/usernames for list filtering.
+- [x] Group admins can create/edit/set members for groups in scope and static-IP
+      pools/settings; they cannot create new **root** groups, reparent/delete the
+      root groups they manage, or touch accounts outside their scope.
+- [x] Group admins manage `USER` accounts only (never `ADMIN`/`GROUP_ADMIN`),
+      including per-user CCD settings, static IPs, and password resets.
+- [x] Connection logs: `GET /api/admin/connection-logs` returns only in-scope
+      sessions for group admins.
+- [x] API tokens now always carry the `ADMIN` role (any other role rejected with
+      `invalid_role`); existing reseller tokens are inert.
+- [x] Only an `ADMIN` may grant `GROUP_ADMIN` and must pick ≥1 managed group
+      (`admin_groups_required`); assignment changes persist via the join table.
+- [x] Demo seed: `dave` is now a group admin over `devops`.
+
+### Frontend
+- [x] Role plumbing `RESELLER` → `GROUP_ADMIN` (`useAuth`, routes, nav); group
+      admins land on Users, get Groups + new **Connection Logs** page.
+- [x] Users page: role selector (admin-only) with managed-groups multi-select,
+      "Manages" column, action hiding on admin rows.
+- [x] Groups page: no root-group creation/deletion for group admins.
+- [x] ApiTokens page: ADMIN role only.
+
+### Tests
+- [x] Backend 599 green (UserAdminService/GroupAdminService scope suites,
+      ConnectionLogService scoping, DemoSeed assignments, token-role filter).
+- [x] Frontend 147 green (role-based routing/nav, Users/Groups role gating).
+
+---
+
 ## v0.1.0-beta.6 — 2026-08-15
 
 Sixth **beta** milestone (SemVer pre-release): multi-node certificate and config

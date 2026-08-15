@@ -69,7 +69,7 @@ def main():
     out.append(f"# API Reference — {info.get('title', 'OpenVPN Panel')}")
     out.append("")
     out.append("> Generated from the live OpenAPI document. Endpoints under `/api/admin/**`")
-    out.append("> require an `ADMIN` (or scoped `RESELLER`) role; `/api/portal/**` endpoints are")
+    out.append("> require an `ADMIN` (or scoped `GROUP_ADMIN`) role; `/api/portal/**` endpoints are")
     out.append("> self-service. `docs/api.md` is regenerated with `make api-docs`.")
     out.append("")
     if info.get("version"):

@@ -145,8 +145,9 @@ Package root `com.opnl.vpn` (`backend/src/main/java/com/opnl/vpn`):
 
 ### 4.1 Endpoint tiers
 
-- `/api/**` — admin + reseller endpoints, JWT or API-token authenticated,
-  `@PreAuthorize` role checks.
+- `/api/**` — admin + group-admin endpoints, JWT or API-token authenticated,
+  `@PreAuthorize` role checks. `GROUP_ADMIN` access is scoped to the root groups
+  the account is bound to (`group_admin_assignments`) plus all their subgroups.
 - `/api/portal/**` — self-service (own profile, own certificates), scoped to the
   calling user.
 - `/internal/**` — script-facing endpoints; not routable outside the docker
@@ -170,10 +171,16 @@ Package root `com.opnl.vpn` (`backend/src/main/java/com/opnl/vpn`):
 
 ### 4.3 RBAC
 
-Roles are `ADMIN`, `RESELLER`, `USER`. Endpoints that write data require an
+Roles are `ADMIN`, `GROUP_ADMIN`, `USER`. Endpoints that write data require an
 admin role unless explicitly marked portal-scoped or `@Anonymous`. Method-level
 authorization via `@PreAuthorize("hasRole('ADMIN')")` etc. and the Swagger
-`bearerAuth` scheme in `OpenApiConfig`.
+`bearerAuth` scheme in `OpenApiConfig`. A `GROUP_ADMIN` can only manage the
+groups it is bound to (including their subgroups), the `USER` accounts that are
+members of those groups, their per-user settings/static IPs, and the connection
+logs of those users; it cannot grant or manage other admins, create new root
+groups, or delete the root groups it manages. `GroupScope` in `com.opnl.vpn.group`
+resolves the managed scope (root group + descendants). API tokens always carry
+the `ADMIN` role.
 
 ## 5. VPN control model
 

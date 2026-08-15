@@ -107,7 +107,7 @@ cd frontend && npm run lint && npm run test
       (missing OTP → `mfa_required`, wrong OTP → `invalid_code`, valid OTP → allowed).
 
 ### 5.3 Users & groups (Phase 2)
-- [x] Create/edit/delete user, ban/unban, admin grant, RESELLER restrictions.
+- [x] Create/edit/delete user, ban/unban, admin grant, GROUP_ADMIN scope restrictions.
 - [x] Password reset (hash re-encode), group assignment, static-IP handoff to `CcdService`.
 - [x] Bulk ban/unban/delete, empty-batch rejection, last-admin guard, self-delete guard,
       username trimming + uniqueness conflict, search filter (username/full name/email).
