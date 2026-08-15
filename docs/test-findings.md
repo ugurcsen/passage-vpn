@@ -32,8 +32,8 @@ case with wrong status code / masking, `[LOW]` polish / hardening.
 | 12 | LOW | Pre-fix invalid access rule remains in production data | data hygiene |
 | 13 | MED | Demo-seeded cert rows have no backing PKI files | demo mode |
 | 14 | HIGH | Full-tunnel VPN client on the server host black-holes host routing | operational |
-| 15 | HIGH | Cert restore flips the index to VALID without restoring on-disk artifacts | PKI / Easy-RSA |
-| 16 | HIGH | Web-login lockout never triggers (`@Transactional` rollback) | authentication |
+| 15 | HIGH | Cert restore flips the index to VALID without restoring on-disk artifacts | PKI / Easy-RSA | **FIXED** `9005aa2` |
+| 16 | HIGH | Web-login lockout never triggers (`@Transactional` rollback) | authentication | **FIXED** `66d97c0` |
 
 ---
 
@@ -484,6 +484,16 @@ artifact is unusable — a silent data/artifact mismatch.
 3. Add a `CertServiceTest` regression: issue → revoke → restore → rotate must succeed,
    and restore → revoke must succeed.
 
+**Resolved** `9005aa2`. `EasyRsaService.unrevokeCert` now captures the restored serial
+and CN from the matching `index.txt` row and restores the artifacts **before** writing the
+index: the cert is copied back from `certs_by_serial/<serial>.pem` (fallback:
+`revoked/certs_by_serial/<serial>/<cn>.crt`) to `issued/<cn>.crt` (mandatory) and the key
+best-effort from `revoked/private_by_serial/<serial>.key` to `private/<cn>.key`. Missing
+cert artifact now fails fast with `pki_missing` (404) and leaves the index untouched.
+Regressions: `unrevokeCertRestoresIssuedCertAndPrivateKey`,
+`unrevokeCertThrowsWhenRevokedArtifactMissing`, legacy-layout restore, and
+`CertServiceTest` restore→rotate and restore→revoke.
+
 ---
 
 ### 2.16 HIGH — Web-login lockout never triggers (`@Transactional` rollback)
@@ -520,6 +530,13 @@ brute-force attempts.
 3. Add an `AuthServiceTest` regression: N failed web logins increment `failed_attempts`,
    write `LOGIN_FAILED` audit rows, and at the threshold set `locked_until`; the
    subsequent attempt is rejected with a locked reason.
+
+**Resolved** `66d97c0`. New `AuthFailureRecorder` component persists the failure counter
+and the `LOGIN_FAILED` audit row in its own `REQUIRES_NEW` transaction; `AuthService.login`
+and the web MFA step call it **before** throwing the auth `ApiException`, so the record
+survives the enclosing rollback. The web MFA invalid-code path now also counts toward
+lockout, matching the VPN OTP path. Regressions: `loginRejectsWrongPassword`,
+`loginLocksAccountAfterMaxAttempts`, `mfaRejectsWrongCodeAndRecordsFailure`.
 
 ---
 
