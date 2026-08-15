@@ -57,9 +57,8 @@ public class ApiTokenService {
       throw ApiException.badRequest("label_required", "Token label is required");
     }
     User.Role effectiveRole = role == null ? User.Role.ADMIN : role;
-    if (effectiveRole == User.Role.USER) {
-      throw ApiException.badRequest(
-          "invalid_role", "API tokens must carry the ADMIN or RESELLER role");
+    if (effectiveRole != User.Role.ADMIN) {
+      throw ApiException.badRequest("invalid_role", "API tokens must carry the ADMIN role");
     }
     if (expiresAt != null && !expiresAt.isAfter(Instant.now())) {
       throw ApiException.badRequest(

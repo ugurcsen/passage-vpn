@@ -23,11 +23,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Admin user management API. ADMIN and RESELLER can manage users; only ADMIN manages roles. */
+/** Admin user management API. ADMIN and GROUP_ADMIN can manage users; only ADMIN manages roles. */
 @RestController
 @RequestMapping("/api/admin/users")
-@PreAuthorize("hasAnyRole('ADMIN', 'RESELLER')")
-@Tag(name = "Admin - Users", description = "User lifecycle and settings (ADMIN/RESELLER)")
+@PreAuthorize("hasAnyRole('ADMIN', 'GROUP_ADMIN')")
+@Tag(name = "Admin - Users", description = "User lifecycle and settings (ADMIN/GROUP_ADMIN)")
 public class UserAdminController {
 
   private final UserAdminService userAdminService;
@@ -39,8 +39,9 @@ public class UserAdminController {
   }
 
   @GetMapping
-  public List<UserDto> list(@RequestParam(required = false) String search) {
-    return userAdminService.listUsers(search);
+  public List<UserDto> list(
+      Authentication authentication, @RequestParam(required = false) String search) {
+    return userAdminService.listUsers(actor(authentication), search);
   }
 
   @PostMapping("/bulk")
@@ -53,8 +54,8 @@ public class UserAdminController {
   }
 
   @GetMapping("/{id}")
-  public UserDto get(@PathVariable String id) {
-    return userAdminService.getUser(id);
+  public UserDto get(Authentication authentication, @PathVariable String id) {
+    return userAdminService.getUser(actor(authentication), id);
   }
 
   @PostMapping
@@ -102,20 +103,24 @@ public class UserAdminController {
 
   @PostMapping("/{id}/mfa/setup")
   @PreAuthorize("hasRole('ADMIN')")
-  public UserAdminService.MfaSetup mfaSetup(@PathVariable String id) {
+  public UserAdminService.MfaSetup mfaSetup(
+      Authentication authentication, @PathVariable String id) {
     return userAdminService.setupMfa(id);
   }
 
   @PostMapping("/{id}/mfa/enable")
   @PreAuthorize("hasRole('ADMIN')")
-  public UserDto mfaEnable(@PathVariable String id, @Valid @RequestBody MfaEnableRequest request) {
-    return userAdminService.enableMfa(id, request.code());
+  public UserDto mfaEnable(
+      Authentication authentication,
+      @PathVariable String id,
+      @Valid @RequestBody MfaEnableRequest request) {
+    return userAdminService.enableMfa(actor(authentication), id, request.code());
   }
 
   @PostMapping("/{id}/mfa/disable")
   @PreAuthorize("hasRole('ADMIN')")
-  public UserDto mfaDisable(@PathVariable String id) {
-    return userAdminService.disableMfa(id);
+  public UserDto mfaDisable(Authentication authentication, @PathVariable String id) {
+    return userAdminService.disableMfa(actor(authentication), id);
   }
 
   @PutMapping("/{id}/static-ip")
@@ -150,18 +155,19 @@ public class UserAdminController {
   }
 
   @DeleteMapping("/{id}/static-ipv6")
-  public UserDto clearStaticIpv6(@PathVariable String id) {
-    return userAdminService.clearStaticIpv6(id);
+  public UserDto clearStaticIpv6(Authentication authentication, @PathVariable String id) {
+    return userAdminService.clearStaticIpv6(actor(authentication), id);
   }
 
   @GetMapping("/{id}/settings")
-  public Map<String, Object> settings(@PathVariable String id) {
-    return userAdminService.userSettings(id);
+  public Map<String, Object> settings(Authentication authentication, @PathVariable String id) {
+    return userAdminService.userSettings(actor(authentication), id);
   }
 
   @GetMapping("/{id}/settings/effective")
-  public Map<String, Object> effectiveSettings(@PathVariable String id) {
-    return userAdminService.effectiveSettings(id);
+  public Map<String, Object> effectiveSettings(
+      Authentication authentication, @PathVariable String id) {
+    return userAdminService.effectiveSettings(actor(authentication), id);
   }
 
   @PutMapping("/{id}/settings/{key}")

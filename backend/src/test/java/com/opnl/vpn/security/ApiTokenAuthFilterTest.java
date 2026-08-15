@@ -53,7 +53,7 @@ class ApiTokenAuthFilterTest {
 
   @Test
   void authenticatesViaBearerHeaderWithTokenPrefix() throws Exception {
-    var token = token("t1", "RESELLER");
+    var token = token("t1", "GROUP_ADMIN");
     when(apiTokenService.authenticate("opnl_raw")).thenReturn(Optional.of(token));
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.addHeader("Authorization", "Bearer opnl_raw");
@@ -64,7 +64,7 @@ class ApiTokenAuthFilterTest {
     var authentication = SecurityContextHolder.getContext().getAuthentication();
     assertThat(authentication.getAuthorities())
         .extracting(GrantedAuthority::getAuthority)
-        .containsExactly("ROLE_RESELLER");
+        .containsExactly("ROLE_GROUP_ADMIN");
   }
 
   @Test

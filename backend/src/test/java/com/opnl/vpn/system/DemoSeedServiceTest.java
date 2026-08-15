@@ -22,6 +22,7 @@ import com.opnl.vpn.dns.DnsOverrideService;
 import com.opnl.vpn.dns.DnsRecordDto;
 import com.opnl.vpn.dns.DnsRecordRepository;
 import com.opnl.vpn.group.Group;
+import com.opnl.vpn.group.GroupAdminAssignmentRepository;
 import com.opnl.vpn.group.GroupMemberRepository;
 import com.opnl.vpn.group.GroupRepository;
 import com.opnl.vpn.monitor.ConnectionLogRepository;
@@ -45,6 +46,7 @@ class DemoSeedServiceTest {
   private UserRepository userRepository;
   private GroupRepository groupRepository;
   private GroupMemberRepository memberRepository;
+  private GroupAdminAssignmentRepository adminAssignmentRepository;
   private PasswordEncoder passwordEncoder;
   private SettingsService settingsService;
   private CcdService ccdService;
@@ -63,6 +65,7 @@ class DemoSeedServiceTest {
     userRepository = mock(UserRepository.class);
     groupRepository = mock(GroupRepository.class);
     memberRepository = mock(GroupMemberRepository.class);
+    adminAssignmentRepository = mock(GroupAdminAssignmentRepository.class);
     passwordEncoder = mock(PasswordEncoder.class);
     settingsService = mock(SettingsService.class);
     ccdService = mock(CcdService.class);
@@ -79,6 +82,7 @@ class DemoSeedServiceTest {
             userRepository,
             groupRepository,
             memberRepository,
+            adminAssignmentRepository,
             passwordEncoder,
             settingsService,
             ccdService,
@@ -105,6 +109,7 @@ class DemoSeedServiceTest {
     verify(userRepository, times(4)).save(any(User.class));
     verify(groupRepository, times(2)).save(any(Group.class));
     verify(memberRepository, times(3)).save(any());
+    verify(adminAssignmentRepository, times(1)).save(any());
     verify(settingsService, times(2)).setGroupSetting(any(), eq(SettingKeys.STATIC_IP_POOL), any());
     verify(settingsService).setServerSetting(DemoSeedService.DEMO_SEEDED_KEY, true);
     verify(ccdService).setStaticIp(any(), eq("10.8.0.100"));

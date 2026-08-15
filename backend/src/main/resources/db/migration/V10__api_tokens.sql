@@ -1,6 +1,6 @@
 -- API tokens for automation: only the SHA-256 hash of the raw token is stored;
--- the plaintext value is shown once at creation time. A token may carry a role
--- (ADMIN/RESELLER) so scripted automation can act with the right privilege set.
+-- the plaintext value is shown once at creation time. A token always carries the
+-- ADMIN role so scripted automation can act with full administrative privileges.
 
 CREATE TABLE api_tokens (
     id           TEXT PRIMARY KEY,

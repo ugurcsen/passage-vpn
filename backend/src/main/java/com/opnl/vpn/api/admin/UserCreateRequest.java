@@ -13,4 +13,5 @@ public record UserCreateRequest(
     @Size(max = 128) String fullName,
     @Email @Size(max = 128) String email,
     User.Role role,
-    List<String> groupIds) {}
+    List<String> groupIds,
+    List<String> adminGroupIds) {}

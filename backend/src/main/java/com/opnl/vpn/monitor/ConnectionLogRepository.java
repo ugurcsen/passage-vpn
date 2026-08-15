@@ -1,8 +1,10 @@
 package com.opnl.vpn.monitor;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,6 +18,9 @@ public interface ConnectionLogRepository extends JpaRepository<ConnectionLog, St
   List<ConnectionLog> findAllByDisconnectedAtIsNull();
 
   List<ConnectionLog> findTop20ByOrderByConnectedAtDesc();
+
+  List<ConnectionLog> findByUsernameInOrderByConnectedAtDesc(
+      Collection<String> usernames, Pageable pageable);
 
   @Modifying
   @Query(

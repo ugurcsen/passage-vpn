@@ -12,4 +12,5 @@ public record UserUpdateRequest(
     User.Role role,
     Boolean banned,
     @Size(min = 8, max = 128) String password,
-    List<String> groupIds) {}
+    List<String> groupIds,
+    List<String> adminGroupIds) {}

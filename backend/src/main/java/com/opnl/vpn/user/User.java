@@ -13,7 +13,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** A panel user. Roles: ADMIN, RESELLER, USER. */
+/** A panel user. Roles: ADMIN, GROUP_ADMIN, USER. */
 @Entity
 @Table(name = "users", indexes = @Index(name = "idx_users_username", columnList = "username"))
 @Data
@@ -24,7 +24,7 @@ public class User {
 
   public enum Role {
     ADMIN,
-    RESELLER,
+    GROUP_ADMIN,
     USER
   }
 

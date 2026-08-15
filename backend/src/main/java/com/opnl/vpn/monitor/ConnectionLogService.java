@@ -1,11 +1,14 @@
 package com.opnl.vpn.monitor;
 
 import com.opnl.vpn.api.admin.ConnectionLogDto;
+import com.opnl.vpn.group.GroupScope;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
+import com.opnl.vpn.user.User;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -31,14 +34,17 @@ public class ConnectionLogService {
   private final ConnectionLogRepository repository;
   private final TrafficAggregator aggregator;
   private final SettingsService settingsService;
+  private final GroupScope groupScope;
 
   public ConnectionLogService(
       ConnectionLogRepository repository,
       TrafficAggregator aggregator,
-      SettingsService settingsService) {
+      SettingsService settingsService,
+      GroupScope groupScope) {
     this.repository = repository;
     this.aggregator = aggregator;
     this.settingsService = settingsService;
+    this.groupScope = groupScope;
   }
 
   /** Opens a history row when a client connects (local deployment). */
@@ -127,14 +133,16 @@ public class ConnectionLogService {
     repository.save(log);
   }
 
-  /** Recent sessions, newest first. */
-  public List<ConnectionLogDto> recent(int limit) {
+  /** Recent sessions, newest first, restricted to the actor's scope (ADMIN sees everything). */
+  public List<ConnectionLogDto> recent(User actor, int limit) {
     int safeLimit = Math.min(Math.max(limit, 1), 100);
-    return repository
-        .findAll(PageRequest.of(0, safeLimit, Sort.by(Sort.Direction.DESC, "connectedAt")))
-        .stream()
-        .map(ConnectionLogDto::from)
-        .toList();
+    PageRequest page = PageRequest.of(0, safeLimit, Sort.by(Sort.Direction.DESC, "connectedAt"));
+    Set<String> usernames = groupScope.scopedUsernames(actor);
+    List<ConnectionLog> rows =
+        usernames == null
+            ? repository.findAll(page).getContent()
+            : repository.findByUsernameInOrderByConnectedAtDesc(usernames, page);
+    return rows.stream().map(ConnectionLogDto::from).toList();
   }
 
   /** Deletes closed rows older than the retention window; runs daily. */

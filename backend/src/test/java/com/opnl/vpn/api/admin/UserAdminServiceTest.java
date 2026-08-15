@@ -3,6 +3,7 @@ package com.opnl.vpn.api.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,8 +14,10 @@ import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.auth.TotpService;
 import com.opnl.vpn.ccd.CcdService;
 import com.opnl.vpn.common.ApiException;
+import com.opnl.vpn.group.GroupAdminAssignmentRepository;
 import com.opnl.vpn.group.GroupMemberRepository;
 import com.opnl.vpn.group.GroupRepository;
+import com.opnl.vpn.group.GroupScope;
 import com.opnl.vpn.pki.CertService;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.user.User;
@@ -22,6 +25,7 @@ import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -31,6 +35,8 @@ class UserAdminServiceTest {
   private UserRepository userRepository;
   private GroupRepository groupRepository;
   private GroupMemberRepository memberRepository;
+  private GroupAdminAssignmentRepository adminAssignmentRepository;
+  private GroupScope groupScope;
   private SettingsService settingsService;
   private CcdService ccdService;
   private CertService certService;
@@ -46,11 +52,11 @@ class UserAdminServiceTest {
         .build();
   }
 
-  private User reseller() {
+  private User groupAdmin() {
     return User.builder()
-        .id("res1")
-        .username("reseller")
-        .role(User.Role.RESELLER)
+        .id("gadmin1")
+        .username("gadmin")
+        .role(User.Role.GROUP_ADMIN)
         .createdAt(Instant.now())
         .build();
   }
@@ -60,15 +66,19 @@ class UserAdminServiceTest {
     userRepository = mock(UserRepository.class);
     groupRepository = mock(GroupRepository.class);
     memberRepository = mock(GroupMemberRepository.class);
+    adminAssignmentRepository = mock(GroupAdminAssignmentRepository.class);
     settingsService = mock(SettingsService.class);
     ccdService = mock(CcdService.class);
     certService = mock(CertService.class);
     accessRuleService = mock(AccessRuleService.class);
+    groupScope = mock(GroupScope.class);
     service =
         new UserAdminService(
             userRepository,
             groupRepository,
             memberRepository,
+            adminAssignmentRepository,
+            groupScope,
             new BCryptPasswordEncoder(),
             new TotpService(),
             settingsService,
@@ -80,6 +90,26 @@ class UserAdminServiceTest {
     when(memberRepository.findById_UserId(any())).thenReturn(List.of());
     when(settingsService.userSettings(any())).thenReturn(new java.util.HashMap<>());
     when(settingsService.effectiveForUsers(any())).thenReturn(new java.util.HashMap<>());
+    when(groupScope.isAdmin(any()))
+        .thenAnswer(inv -> ((User) inv.getArgument(0)).getRole() == User.Role.ADMIN);
+    when(groupScope.scopedUserIds(any()))
+        .thenAnswer(
+            inv -> {
+              User actor = inv.getArgument(0);
+              return actor.getRole() == User.Role.ADMIN ? null : Set.of("u2");
+            });
+    when(groupScope.managesUser(any(), any()))
+        .thenAnswer(
+            inv -> {
+              User actor = inv.getArgument(0);
+              return actor.getRole() == User.Role.ADMIN || "u2".equals(inv.getArgument(1));
+            });
+    when(groupScope.managesGroup(any(), anyString()))
+        .thenAnswer(
+            inv -> {
+              User actor = inv.getArgument(0);
+              return actor.getRole() == User.Role.ADMIN || "g1".equals(inv.getArgument(1));
+            });
   }
 
   @Test
@@ -89,22 +119,86 @@ class UserAdminServiceTest {
             () ->
                 service.createUser(
                     admin(),
-                    new UserCreateRequest("bob", "supersecret1", null, null, User.Role.USER, null)))
+                    new UserCreateRequest(
+                        "bob", "supersecret1", null, null, User.Role.USER, null, null)))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("username_taken"));
   }
 
   @Test
-  void resellerCannotGrantAdminRole() {
+  void groupAdminCannotGrantAdminRole() {
     assertThatThrownBy(
             () ->
                 service.createUser(
-                    reseller(),
+                    groupAdmin(),
                     new UserCreateRequest(
-                        "bob", "supersecret1", null, null, User.Role.ADMIN, null)))
+                        "bob", "supersecret1", null, null, User.Role.ADMIN, null, null)))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
     verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  void groupAdminCannotGrantGroupAdminRole() {
+    assertThatThrownBy(
+            () ->
+                service.createUser(
+                    groupAdmin(),
+                    new UserCreateRequest(
+                        "bob",
+                        "supersecret1",
+                        null,
+                        null,
+                        User.Role.GROUP_ADMIN,
+                        null,
+                        List.of("g1"))))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
+    verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  void createGroupAdminWithoutManagedGroupsIsRejected() {
+    assertThatThrownBy(
+            () ->
+                service.createUser(
+                    admin(),
+                    new UserCreateRequest(
+                        "dave", "supersecret1", null, null, User.Role.GROUP_ADMIN, null, null)))
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            e -> assertThat(((ApiException) e).getCode()).isEqualTo("admin_groups_required"));
+    verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  void createGroupAdminPersistsAssignments() {
+    java.util.concurrent.atomic.AtomicReference<User> saved =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    when(userRepository.save(any()))
+        .thenAnswer(
+            inv -> {
+              saved.set(inv.getArgument(0));
+              return inv.getArgument(0);
+            });
+    when(userRepository.findById(any())).thenAnswer(inv -> Optional.ofNullable(saved.get()));
+    when(userRepository.existsByUsername(any())).thenReturn(false);
+    when(groupRepository.findById("g1"))
+        .thenReturn(
+            Optional.of(
+                com.opnl.vpn.group.Group.builder()
+                    .id("g1")
+                    .name("DevOps")
+                    .createdAt(Instant.now())
+                    .build()));
+
+    service.createUser(
+        admin(),
+        new UserCreateRequest(
+            "dave", "supersecret1", null, null, User.Role.GROUP_ADMIN, null, List.of("g1")));
+
+    verify(adminAssignmentRepository).save(any());
+    verify(adminAssignmentRepository).deleteAll(any());
   }
 
   @Test
@@ -174,6 +268,21 @@ class UserAdminServiceTest {
     verify(ccdService, never()).clearStaticIp(any());
     verify(ccdService, never()).clearStaticIpv6(any());
     verify(userRepository).delete(any());
+  }
+
+  @Test
+  void deleteGroupAdminCleansAssignments() {
+    User gadmin =
+        User.builder()
+            .id("gadmin1")
+            .username("gadmin")
+            .role(User.Role.GROUP_ADMIN)
+            .createdAt(Instant.now())
+            .build();
+    when(userRepository.findById("gadmin1")).thenReturn(Optional.of(gadmin));
+    service.deleteUser(admin(), "gadmin1");
+    verify(adminAssignmentRepository).deleteAll(any());
+    verify(userRepository).delete(gadmin);
   }
 
   @Test
@@ -247,12 +356,45 @@ class UserAdminServiceTest {
     when(settingsService.effectiveForUsers(any()))
         .thenReturn(java.util.Map.of("u1", java.util.Map.of(), "u2", java.util.Map.of()));
 
-    assertThat(service.listUsers("ali")).extracting(UserDto::username).containsExactly("alice");
-    assertThat(service.listUsers("robert")).extracting(UserDto::username).containsExactly("bob");
-    assertThat(service.listUsers("corp.io")).extracting(UserDto::username).containsExactly("bob");
-    assertThat(service.listUsers(null))
+    assertThat(service.listUsers(admin(), "ali"))
+        .extracting(UserDto::username)
+        .containsExactly("alice");
+    assertThat(service.listUsers(admin(), "robert"))
+        .extracting(UserDto::username)
+        .containsExactly("bob");
+    assertThat(service.listUsers(admin(), "corp.io"))
+        .extracting(UserDto::username)
+        .containsExactly("bob");
+    assertThat(service.listUsers(admin(), null))
         .extracting(UserDto::username)
         .containsExactly("alice", "bob");
+  }
+
+  @Test
+  void groupAdminSeesOnlyScopedUsers() {
+    User alice =
+        User.builder()
+            .id("u1")
+            .username("alice")
+            .role(User.Role.USER)
+            .createdAt(Instant.now())
+            .build();
+    User bob =
+        User.builder()
+            .id("u2")
+            .username("bob")
+            .role(User.Role.USER)
+            .createdAt(Instant.now())
+            .build();
+    when(userRepository.findAll()).thenReturn(List.of(alice, bob));
+    when(groupRepository.findAll()).thenReturn(List.of());
+    when(memberRepository.findAll()).thenReturn(List.of());
+    when(settingsService.effectiveForUsers(any()))
+        .thenReturn(java.util.Map.of("u1", java.util.Map.of(), "u2", java.util.Map.of()));
+
+    assertThat(service.listUsers(groupAdmin(), null))
+        .extracting(UserDto::username)
+        .containsExactly("bob");
   }
 
   @Test
@@ -270,7 +412,7 @@ class UserAdminServiceTest {
                     com.opnl.vpn.setting.SettingKeys.MUST_CHANGE_PASSWORD,
                     true)));
 
-    List<UserDto> dtos = service.listUsers(null);
+    List<UserDto> dtos = service.listUsers(admin(), null);
 
     assertThat(dtos).hasSize(1);
     assertThat(dtos.get(0).mfaRequired()).isTrue();
@@ -350,29 +492,29 @@ class UserAdminServiceTest {
   }
 
   @Test
-  void resellerCannotManageAdminOrResellerAccounts() {
+  void groupAdminCannotManageAdminOrGroupAdminAccounts() {
     when(userRepository.findById("admin1")).thenReturn(Optional.of(admin()));
-    when(userRepository.findById("res1")).thenReturn(Optional.of(reseller()));
+    when(userRepository.findById("gadmin1")).thenReturn(Optional.of(groupAdmin()));
 
-    assertThatThrownBy(() -> service.resetPassword(reseller(), "admin1", "pwned123!"))
+    assertThatThrownBy(() -> service.resetPassword(groupAdmin(), "admin1", "pwned123!"))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
-    assertThatThrownBy(() -> service.setBanned(reseller(), "admin1", true))
+    assertThatThrownBy(() -> service.setBanned(groupAdmin(), "admin1", true))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
-    assertThatThrownBy(() -> service.deleteUser(reseller(), "admin1"))
+    assertThatThrownBy(() -> service.deleteUser(groupAdmin(), "admin1"))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
-    assertThatThrownBy(() -> service.resetPassword(reseller(), "res1", "pwned123!"))
+    assertThatThrownBy(() -> service.resetPassword(groupAdmin(), "gadmin1", "pwned123!"))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
-    assertThatThrownBy(() -> service.setStaticIp(reseller(), "res1", "10.8.0.200"))
+    assertThatThrownBy(() -> service.setStaticIp(groupAdmin(), "gadmin1", "10.8.0.200"))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
   }
 
   @Test
-  void resellerCanManageUserAccounts() {
+  void groupAdminCanManageUserAccountsInScope() {
     User bob =
         User.builder()
             .id("u2")
@@ -382,8 +524,8 @@ class UserAdminServiceTest {
             .build();
     when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
 
-    service.resetPassword(reseller(), "u2", "brandnewpass1");
-    service.setBanned(reseller(), "u2", true);
+    service.resetPassword(groupAdmin(), "u2", "brandnewpass1");
+    service.setBanned(groupAdmin(), "u2", true);
     verify(userRepository, org.mockito.Mockito.times(2)).save(bob);
   }
 
@@ -400,7 +542,7 @@ class UserAdminServiceTest {
     when(userRepository.findById(any())).thenAnswer(inv -> Optional.ofNullable(saved.get()));
     service.createUser(
         admin(),
-        new UserCreateRequest("  bob  ", "supersecret1", null, null, User.Role.USER, null));
+        new UserCreateRequest("  bob  ", "supersecret1", null, null, User.Role.USER, null, null));
     org.mockito.ArgumentCaptor<User> captor = org.mockito.ArgumentCaptor.forClass(User.class);
     verify(userRepository).save(captor.capture());
     assertThat(captor.getValue().getUsername()).isEqualTo("bob");

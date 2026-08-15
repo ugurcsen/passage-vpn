@@ -12,5 +12,7 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, GroupM
 
   List<GroupMember> findById_UserIdIn(Collection<String> userIds);
 
+  List<GroupMember> findById_GroupIdIn(Collection<String> groupIds);
+
   void deleteById_GroupId(String groupId);
 }

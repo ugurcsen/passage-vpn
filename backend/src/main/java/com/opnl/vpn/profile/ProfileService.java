@@ -209,7 +209,7 @@ public class ProfileService {
 
   private Optional<User> requireUserForGenericSafe() {
     return userRepository.findAll().stream()
-        .filter(u -> u.getRole() == User.Role.USER || u.getRole() == User.Role.RESELLER)
+        .filter(u -> u.getRole() == User.Role.USER || u.getRole() == User.Role.GROUP_ADMIN)
         .findFirst();
   }
 

@@ -16,13 +16,20 @@ public record UserDto(
     boolean banned,
     boolean mustChangePassword,
     List<String> groups,
+    List<String> adminGroupIds,
+    List<String> adminGroupNames,
     Instant createdAt,
     Instant lastLoginAt,
     String staticIp,
     String staticIpv6) {
 
   public static UserDto from(
-      User user, boolean mfaRequired, boolean mustChangePassword, List<String> groupNames) {
+      User user,
+      boolean mfaRequired,
+      boolean mustChangePassword,
+      List<String> groupNames,
+      List<String> adminGroupIds,
+      List<String> adminGroupNames) {
     return new UserDto(
         user.getId(),
         user.getUsername(),
@@ -34,6 +41,8 @@ public record UserDto(
         user.isBanned(),
         mustChangePassword,
         groupNames,
+        adminGroupIds,
+        adminGroupNames,
         user.getCreatedAt(),
         user.getLastLoginAt(),
         user.getStaticIp(),
@@ -41,6 +50,6 @@ public record UserDto(
   }
 
   public static UserDto from(User user, boolean mfaRequired, boolean mustChangePassword) {
-    return from(user, mfaRequired, mustChangePassword, List.of());
+    return from(user, mfaRequired, mustChangePassword, List.of(), List.of(), List.of());
   }
 }

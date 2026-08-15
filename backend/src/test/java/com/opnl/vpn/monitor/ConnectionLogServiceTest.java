@@ -8,8 +8,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.api.admin.ConnectionLogDto;
+import com.opnl.vpn.group.GroupScope;
 import com.opnl.vpn.monitor.MgmtStatus.MgmtClientStatus;
 import com.opnl.vpn.setting.SettingsService;
+import com.opnl.vpn.user.User;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +26,7 @@ class ConnectionLogServiceTest {
   private ConnectionLogRepository repository;
   private TrafficAggregator aggregator;
   private SettingsService settingsService;
+  private GroupScope groupScope;
   private ConnectionLogService service;
 
   @BeforeEach
@@ -31,7 +34,17 @@ class ConnectionLogServiceTest {
     repository = mock(ConnectionLogRepository.class);
     aggregator = new TrafficAggregator();
     settingsService = mock(SettingsService.class);
-    service = new ConnectionLogService(repository, aggregator, settingsService);
+    groupScope = mock(GroupScope.class);
+    service = new ConnectionLogService(repository, aggregator, settingsService, groupScope);
+  }
+
+  private User admin() {
+    return User.builder()
+        .id("admin1")
+        .username("admin")
+        .role(User.Role.ADMIN)
+        .createdAt(Instant.now())
+        .build();
   }
 
   @Test
@@ -100,15 +113,45 @@ class ConnectionLogServiceTest {
             .bytesOut(200)
             .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
             .build();
+    when(groupScope.scopedUsernames(any())).thenReturn(null);
     when(repository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(log)));
 
-    List<ConnectionLogDto> recent = service.recent(25);
+    List<ConnectionLogDto> recent = service.recent(admin(), 25);
 
     assertThat(recent).hasSize(1);
     ConnectionLogDto dto = recent.get(0);
     assertThat(dto.username()).isEqualTo("alice");
     assertThat(dto.bytesIn()).isEqualTo(100);
     assertThat(dto.durationSeconds()).isEqualTo(120);
+  }
+
+  @Test
+  void recentScopesToManagedUsernamesForGroupAdmin() {
+    ConnectionLog log =
+        ConnectionLog.builder()
+            .id("log1")
+            .username("alice")
+            .commonName("alice")
+            .connectedAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
+            .build();
+    User groupAdmin =
+        User.builder()
+            .id("gadmin1")
+            .username("gadmin")
+            .role(User.Role.GROUP_ADMIN)
+            .createdAt(Instant.now())
+            .build();
+    when(groupScope.scopedUsernames(groupAdmin)).thenReturn(Set.of("alice"));
+    when(repository.findByUsernameInOrderByConnectedAtDesc(any(), any(Pageable.class)))
+        .thenReturn(List.of(log));
+
+    List<ConnectionLogDto> recent = service.recent(groupAdmin, 25);
+
+    assertThat(recent).hasSize(1);
+    verify(repository)
+        .findByUsernameInOrderByConnectedAtDesc(
+            org.mockito.ArgumentMatchers.eq(Set.of("alice")), any(Pageable.class));
   }
 
   @Test

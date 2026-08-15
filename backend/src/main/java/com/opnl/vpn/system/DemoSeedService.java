@@ -12,6 +12,8 @@ import com.opnl.vpn.dns.DnsRecord;
 import com.opnl.vpn.dns.DnsRecordDto;
 import com.opnl.vpn.dns.DnsRecordRepository;
 import com.opnl.vpn.group.Group;
+import com.opnl.vpn.group.GroupAdminAssignment;
+import com.opnl.vpn.group.GroupAdminAssignmentRepository;
 import com.opnl.vpn.group.GroupMember;
 import com.opnl.vpn.group.GroupMemberRepository;
 import com.opnl.vpn.group.GroupRepository;
@@ -61,6 +63,7 @@ public class DemoSeedService {
   private final UserRepository userRepository;
   private final GroupRepository groupRepository;
   private final GroupMemberRepository memberRepository;
+  private final GroupAdminAssignmentRepository adminAssignmentRepository;
   private final PasswordEncoder passwordEncoder;
   private final SettingsService settingsService;
   private final CcdService ccdService;
@@ -77,6 +80,7 @@ public class DemoSeedService {
       UserRepository userRepository,
       GroupRepository groupRepository,
       GroupMemberRepository memberRepository,
+      GroupAdminAssignmentRepository adminAssignmentRepository,
       PasswordEncoder passwordEncoder,
       SettingsService settingsService,
       CcdService ccdService,
@@ -91,6 +95,7 @@ public class DemoSeedService {
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
     this.memberRepository = memberRepository;
+    this.adminAssignmentRepository = adminAssignmentRepository;
     this.passwordEncoder = passwordEncoder;
     this.settingsService = settingsService;
     this.ccdService = ccdService;
@@ -139,7 +144,8 @@ public class DemoSeedService {
     User bob = createUser("bob", "Bob Smith", "bob@example.com", User.Role.USER, marketing.getId());
     User carol =
         createUser("carol", "Carol Williams", "carol@example.com", User.Role.USER, devops.getId());
-    User dave = createUser("dave", "Dave Brown", "dave@example.com", User.Role.RESELLER, null);
+    User dave = createUser("dave", "Dave Brown", "dave@example.com", User.Role.GROUP_ADMIN, null);
+    adminAssignmentRepository.save(new GroupAdminAssignment(dave.getId(), devops.getId()));
 
     settingsService.setUserSetting(alice.getId(), SettingKeys.TUNNEL_MODE, "full");
     settingsService.setUserSetting(carol.getId(), SettingKeys.MAX_CONNECTIONS, 2);
@@ -387,6 +393,7 @@ public class DemoSeedService {
     String id = user.getId();
     certificateRepository.findByUserId(id).forEach(certificateRepository::delete);
     memberRepository.deleteAll(memberRepository.findById_UserId(id));
+    adminAssignmentRepository.deleteAll(adminAssignmentRepository.findById_UserId(id));
     settingsService
         .userSettings(id)
         .keySet()
@@ -403,6 +410,7 @@ public class DemoSeedService {
   private void deleteGroupWithDependencies(Group group) {
     String id = group.getId();
     memberRepository.deleteById_GroupId(id);
+    adminAssignmentRepository.deleteById_GroupId(id);
     settingsService
         .groupSettings(id)
         .keySet()
