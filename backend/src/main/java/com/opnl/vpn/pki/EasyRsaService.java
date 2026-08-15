@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -148,6 +149,8 @@ public class EasyRsaService {
     java.util.ArrayList<String> updated = new java.util.ArrayList<>(lines.size());
     boolean restored = false;
     boolean found = false;
+    String restoredSerial = null;
+    String restoredCn = null;
     for (String line : lines) {
       String[] parts = line.split("\\t", -1);
       // index.txt row: status, expiry, revocation date, serial, filename, CN
@@ -161,6 +164,8 @@ public class EasyRsaService {
       }
       found = true;
       if ("R".equals(parts[0])) {
+        restoredSerial = parts[3];
+        restoredCn = parts[5].startsWith("/CN=") ? parts[5].substring(4) : parts[5];
         updated.add("V\t" + parts[1] + "\t\t" + parts[3] + "\t" + parts[4] + "\t" + parts[5]);
         restored = true;
       } else {
@@ -175,12 +180,77 @@ public class EasyRsaService {
     if (!restored) {
       throw ApiException.conflict("not_revoked", "Certificate with " + target + " is not revoked");
     }
+    // Restore the on-disk artifacts BEFORE touching the index so a restore can never leave a VALID
+    // row whose certificate is unusable. Easy-RSA moves issued/<cn>.crt to
+    // certs_by_serial/<serial>.pem and private/<cn>.key to revoked/private_by_serial/<serial>.key
+    // on revoke; without putting them back a later revoke/rotate fails with
+    // "Unable to revoke as no certificate was found".
+    String targetSerial = matchBySerial ? serial : restoredSerial;
+    String targetCn = commonName != null ? commonName : restoredCn;
+    restoreRevokedArtifacts(targetSerial, targetCn);
     try {
       Files.write(indexFile, updated, StandardCharsets.UTF_8);
     } catch (IOException e) {
       throw ApiException.internal("pki_index", "Cannot write index.txt: " + e.getMessage());
     }
     genCrl();
+  }
+
+  /**
+   * Restores the certificate (and, when present, its private key) that Easy-RSA moved away on
+   * revoke. The certificate is mandatory — without it any subsequent revoke or rotate fails — while
+   * the key is restored best-effort when the revoked-key archive still holds it.
+   *
+   * @throws ApiException {@code pki_missing} when the revoked certificate artifact cannot be
+   *     located; the caller must not flip the index in that case
+   */
+  private void restoreRevokedArtifacts(String serial, String commonName) {
+    if (serial == null || serial.isBlank()) {
+      // Legacy row without a recorded serial: nothing to locate on disk, keep the index-only
+      // restore behaviour for this path.
+      return;
+    }
+    Path certSource = pkiDir.resolve("certs_by_serial").resolve(serial + ".pem");
+    if (!Files.exists(certSource)) {
+      certSource =
+          pkiDir
+              .resolve("revoked")
+              .resolve("certs_by_serial")
+              .resolve(serial)
+              .resolve(commonName + ".crt");
+    }
+    if (!Files.exists(certSource)) {
+      throw ApiException.notFound(
+          "pki_missing",
+          "Revoked certificate artifacts for serial "
+              + serial
+              + " were not found; cannot restore "
+              + commonName);
+    }
+    Path issuedDir = pkiDir.resolve("issued");
+    try {
+      Files.createDirectories(issuedDir);
+      Files.copy(
+          certSource, issuedDir.resolve(commonName + ".crt"), StandardCopyOption.REPLACE_EXISTING);
+    } catch (IOException e) {
+      throw ApiException.internal(
+          "pki_restore", "Cannot restore certificate for " + commonName + ": " + e.getMessage());
+    }
+    Path keySource =
+        pkiDir.resolve("revoked").resolve("private_by_serial").resolve(serial + ".key");
+    if (Files.exists(keySource)) {
+      Path privateDir = pkiDir.resolve("private");
+      try {
+        Files.createDirectories(privateDir);
+        Files.copy(
+            keySource,
+            privateDir.resolve(commonName + ".key"),
+            StandardCopyOption.REPLACE_EXISTING);
+      } catch (IOException e) {
+        throw ApiException.internal(
+            "pki_restore", "Cannot restore private key for " + commonName + ": " + e.getMessage());
+      }
+    }
   }
 
   /** Regenerates the CRL from the current index.txt. */

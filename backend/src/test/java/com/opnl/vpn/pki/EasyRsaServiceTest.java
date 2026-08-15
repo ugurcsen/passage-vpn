@@ -82,9 +82,22 @@ class EasyRsaServiceTest {
         + "\tissued/bob.crt\t/CN=bob\n";
   }
 
+  /** Simulates the artifact layout Easy-RSA leaves behind after a revoke. */
+  private void writeRevokedArtifacts(String serial, String cn) throws Exception {
+    Path certsBySerial = pkiDir.resolve("certs_by_serial");
+    Path revokedKeys = pkiDir.resolve("revoked").resolve("private_by_serial");
+    Files.createDirectories(certsBySerial);
+    Files.createDirectories(revokedKeys);
+    Files.writeString(
+        certsBySerial.resolve(serial + ".pem"), "-----BEGIN CERTIFICATE-----\n" + cn + "\n");
+    Files.writeString(
+        revokedKeys.resolve(serial + ".key"), "-----BEGIN PRIVATE KEY-----\n" + cn + "\n");
+  }
+
   @Test
   void unrevokeCertFlipsEntryToValidAndClearsRevocationDate() throws Exception {
     Files.writeString(indexFile, indexWithRevoked("02", "260801000000Z"));
+    writeRevokedArtifacts("02", "bob");
 
     service.unrevokeCert("02", "bob");
 
@@ -97,8 +110,47 @@ class EasyRsaServiceTest {
   }
 
   @Test
+  void unrevokeCertRestoresIssuedCertAndPrivateKey() throws Exception {
+    Files.writeString(indexFile, indexWithRevoked("02", "260801000000Z"));
+    writeRevokedArtifacts("02", "bob");
+
+    service.unrevokeCert("02", "bob");
+
+    assertThat(Files.readString(pkiDir.resolve("issued").resolve("bob.crt")))
+        .isEqualTo("-----BEGIN CERTIFICATE-----\nbob\n");
+    assertThat(Files.readString(pkiDir.resolve("private").resolve("bob.key")))
+        .isEqualTo("-----BEGIN PRIVATE KEY-----\nbob\n");
+  }
+
+  @Test
+  void unrevokeCertThrowsWhenRevokedArtifactMissing() throws Exception {
+    Files.writeString(indexFile, indexWithRevoked("02", "260801000000Z"));
+
+    assertThatThrownBy(() -> service.unrevokeCert("02", "bob"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_missing");
+    // Nothing is flipped and nothing is restored: the index stays untouched.
+    assertThat(Files.readString(indexFile)).isEqualTo(indexWithRevoked("02", "260801000000Z"));
+    assertThat(pkiDir.resolve("issued").resolve("bob.crt")).doesNotExist();
+  }
+
+  @Test
+  void unrevokeCertRestoresLegacyRevokedCertsBySerialLayout() throws Exception {
+    Files.writeString(indexFile, indexWithRevoked("02", "260801000000Z"));
+    Path legacy = pkiDir.resolve("revoked").resolve("certs_by_serial").resolve("02");
+    Files.createDirectories(legacy);
+    Files.writeString(legacy.resolve("bob.crt"), "legacy-cert");
+
+    service.unrevokeCert("02", "bob");
+
+    assertThat(Files.readString(pkiDir.resolve("issued").resolve("bob.crt")))
+        .isEqualTo("legacy-cert");
+  }
+
+  @Test
   void unrevokeCertKeepsOtherRowsUntouched() throws Exception {
     Files.writeString(indexFile, indexWithRevoked("02", "260801000000Z"));
+    writeRevokedArtifacts("02", "bob");
 
     service.unrevokeCert("02", "bob");
 
@@ -133,6 +185,7 @@ class EasyRsaServiceTest {
   @Test
   void unrevokeCertMatchesByCommonNameWhenSerialMissing() throws Exception {
     Files.writeString(indexFile, indexWithRevoked("02", "260801000000Z"));
+    writeRevokedArtifacts("02", "bob");
 
     service.unrevokeCert(null, "bob");
 
@@ -140,6 +193,9 @@ class EasyRsaServiceTest {
     assertThat(content)
         .contains("V\t260101000000Z\t\t02\tissued/bob.crt\t/CN=bob\n")
         .doesNotContain("R\t260101000000Z\t260801000000Z\t02");
+    // The serial is taken from the matching index row so artifacts are still restored.
+    assertThat(Files.readString(pkiDir.resolve("issued").resolve("bob.crt")))
+        .isEqualTo("-----BEGIN CERTIFICATE-----\nbob\n");
   }
 
   @Test

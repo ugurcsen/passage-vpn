@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -283,6 +284,69 @@ class CertServiceTest {
     verify(easyRsa).revokeCert("alice");
     verify(easyRsa).deleteClientCert("alice");
     verify(easyRsa).issueClientCert("alice");
+  }
+
+  @Test
+  void restoreThenRotateSucceeds() {
+    Certificate revoked =
+        Certificate.builder()
+            .id("c1")
+            .commonName("alice")
+            .userId("u1")
+            .serial("AB")
+            .status(Status.REVOKED)
+            .revokedAt(Instant.now())
+            .build();
+    when(userRepository.findById("u1")).thenReturn(Optional.of(user()));
+    when(certificateRepository.findById("c1")).thenReturn(Optional.of(revoked));
+    when(certificateRepository.findByUserIdAndStatus("u1", Status.VALID))
+        .thenReturn(List.of(revoked));
+    when(certificateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    // After restore the artifact is back on disk, so rotate's revoke finds it.
+    when(easyRsa.hasClientCert("alice")).thenReturn(true);
+    when(easyRsa.index())
+        .thenReturn(
+            List.of(
+                new CertIndexEntry(
+                    CertIndexEntry.Status.VALID,
+                    Instant.now().plusSeconds(86400),
+                    "AB2",
+                    "alice.crt",
+                    "alice")));
+
+    Certificate restored = service.restore("c1");
+    Certificate rotated = service.rotate("u1");
+
+    assertThat(restored.getStatus()).isEqualTo(Status.VALID);
+    assertThat(rotated.getStatus()).isEqualTo(Status.VALID);
+    assertThat(rotated.getSerial()).isEqualTo("AB2");
+    verify(easyRsa).unrevokeCert("AB", "alice");
+    verify(easyRsa).revokeCert("alice");
+    verify(easyRsa).issueClientCert("alice");
+  }
+
+  @Test
+  void restoreThenRevokeSucceeds() {
+    Certificate revoked =
+        Certificate.builder()
+            .id("c1")
+            .commonName("alice")
+            .userId("u1")
+            .serial("AB")
+            .status(Status.REVOKED)
+            .revokedAt(Instant.now())
+            .build();
+    when(certificateRepository.findById("c1")).thenReturn(Optional.of(revoked));
+    when(certificateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(easyRsa.hasClientCert("alice")).thenReturn(true);
+
+    Certificate restored = service.restore("c1");
+    assertThat(restored.getStatus()).isEqualTo(Status.VALID);
+
+    Certificate revokedAgain = service.revoke("c1");
+
+    assertThat(revokedAgain.getStatus()).isEqualTo(Status.REVOKED);
+    verify(easyRsa, times(1)).revokeCert("alice");
   }
 
   @Test
