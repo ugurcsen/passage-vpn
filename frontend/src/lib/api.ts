@@ -228,6 +228,8 @@ export const endpoints = {
   portalAccountMfaEnable: "/portal/account/mfa/enable",
   portalAccountMfaDisable: "/portal/account/mfa/disable",
   portalAccountPassword: "/portal/account/password",
+  portalCert: "/portal/cert",
+  portalCertRotate: "/portal/cert/rotate",
   connections: "/admin/connections",
   status: "/admin/status",
   settings: "/admin/settings",
@@ -407,6 +409,15 @@ export interface MfaSetup {
   secret: string;
   otpAuthUrl: string;
   qrDataUrl: string;
+}
+
+/** Snapshot of the current user's VPN certificate; status is NONE when none exists. */
+export interface CertificateInfo {
+  status: "VALID" | "REVOKED" | "EXPIRED" | "NONE";
+  commonName: string | null;
+  serial: string | null;
+  issuedAt: string | null;
+  expiresAt: string | null;
 }
 
 /** Management view of an API token; the raw value is shown only at creation. */

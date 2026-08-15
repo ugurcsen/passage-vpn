@@ -4,15 +4,17 @@
 # Phase 1 (script_type=user-pass-verify):
 #   Verifies username/password (plus an inline TOTP from static-challenge
 #   clients, which arrive as "password\nOTP" in $password) against the backend.
-#   When the account requires MFA and no code was supplied, the script writes
-#   an auth-pending file with a crtext prompt and exits 2, so auth-pending
-#   capable clients (OpenVPN Connect, OpenVPN 3) prompt for the TOTP code.
+#   When the account requires MFA and no code was supplied, the backend returns
+#   a single-use pendingId; the script stashes it in /tmp/opnl-pending-<user>,
+#   writes an auth-pending file with a crtext prompt and exits 2, so
+#   auth-pending capable clients (OpenVPN Connect, OpenVPN 3) prompt for the
+#   TOTP code.
 #
 # Phase 2 (script_type=client-crresponse):
 #   OpenVPN writes the client's base64-encoded response to a temporary file
-#   and passes the path as argv[1]. The code is decoded and validated via the
-#   backend; the verdict is written to $auth_control_file ("1" allow, "0"
-#   deny) and the script exits 0.
+#   and passes the path as argv[1]. The code is decoded, combined with the
+#   phase-1 pendingId and validated via the backend; the verdict is written to
+#   $auth_control_file ("1" allow, "0" deny) and the script exits 0.
 #
 # Contract: exit 0 = authenticated/controlled, 1 = denied, 2 = auth pending.
 set -euo pipefail
@@ -37,8 +39,16 @@ if [[ "${script_type:-}" == "client-crresponse" ]]; then
     if [[ -r "$resp_file" ]]; then
         otp="$(tr -d '\r\n' < "$resp_file" | base64 -d 2>/dev/null || true)"
     fi
-    body="$(jq -n --arg u "$auth_user" --arg o "$otp" --arg r "${trusted_ip:-}" \
-        '{username:$u, otp:$o, remoteIp:$r}' 2>/dev/null || true)"
+    # The phase-1 pendingId binds this attempt to the accepted password. It is
+    # single-use: read and remove the file before calling the backend.
+    pending_file="/tmp/opnl-pending-$auth_user"
+    pending_id=""
+    if [[ -r "$pending_file" ]]; then
+        pending_id="$(cat "$pending_file" 2>/dev/null || true)"
+        rm -f "$pending_file"
+    fi
+    body="$(jq -n --arg u "$auth_user" --arg o "$otp" --arg r "${trusted_ip:-}" --arg p "$pending_id" \
+        '{username:$u, otp:$o, remoteIp:$r, pendingId:$p}' 2>/dev/null || true)"
     resp="$(call_internal "/internal/auth/verify-otp" "$body" || true)"
     allowed="$(printf '%s' "$resp" | jq -r '.allowed // "false"' 2>/dev/null || echo "false")"
     if [[ -n "${auth_control_file:-}" ]]; then
@@ -79,8 +89,18 @@ reason="$(printf '%s' "$resp" | jq -r '.reason // "invalid credentials"' 2>/dev/
 
 if [[ "$reason" == "mfa_required" ]]; then
     if [[ -n "${auth_pending_file:-}" ]]; then
-        # Signal auth-pending: 300s timeout, crtext method, prompt text.
-        printf '300\ncrtext\nCR_TEXT:E,R:Please enter your TOTP code!\n' > "$auth_pending_file"
+        # Stash the phase-1 nonce so phase 2 can redeem it (120s TTL, matching
+        # the backend's PENDING_VPN_AUTH_TTL_SECONDS).
+        if [[ -n "${username:-}" ]]; then
+            pending_id="$(printf '%s' "$resp" | jq -r '.pendingId // ""' 2>/dev/null || true)"
+            if [[ -n "$pending_id" ]]; then
+                umask 077
+                printf '%s' "$pending_id" > "/tmp/opnl-pending-$username"
+                chmod 600 "/tmp/opnl-pending-$username"
+            fi
+        fi
+        # Signal auth-pending: 120s timeout, crtext method, prompt text.
+        printf '120\ncrtext\nCR_TEXT:E,R:Please enter your TOTP code!\n' > "$auth_pending_file"
         exit 2
     fi
     echo "AUTH_FAILED: mfa_required (client does not support auth-pending)" >&2

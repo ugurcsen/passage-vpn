@@ -141,6 +141,7 @@ export function UsersPage() {
 
   const canManageMfa = currentUser?.role === "ADMIN";
   const isAdmin = currentUser?.role === "ADMIN";
+  const canManageRow = (row: UserRow) => isAdmin || row.role === "USER";
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -559,26 +560,34 @@ export function UsersPage() {
         const row = params.row as UserRow;
         return (
           <Stack direction="row">
-            <Tooltip title="Edit">
-              <IconButton size="small" onClick={() => openEdit(row)}>
-                <LockResetIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title={row.banned ? "Enable" : "Disable"}>
-              <IconButton size="small" onClick={() => banMutation.mutate(row)}>
-                {row.banned ? <CheckCircleIcon fontSize="small" color="success" /> : <BlockIcon fontSize="small" />}
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Reset password">
-              <IconButton size="small" onClick={() => setResetTarget(row)}>
-                <KeyIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="CCD settings">
-              <IconButton size="small" onClick={() => openCcdEditor(row)} data-testid={`edit-ccd-${row.username}`}>
-                <TuneIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            {canManageRow(row) && (
+              <Tooltip title="Edit">
+                <IconButton size="small" onClick={() => openEdit(row)}>
+                  <LockResetIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {canManageRow(row) && (
+              <Tooltip title={row.banned ? "Enable" : "Disable"}>
+                <IconButton size="small" onClick={() => banMutation.mutate(row)}>
+                  {row.banned ? <CheckCircleIcon fontSize="small" color="success" /> : <BlockIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            )}
+            {canManageRow(row) && (
+              <Tooltip title="Reset password">
+                <IconButton size="small" onClick={() => setResetTarget(row)}>
+                  <KeyIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {canManageRow(row) && (
+              <Tooltip title="CCD settings">
+                <IconButton size="small" onClick={() => openCcdEditor(row)} data-testid={`edit-ccd-${row.username}`}>
+                  <TuneIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
             {canManageMfa && (
               <Tooltip title="Manage MFA">
                 <IconButton
@@ -593,14 +602,16 @@ export function UsersPage() {
                 </IconButton>
               </Tooltip>
             )}
-            <Tooltip title="Delete">
-              <IconButton
-                size="small"
-                onClick={() => openDeleteDialog([row.id], row.username)}
-              >
-                <DeleteIcon fontSize="small" color="error" />
-              </IconButton>
-            </Tooltip>
+            {canManageRow(row) && (
+              <Tooltip title="Delete">
+                <IconButton
+                  size="small"
+                  onClick={() => openDeleteDialog([row.id], row.username)}
+                >
+                  <DeleteIcon fontSize="small" color="error" />
+                </IconButton>
+              </Tooltip>
+            )}
           </Stack>
         );
       },
@@ -696,6 +707,7 @@ export function UsersPage() {
           initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
           checkboxSelection
           disableRowSelectionOnClick
+          isRowSelectable={(params) => canManageRow(params.row as UserRow)}
           onRowSelectionModelChange={setSelection}
         />
       </Paper>

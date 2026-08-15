@@ -12,8 +12,10 @@ import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -145,10 +147,79 @@ public class ProfileService {
     return tokenRepository.findByToken(token);
   }
 
-  private User requireUserForGeneric() {
+  /**
+   * Profile types allowed for portal self-service downloads. Reads the {@code portal_profile_types}
+   * server setting; when unset (or empty) only the password-bound certificate types are allowed so
+   * AUTO_LOGIN/GENERIC stay disabled unless an admin opts in.
+   */
+  @Transactional(readOnly = true)
+  public Set<ProfileType> portalAllowedTypes() {
+    Object value = settingsService.serverSettings().get(SettingKeys.PORTAL_PROFILE_TYPES);
+    Set<ProfileType> allowed = EnumSet.noneOf(ProfileType.class);
+    if (value instanceof java.util.Collection<?> collection) {
+      for (Object item : collection) {
+        profileTypeOf(item).ifPresent(allowed::add);
+      }
+    } else if (value instanceof String s && !s.isBlank()) {
+      for (String name : s.split(",")) {
+        profileTypeOf(name).ifPresent(allowed::add);
+      }
+    }
+    return allowed.isEmpty()
+        ? EnumSet.of(ProfileType.USER_LOCKED, ProfileType.SERVER_LOCKED)
+        : allowed;
+  }
+
+  /** Whether the given profile type may be downloaded from the client portal. */
+  public boolean portalAllows(ProfileType type) {
+    return portalAllowedTypes().contains(type);
+  }
+
+  /**
+   * Whether the given profile type is actually usable right now: a matching enabled daemon exists
+   * (and for GENERIC a non-admin account is present to back the shared credentials).
+   */
+  @Transactional(readOnly = true)
+  public boolean portalAvailable(ProfileType type) {
+    if (!daemonService.findMatchingForProfile(type).isPresent()) {
+      return false;
+    }
+    return type != ProfileType.GENERIC || requireUserForGenericSafe().isPresent();
+  }
+
+  /** Rejects a portal download/QR for types the admin disabled or no daemon can serve. */
+  public void assertPortalDownloadAllowed(ProfileType type) {
+    if (!portalAllows(type)) {
+      throw ApiException.forbidden(
+          "portal_type_disabled",
+          "This profile type is disabled by the administrator for self-service downloads");
+    }
+    if (!portalAvailable(type)) {
+      throw ApiException.forbidden(
+          "portal_type_unavailable",
+          "This profile type is unavailable; no enabled daemon serves it");
+    }
+  }
+
+  private Optional<ProfileType> profileTypeOf(Object name) {
+    if (name == null) {
+      return Optional.empty();
+    }
+    try {
+      return Optional.of(ProfileType.valueOf(String.valueOf(name).trim()));
+    } catch (IllegalArgumentException e) {
+      return Optional.empty();
+    }
+  }
+
+  private Optional<User> requireUserForGenericSafe() {
     return userRepository.findAll().stream()
         .filter(u -> u.getRole() == User.Role.USER || u.getRole() == User.Role.RESELLER)
-        .findFirst()
+        .findFirst();
+  }
+
+  private User requireUserForGeneric() {
+    return requireUserForGenericSafe()
         .orElseThrow(
             () ->
                 ApiException.badRequest(

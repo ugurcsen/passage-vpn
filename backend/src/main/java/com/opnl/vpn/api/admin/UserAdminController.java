@@ -83,18 +83,21 @@ public class UserAdminController {
   }
 
   @PostMapping("/{id}/reset-password")
-  public void resetPassword(@PathVariable String id, @Valid @RequestBody PasswordRequest request) {
-    userAdminService.resetPassword(id, request.password());
+  public void resetPassword(
+      Authentication authentication,
+      @PathVariable String id,
+      @Valid @RequestBody PasswordRequest request) {
+    userAdminService.resetPassword(actor(authentication), id, request.password());
   }
 
   @PostMapping("/{id}/ban")
-  public UserDto ban(@PathVariable String id) {
-    return userAdminService.setBanned(id, true);
+  public UserDto ban(Authentication authentication, @PathVariable String id) {
+    return userAdminService.setBanned(actor(authentication), id, true);
   }
 
   @PostMapping("/{id}/unban")
-  public UserDto unban(@PathVariable String id) {
-    return userAdminService.setBanned(id, false);
+  public UserDto unban(Authentication authentication, @PathVariable String id) {
+    return userAdminService.setBanned(actor(authentication), id, false);
   }
 
   @PostMapping("/{id}/mfa/setup")
@@ -116,29 +119,34 @@ public class UserAdminController {
   }
 
   @PutMapping("/{id}/static-ip")
-  public UserDto setStaticIp(@PathVariable String id, @Valid @RequestBody StaticIpRequest request) {
-    return userAdminService.setStaticIp(id, request.staticIp());
+  public UserDto setStaticIp(
+      Authentication authentication,
+      @PathVariable String id,
+      @Valid @RequestBody StaticIpRequest request) {
+    return userAdminService.setStaticIp(actor(authentication), id, request.staticIp());
   }
 
   @PostMapping("/{id}/static-ip/allocate")
-  public UserDto allocateStaticIp(@PathVariable String id) {
-    return userAdminService.allocateStaticIp(id);
+  public UserDto allocateStaticIp(Authentication authentication, @PathVariable String id) {
+    return userAdminService.allocateStaticIp(actor(authentication), id);
   }
 
   @DeleteMapping("/{id}/static-ip")
-  public UserDto clearStaticIp(@PathVariable String id) {
-    return userAdminService.clearStaticIp(id);
+  public UserDto clearStaticIp(Authentication authentication, @PathVariable String id) {
+    return userAdminService.clearStaticIp(actor(authentication), id);
   }
 
   @PutMapping("/{id}/static-ipv6")
   public UserDto setStaticIpv6(
-      @PathVariable String id, @Valid @RequestBody StaticIpv6Request request) {
-    return userAdminService.setStaticIpv6(id, request.staticIpv6());
+      Authentication authentication,
+      @PathVariable String id,
+      @Valid @RequestBody StaticIpv6Request request) {
+    return userAdminService.setStaticIpv6(actor(authentication), id, request.staticIpv6());
   }
 
   @PostMapping("/{id}/static-ipv6/allocate")
-  public UserDto allocateStaticIpv6(@PathVariable String id) {
-    return userAdminService.allocateStaticIpv6(id);
+  public UserDto allocateStaticIpv6(Authentication authentication, @PathVariable String id) {
+    return userAdminService.allocateStaticIpv6(actor(authentication), id);
   }
 
   @DeleteMapping("/{id}/static-ipv6")
@@ -158,13 +166,17 @@ public class UserAdminController {
 
   @PutMapping("/{id}/settings/{key}")
   public Map<String, Object> setSetting(
-      @PathVariable String id, @PathVariable String key, @RequestBody Object value) {
-    return userAdminService.setUserSetting(id, key, value);
+      Authentication authentication,
+      @PathVariable String id,
+      @PathVariable String key,
+      @RequestBody Object value) {
+    return userAdminService.setUserSetting(actor(authentication), id, key, value);
   }
 
   @DeleteMapping("/{id}/settings/{key}")
-  public Map<String, Object> deleteSetting(@PathVariable String id, @PathVariable String key) {
-    return userAdminService.deleteUserSetting(id, key);
+  public Map<String, Object> deleteSetting(
+      Authentication authentication, @PathVariable String id, @PathVariable String key) {
+    return userAdminService.deleteUserSetting(actor(authentication), id, key);
   }
 
   private User actor(Authentication authentication) {

@@ -6,12 +6,16 @@ import com.opnl.vpn.auth.TotpService;
 import com.opnl.vpn.auth.spi.AuthProvider;
 import com.opnl.vpn.auth.spi.AuthProviderManager;
 import com.opnl.vpn.common.ApiException;
+import com.opnl.vpn.pki.CertService;
+import com.opnl.vpn.pki.Certificate;
+import com.opnl.vpn.pki.CertificateRepository;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.user.RefreshToken;
 import com.opnl.vpn.user.RefreshTokenRepository;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
+import java.time.Instant;
 import java.util.Map;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,6 +31,10 @@ public class PortalAccountService {
 
   public record MfaSetup(String secret, String otpAuthUrl, String qrDataUrl) {}
 
+  /** Snapshot of the current user's VPN certificate; {@code status} is NONE when none exists. */
+  public record CertificateInfo(
+      String status, String commonName, String serial, Instant issuedAt, Instant expiresAt) {}
+
   private final UserRepository userRepository;
   private final RefreshTokenRepository refreshTokenRepository;
   private final PasswordEncoder passwordEncoder;
@@ -34,6 +42,8 @@ public class PortalAccountService {
   private final SettingsService settingsService;
   private final AuthProvider authProvider;
   private final AuditLogService auditLogService;
+  private final CertService certService;
+  private final CertificateRepository certificateRepository;
 
   public PortalAccountService(
       UserRepository userRepository,
@@ -42,7 +52,9 @@ public class PortalAccountService {
       TotpService totpService,
       SettingsService settingsService,
       AuthProviderManager authProviderManager,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService,
+      CertService certService,
+      CertificateRepository certificateRepository) {
     this.userRepository = userRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.passwordEncoder = passwordEncoder;
@@ -50,6 +62,8 @@ public class PortalAccountService {
     this.settingsService = settingsService;
     this.authProvider = authProviderManager.active();
     this.auditLogService = auditLogService;
+    this.certService = certService;
+    this.certificateRepository = certificateRepository;
   }
 
   /** Starts TOTP provisioning; the user must confirm with {@link #enableMfa}. */
@@ -127,6 +141,44 @@ public class PortalAccountService {
   private void revoke(RefreshToken token) {
     token.setRevoked(true);
     refreshTokenRepository.save(token);
+  }
+
+  /** Self-service snapshot of the user's VPN certificate; NONE when no certificate exists. */
+  @Transactional(readOnly = true)
+  public CertificateInfo myCertificate(String userId) {
+    requireUser(userId);
+    return certificateRepository.findByUserId(userId).stream()
+        .sorted(
+            java.util.Comparator.comparing(
+                Certificate::getIssuedAt,
+                java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+        .findFirst()
+        .map(PortalAccountService::toInfo)
+        .orElseGet(() -> new CertificateInfo("NONE", null, null, null, null));
+  }
+
+  /**
+   * Self-service rotate: revokes the current valid certificate and reissues a fresh one (same
+   * common name). When no valid certificate exists a new one is issued instead.
+   */
+  @Transactional
+  public CertificateInfo rotateCertificate(String userId) {
+    requireUser(userId);
+    Certificate certificate =
+        certificateRepository.findByUserIdAndStatus(userId, Certificate.Status.VALID).stream()
+            .findFirst()
+            .map(ignored -> certService.rotate(userId))
+            .orElseGet(() -> certService.ensureUserCert(userId));
+    return toInfo(certificate);
+  }
+
+  private static CertificateInfo toInfo(Certificate certificate) {
+    return new CertificateInfo(
+        certificate.getStatus().name(),
+        certificate.getCommonName(),
+        certificate.getSerial(),
+        certificate.getIssuedAt(),
+        certificate.getExpiresAt());
   }
 
   private void verifyPassword(User user, String password) {

@@ -64,7 +64,7 @@ cd frontend && npm run lint && npm run test
 | `access/AccessRuleServiceTest` | Rule CRUD validation, priority, target-name resolution | [x] |
 | `profile/ProfileServiceTest` | 4 profile types + token lifecycle (uses/expiry/generic) | [x] |
 | `api/portal/PortalAccountServiceTest` | Self-service MFA setup/enable/disable + password change | [x] |
-| `internal/InternalControllerTest` | `/internal/connect|disconnect|auth/verify|seed-admin` contract + filter | [x] |
+| `internal/InternalControllerTest` | `/internal/connect|disconnect|auth/verify|verify-otp|seed-*` contract + internal-token filter + bootstrap-token guard + reason normalization | [x] |
 
 ### 4.2 Frontend — 18 test files, 76 tests
 
@@ -149,6 +149,10 @@ cd frontend && npm run lint && npm run test
 - [x] MockMvc tests for `/internal/connect` + `/internal/disconnect`: unknown user,
       banned/locked user, no-rule user (empty iptables), rule user (non-empty apply/remove),
       seed-admin (create/weak/conflict) + internal-token 401 serialization.
+- [x] `/internal/auth/verify-otp` pendingId binding (deny without nonce, mfa-required nonce
+      surfaced, locked-account reason normalized to `invalid_credentials`), `SeedGuard`
+      bootstrap-token 403 on `seed-admin`/`seed-demo`, IP-failure lockout (`ip_blocked`)
+      and nonce replay rejection covered in `AuthServiceTest`.
 - [ ] `verify-user-pass.sh` / `client-connect.sh` / `client-disconnect.sh` contract tests
       (shell: feed env, assert curl payload shape + exit codes against a stubbed backend).
 

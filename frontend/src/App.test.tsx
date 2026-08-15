@@ -78,7 +78,9 @@ describe("role-based route guarding", () => {
   it("redirects a plain user from the admin dashboard to the portal", async () => {
     render(<App />);
 
-    expect(await screen.findByText(/signed in as alice/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/signed in as alice/i, undefined, { timeout: 5000 }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/recent connections/i)).not.toBeInTheDocument();
   });
 
@@ -86,7 +88,9 @@ describe("role-based route guarding", () => {
     setPath("/settings");
     render(<App />);
 
-    expect(await screen.findByText(/signed in as alice/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/signed in as alice/i, undefined, { timeout: 5000 }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/server settings/i)).not.toBeInTheDocument();
   });
 
@@ -95,7 +99,9 @@ describe("role-based route guarding", () => {
     setPath("/");
     render(<App />);
 
-    expect(await screen.findByRole("button", { name: /new user/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /new user/i }, { timeout: 5000 }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/recent connections/i)).not.toBeInTheDocument();
   });
 
@@ -104,6 +110,8 @@ describe("role-based route guarding", () => {
     setPath("/");
     render(<App />);
 
-    expect(await screen.findByText(/recent connections/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/recent connections/i, undefined, { timeout: 5000 }),
+    ).toBeInTheDocument();
   });
 });

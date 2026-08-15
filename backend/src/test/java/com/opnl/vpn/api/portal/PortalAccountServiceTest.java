@@ -13,6 +13,8 @@ import com.opnl.vpn.auth.spi.AuthProviderManager;
 import com.opnl.vpn.auth.spi.LocalAuthProvider;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.OpnlProperties;
+import com.opnl.vpn.pki.CertService;
+import com.opnl.vpn.pki.CertificateRepository;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.user.RefreshToken;
@@ -68,7 +70,9 @@ class PortalAccountServiceTest {
             new TotpService(),
             settingsService,
             authProviderManager,
-            mock(AuditLogService.class));
+            mock(AuditLogService.class),
+            mock(CertService.class),
+            mock(CertificateRepository.class));
     when(userRepository.findById("u1")).thenReturn(Optional.of(alice()));
     when(userRepository.findByUsername("alice")).thenReturn(Optional.of(alice()));
   }

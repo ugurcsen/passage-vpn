@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
   Alert,
@@ -13,21 +13,24 @@ import {
   IconButton,
   InputAdornment,
   Paper,
+  Skeleton,
   Stack,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import { api, copyToClipboard, endpoints, type MfaSetup } from "@/lib/api";
+import { api, copyToClipboard, endpoints, type CertificateInfo, type MfaSetup } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/useToast";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
-/** Self-service account page: TOTP MFA management and password change (client portal). */
+/** Self-service account page: TOTP MFA management, certificate and password change (client portal). */
 export function AccountPage() {
   const toast = useToast();
   const { user, refreshMe, logout } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // MFA setup flow: re-authenticate -> QR -> confirm code.
   const [setupOpen, setSetupOpen] = useState(false);
@@ -115,6 +118,23 @@ export function AccountPage() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Password change failed"),
   });
 
+  const certQuery = useQuery<CertificateInfo>({
+    queryKey: ["portal-cert"],
+    queryFn: () => api<CertificateInfo>(endpoints.portalCert),
+  });
+
+  const [certConfirmOpen, setCertConfirmOpen] = useState(false);
+
+  const rotateCertMutation = useMutation({
+    mutationFn: () => api<CertificateInfo>(endpoints.portalCertRotate, { method: "POST" }),
+    onSuccess: (info) => {
+      queryClient.setQueryData(["portal-cert"], info);
+      setCertConfirmOpen(false);
+      toast.success("VPN certificate revoked and reissued");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Certificate rotate failed"),
+  });
+
   const copySecret = async () => {
     if (!mfaSetup) return;
     const ok = await copyToClipboard(mfaSetup.secret);
@@ -171,6 +191,49 @@ export function AccountPage() {
             Set up MFA
           </Button>
         )}
+      </Paper>
+
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+          VPN certificate
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          The certificate authenticates your device to the VPN server. Rotating it revokes the
+          current one and issues a fresh certificate; existing connections stay until they
+          disconnect and must reconnect with the new profile.
+        </Typography>
+        {certQuery.isLoading ? (
+          <Skeleton width={260} />
+        ) : certQuery.data && certQuery.data.status !== "NONE" ? (
+          <Stack spacing={1} sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>Status:</strong> {certQuery.data.status.toLowerCase()}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Common name:</strong> {certQuery.data.commonName}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Serial:</strong> {certQuery.data.serial ?? "—"}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Expires:</strong>{" "}
+              {certQuery.data.expiresAt ? new Date(certQuery.data.expiresAt).toLocaleDateString() : "—"}
+            </Typography>
+          </Stack>
+        ) : (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            No VPN certificate has been issued for your account yet. It is created automatically
+            when you download a profile.
+          </Alert>
+        )}
+        <Button
+          variant="outlined"
+          color="error"
+          disabled={rotateCertMutation.isPending}
+          onClick={() => setCertConfirmOpen(true)}
+        >
+          {rotateCertMutation.isPending ? <CircularProgress size={18} /> : "Revoke & reissue"}
+        </Button>
       </Paper>
 
       <Paper sx={{ p: 3 }}>
@@ -329,6 +392,16 @@ export function AccountPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={certConfirmOpen}
+        title="Revoke and reissue certificate"
+        message="This revokes your current VPN certificate immediately and issues a fresh one. Existing VPN connections must reconnect with a newly downloaded profile. Continue?"
+        danger
+        confirmLabel="Revoke & reissue"
+        onCancel={() => setCertConfirmOpen(false)}
+        onConfirm={() => rotateCertMutation.mutate()}
+      />
     </Box>
   );
 }

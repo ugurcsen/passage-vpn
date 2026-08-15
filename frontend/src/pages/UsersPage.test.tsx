@@ -335,6 +335,29 @@ describe("UsersPage", () => {
     expect(within(dialog).queryByLabelText(/role/i)).not.toBeInTheDocument();
   });
 
+  it("hides user-management actions on ADMIN/RESELLER rows for resellers", async () => {
+    const reseller = { ...currentUser, id: "res1", username: "reseller", role: "RESELLER" };
+    const rows = [
+      ...users,
+      { ...users[1], id: "u3", username: "dave", role: "RESELLER", banned: false },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url.startsWith("/api/auth/me")) return Promise.resolve(json(reseller));
+        if (url.startsWith("/api/admin/groups")) return Promise.resolve(json(groups));
+        return Promise.resolve(json(rows));
+      }),
+    );
+
+    renderPage();
+    await screen.findByText("dave");
+
+    expect(screen.getByTestId("edit-ccd-bob")).toBeInTheDocument();
+    expect(screen.queryByTestId("edit-ccd-alice")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("edit-ccd-dave")).not.toBeInTheDocument();
+  });
+
   it("deletes a single user with cleanup options", async () => {
     const user = userEvent.setup();
     renderPage();

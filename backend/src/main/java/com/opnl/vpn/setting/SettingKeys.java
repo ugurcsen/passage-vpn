@@ -88,4 +88,11 @@ public final class SettingKeys {
 
   /** Timeout in seconds for the post-auth hook script (default 10). */
   public static final String POST_AUTH_TIMEOUT_SECONDS = "post_auth_timeout_seconds";
+
+  /**
+   * Profile types that may be downloaded from the client portal, e.g. {@code ["USER_LOCKED",
+   * "SERVER_LOCKED"]}. When unset, the portal serves only the password-bound certificate types
+   * (USER_LOCKED, SERVER_LOCKED); AUTO_LOGIN and GENERIC must be explicitly enabled by an admin.
+   */
+  public static final String PORTAL_PROFILE_TYPES = "portal_profile_types";
 }

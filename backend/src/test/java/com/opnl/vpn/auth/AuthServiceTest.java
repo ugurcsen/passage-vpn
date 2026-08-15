@@ -14,6 +14,7 @@ import com.opnl.vpn.auth.spi.AuthProviderManager;
 import com.opnl.vpn.auth.spi.LocalAuthProvider;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.OpnlProperties;
+import com.opnl.vpn.security.IpFailureTracker;
 import com.opnl.vpn.security.JwtService;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
@@ -42,6 +43,7 @@ class AuthServiceTest {
   private JwtService jwtService;
   private BCryptPasswordEncoder encoder;
   private PostAuthHookService postAuthHookService;
+  private IpFailureTracker ipFailureTracker;
 
   @BeforeEach
   void setUp() {
@@ -66,6 +68,7 @@ class AuthServiceTest {
         new AuthProviderManager(
             properties, List.of(new LocalAuthProvider(userRepository, encoder)));
     postAuthHookService = mock(PostAuthHookService.class);
+    ipFailureTracker = mock(IpFailureTracker.class);
     service =
         new AuthService(
             userRepository,
@@ -76,7 +79,8 @@ class AuthServiceTest {
             settingsService,
             properties,
             mock(AuditLogService.class),
-            postAuthHookService);
+            postAuthHookService,
+            ipFailureTracker);
   }
 
   private User user(String username, boolean mfaEnabled, String mfaSecret) {
@@ -384,14 +388,12 @@ class AuthServiceTest {
   }
 
   @Test
-  void vpnVerifyOtpDeniedWhenMfaRequiredButNotEnrolled() {
+  void vpnVerifyOtpRejectsMissingPending() {
     when(userRepository.findByUsername("alice"))
-        .thenReturn(Optional.of(user("alice", false, null)));
-    when(settingsService.effectiveForUser(anyString()))
-        .thenReturn(Map.of(SettingKeys.REQUIRE_MFA, true));
-    var result = service.verifyVpnOtp("alice", "123456", "1.2.3.4");
+        .thenReturn(Optional.of(user("alice", true, "JBSWY3DPEHPK3PXP")));
+    var result = service.verifyVpnOtp("alice", "123456", "1.2.3.4", "no-such-pending");
     assertThat(result.allowed()).isFalse();
-    assertThat(result.reason()).isEqualTo("invalid_code");
+    assertThat(result.reason()).isEqualTo("missing_pending");
   }
 
   @Test
@@ -436,15 +438,20 @@ class AuthServiceTest {
     String secret = new TotpService().generateSecret();
     when(userRepository.findByUsername("alice"))
         .thenReturn(Optional.of(user("alice", true, secret)));
-    var result = service.verifyVpnOtp("alice", totpCode(secret), "1.2.3.4");
+    var phaseOne = service.verifyVpnLogin("alice", "supersecret1", null, "1.2.3.4");
+    assertThat(phaseOne.reason()).isEqualTo("mfa_required");
+    assertThat(phaseOne.pendingId()).isNotBlank();
+    var result = service.verifyVpnOtp("alice", totpCode(secret), "1.2.3.4", phaseOne.pendingId());
     assertThat(result.allowed()).isTrue();
   }
 
   @Test
   void vpnVerifyOtpRejectsInvalidCodeAndRecordsFailure() {
+    String secret = new TotpService().generateSecret();
     when(userRepository.findByUsername("alice"))
-        .thenReturn(Optional.of(user("alice", true, "JBSWY3DPEHPK3PXP")));
-    var result = service.verifyVpnOtp("alice", "000000", "1.2.3.4");
+        .thenReturn(Optional.of(user("alice", true, secret)));
+    var phaseOne = service.verifyVpnLogin("alice", "supersecret1", null, "1.2.3.4");
+    var result = service.verifyVpnOtp("alice", "000000", "1.2.3.4", phaseOne.pendingId());
     assertThat(result.allowed()).isFalse();
     assertThat(result.reason()).isEqualTo("invalid_code");
     verify(userRepository).save(any());
@@ -453,19 +460,22 @@ class AuthServiceTest {
   @Test
   void vpnVerifyOtpRejectsUnknownUser() {
     when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
-    var result = service.verifyVpnOtp("ghost", "123456", "1.2.3.4");
+    var result = service.verifyVpnOtp("ghost", "123456", "1.2.3.4", "abc");
     assertThat(result.allowed()).isFalse();
     assertThat(result.reason()).isEqualTo("invalid_credentials");
   }
 
   @Test
-  void vpnVerifyOtpRejectsWhenMfaNotRequired() {
+  void vpnVerifyOtpRejectsReusedPending() {
+    String secret = new TotpService().generateSecret();
     when(userRepository.findByUsername("alice"))
-        .thenReturn(Optional.of(user("alice", false, null)));
-    when(settingsService.effectiveForUser(anyString())).thenReturn(Map.of());
-    var result = service.verifyVpnOtp("alice", "123456", "1.2.3.4");
-    assertThat(result.allowed()).isFalse();
-    assertThat(result.reason()).isEqualTo("mfa_not_required");
+        .thenReturn(Optional.of(user("alice", true, secret)));
+    var phaseOne = service.verifyVpnLogin("alice", "supersecret1", null, "1.2.3.4");
+    var first = service.verifyVpnOtp("alice", totpCode(secret), "1.2.3.4", phaseOne.pendingId());
+    assertThat(first.allowed()).isTrue();
+    var replay = service.verifyVpnOtp("alice", totpCode(secret), "1.2.3.4", phaseOne.pendingId());
+    assertThat(replay.allowed()).isFalse();
+    assertThat(replay.reason()).isEqualTo("missing_pending");
   }
 
   @Test
@@ -473,7 +483,7 @@ class AuthServiceTest {
     User locked = user("carol", true, "JBSWY3DPEHPK3PXP");
     locked.setLockedUntil(Instant.now().plusSeconds(300));
     when(userRepository.findByUsername("carol")).thenReturn(Optional.of(locked));
-    var result = service.verifyVpnOtp("carol", "123456", "1.2.3.4");
+    var result = service.verifyVpnOtp("carol", "123456", "1.2.3.4", "abc");
     assertThat(result.allowed()).isFalse();
     assertThat(result.reason()).isEqualTo("account_locked");
   }
@@ -501,9 +511,29 @@ class AuthServiceTest {
     String secret = new TotpService().generateSecret();
     when(userRepository.findByUsername("alice"))
         .thenReturn(Optional.of(user("alice", true, secret)));
-    var result = service.verifyVpnOtp("alice", totpCode(secret), "1.2.3.4");
+    var phaseOne = service.verifyVpnLogin("alice", "supersecret1", null, "1.2.3.4");
+    var result = service.verifyVpnOtp("alice", totpCode(secret), "1.2.3.4", phaseOne.pendingId());
     assertThat(result.allowed()).isTrue();
     verify(postAuthHookService).run("alice", "1.2.3.4");
+  }
+
+  @Test
+  void vpnVerifyLoginDeniedWhenIpBlocked() {
+    when(ipFailureTracker.isBlocked("9.9.9.9")).thenReturn(true);
+    var result = service.verifyVpnLogin("alice", "supersecret1", null, "9.9.9.9");
+    assertThat(result.allowed()).isFalse();
+    assertThat(result.reason()).isEqualTo("ip_blocked");
+    verify(userRepository, never()).findByUsername(anyString());
+  }
+
+  @Test
+  void vpnVerifyResetsIpFailuresOnSuccess() {
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", false, null)));
+    when(settingsService.effectiveForUser(anyString())).thenReturn(Map.of());
+    var result = service.verifyVpnLogin("alice", "supersecret1", null, "1.2.3.4");
+    assertThat(result.allowed()).isTrue();
+    verify(ipFailureTracker).reset("1.2.3.4");
   }
 
   private String totpCode(String secret) {

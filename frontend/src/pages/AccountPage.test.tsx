@@ -35,6 +35,14 @@ const mfaSetup = {
   qrDataUrl: "data:image/png;base64,QUJD",
 };
 
+const certInfo = {
+  status: "VALID",
+  commonName: "alice",
+  serial: "AB12",
+  issuedAt: "2026-01-01T00:00:00Z",
+  expiresAt: "2035-01-01T00:00:00Z",
+};
+
 function json(body: unknown) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -81,6 +89,8 @@ describe("AccountPage", () => {
           return Promise.resolve(json(me()));
         }
         if (url.includes("/account/password")) return Promise.resolve(new Response(null, { status: 200 }));
+        if (url === "/api/portal/cert") return Promise.resolve(json(certInfo));
+        if (url === "/api/portal/cert/rotate") return Promise.resolve(json(certInfo));
         return Promise.resolve(json({}));
       }),
     );
@@ -213,5 +223,29 @@ describe("AccountPage", () => {
       await screen.findByText(/required by your organization policy/i),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /disable mfa/i })).toBeDisabled();
+  });
+
+  it("shows the VPN certificate and rotates it after confirmation", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText(/vpn certificate/i)).toBeInTheDocument();
+    expect(screen.getByText(/serial:/i)).toBeInTheDocument();
+    expect(screen.getByText("AB12")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /revoke & reissue/i }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /revoke & reissue/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const rotate = fetchMock.mock.calls.find(
+        ([url, opts]) => url === "/api/portal/cert/rotate" && opts?.method === "POST",
+      );
+      expect(rotate).toBeDefined();
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
   });
 });

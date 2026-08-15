@@ -83,12 +83,15 @@ migrate: ## Apply DB migrations (via backend Flyway on boot; manual run for loca
 seed-admin: ## Create initial admin user (non-wizard path)
 	curl -sS -X POST http://localhost:8080/internal/seed-admin \
 		-H 'Content-Type: application/json' \
+		-H "X-Internal-Token: $${OPNL_INTERNAL_TOKEN:-change-me-internal-token}" \
+		-H "X-Bootstrap-Token: $${OPNL_BOOTSTRAP_TOKEN:-}" \
 		-d "{\"username\":\"admin\",\"password\":\"$${OPNL_ADMIN_PASSWORD:-change-me}\"}"
 
 seed-demo: ## Load demo data (sample users/groups/rules); needs setup complete
 	@code=$$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/internal/seed-demo \
 		-H 'Content-Type: application/json' \
 		-H "X-Internal-Token: $${OPNL_INTERNAL_TOKEN:-change-me-internal-token}" \
+		-H "X-Bootstrap-Token: $${OPNL_BOOTSTRAP_TOKEN:-}" \
 		-d '{"force":false}'); \
 	[ "$$code" = "200" ] && echo "Demo data loaded" || { echo "seed-demo failed (HTTP $$code)"; exit 1; }
 
@@ -96,9 +99,9 @@ backup: ## Produce backup archive (config + PKI + DB dump)
 	@test -d data || { echo "No data dir"; exit 1; }
 	@ts=$$(date +%Y%m%d-%H%M%S); tar -czf backup-opnl-$$ts.tar.gz -C data . && echo "Wrote backup-opnl-$$ts.tar.gz"
 
-api-docs: ## Regenerate docs/api.md from a running backend (needs up) + show swagger URL
+api-docs: ## Regenerate docs/api.md from a running backend + show swagger URL
 	@code=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/v3/api-docs); \
-	[ "$$code" = "200" ] || { echo "Backend not reachable on :8080 (got $$code) — run 'make up' first."; exit 1; }
+	[ "$$code" = "200" ] || { echo "Backend not reachable on :8080 (got $$code) — start it with 'make backend-dev' (docker-compose no longer publishes 8080)."; exit 1; }
 	python3 scripts/gen_api_docs.py "http://localhost:8080/v3/api-docs" > docs/api.md
 	@echo "Wrote docs/api.md"
 	@echo "Swagger UI: http://localhost:8080/swagger-ui.html"

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Box, Grid2, Typography } from "@mui/material";
+import { Alert, Box, Grid2, Typography } from "@mui/material";
 import { api, endpoints, type ProfileType } from "@/lib/api";
 import { ProfileCard } from "@/components/ProfileCard";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,6 +8,10 @@ interface ProfileTypeDto {
   type: ProfileType;
   label: string;
   locked: boolean;
+  /** True when the admin allows this type for self-service downloads. */
+  allowed: boolean;
+  /** True when an enabled daemon serves this profile type. */
+  available: boolean;
 }
 
 const TYPE_HINTS: Record<ProfileType, string> = {
@@ -31,6 +35,9 @@ export function PortalPage() {
     queryFn: () => api<ProfileTypeDto[]>(endpoints.portalProfiles),
   });
 
+  const visible = (types ?? []).filter((t) => t.allowed && t.available);
+  const hidden = (types ?? []).length - visible.length > 0;
+
   return (
     <Box>
       <Typography variant="h5" fontWeight={700}>
@@ -40,8 +47,14 @@ export function PortalPage() {
         Signed in as {user?.username}. Download a profile and import it into OpenVPN Connect or the
         OpenVPN client of your choice.
       </Typography>
+      {hidden && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Some profile types are hidden because they are disabled by the administrator or no enabled
+          server is available to serve them.
+        </Alert>
+      )}
       <Grid2 container spacing={2}>
-        {(types ?? []).map((t) => (
+        {visible.map((t) => (
           <Grid2 size={{ xs: 12, sm: 6, md: 4 }} key={t.type}>
             <ProfileCard
               title={t.type.replaceAll("_", " ")}

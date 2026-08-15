@@ -51,6 +51,7 @@ through `${VAR:-default}` substitutions for the rest.
 | `OPNL_JWT_SECRET` | *(required)* | JWT signing secret, **minimum 32 bytes (256 bits)**. The backend refuses to start with a shorter value (`security/JwtService`). Generate with `openssl rand -base64 48`. |
 | `OPNL_ADMIN_PASSWORD` | `change-me` | Bootstrap admin password used by the setup wizard and `make seed-admin`. |
 | `OPNL_INTERNAL_TOKEN` | *(required)* | Shared secret guarding the `/internal/**` script-facing endpoints (openvpn scripts, seed endpoints). The backend **refuses to start** when unset or still equal to the placeholder `change-me-internal-token` (`security/SecurityBootstrapCheck`). Generate with `openssl rand -hex 32`; the openvpn container must use the same value. |
+| `OPNL_BOOTSTRAP_TOKEN` | *(optional)* | Extra secret guarding the bootstrap-only seed endpoints (`/internal/seed-admin`, `/internal/seed-demo`). When set, requests must present `X-Bootstrap-Token`. Unlike `OPNL_INTERNAL_TOKEN` this value is never exposed to the OpenVPN container, so a compromised gateway cannot re-create an admin account. Generate with `openssl rand -hex 32`. |
 | `OPNL_AUTH_PROVIDER` | `local` | Authentication provider. |
 | `OPNL_AUTH_RATE_LIMIT_MAX` | `20` | Login attempts allowed per rate-limit window. |
 | `OPNL_AUTH_RATE_LIMIT_WINDOW` | `60` | Rate-limit window in seconds. |
@@ -71,7 +72,7 @@ through `${VAR:-default}` substitutions for the rest.
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPNL_SERVER_PORT` | `8080` | Backend HTTP port (also the host port mapping in `docker-compose.yml`). |
+| `OPNL_SERVER_PORT` | `8080` | Backend HTTP port. In docker-compose the listener is **not published to the host** (all traffic enters via the frontend nginx on port 80); it is only used for local development (`make backend-dev`). |
 | `OPNL_LOG_LEVEL` | `INFO` | Root log level. |
 | `OPNL_TOMCAT_THREADS` | `50` | Max Tomcat request threads (bounded: the panel is a fleet admin tool, not a public API). |
 | `OPNL_TRUSTED_PROXIES` | `172.16.0.0/12` | CIDR ranges allowed to set `X-Forwarded-For` (reverse-proxy IPs). Default covers Docker's default bridge subnets. |

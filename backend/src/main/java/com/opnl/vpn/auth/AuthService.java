@@ -6,6 +6,7 @@ import com.opnl.vpn.auth.spi.AuthProvider;
 import com.opnl.vpn.auth.spi.AuthProviderManager;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.OpnlProperties;
+import com.opnl.vpn.security.IpFailureTracker;
 import com.opnl.vpn.security.JwtService;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
@@ -27,6 +28,9 @@ public class AuthService {
   /** Challenge tokens are valid for 300s (see {@link JwtService#issueMfaChallenge}). */
   private static final long MFA_CHALLENGE_TTL_SECONDS = 300;
 
+  /** Pending OpenVPN auth-pending nonces are valid for 120s (matches the script's timeout). */
+  private static final long PENDING_VPN_AUTH_TTL_SECONDS = 120;
+
   private final UserRepository userRepository;
   private final RefreshTokenRepository refreshTokenRepository;
   private final AuthProvider authProvider;
@@ -36,9 +40,15 @@ public class AuthService {
   private final OpnlProperties properties;
   private final AuditLogService auditLogService;
   private final PostAuthHookService postAuthHookService;
+  private final IpFailureTracker ipFailureTracker;
 
   /** Redeemed MFA challenge ids (jti) → redemption epoch-second, for single-use enforcement. */
   private final Map<String, Long> redeemedChallenges = new ConcurrentHashMap<>();
+
+  /** Binds an OpenVPN auth-pending phase 1 to its phase 2; single-use and short-lived. */
+  private record PendingVpnAuth(String username, String remoteIp, Instant expiresAt) {}
+
+  private final Map<String, PendingVpnAuth> pendingVpnAuths = new ConcurrentHashMap<>();
 
   public AuthService(
       UserRepository userRepository,
@@ -49,7 +59,8 @@ public class AuthService {
       SettingsService settingsService,
       OpnlProperties properties,
       AuditLogService auditLogService,
-      PostAuthHookService postAuthHookService) {
+      PostAuthHookService postAuthHookService,
+      IpFailureTracker ipFailureTracker) {
     this.userRepository = userRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.authProvider = authProviderManager.active();
@@ -59,6 +70,7 @@ public class AuthService {
     this.properties = properties;
     this.auditLogService = auditLogService;
     this.postAuthHookService = postAuthHookService;
+    this.ipFailureTracker = ipFailureTracker;
   }
 
   public record TokenResponse(String accessToken, String refreshToken) {}
@@ -238,15 +250,23 @@ public class AuthService {
 
   // ---- VPN auth-user-pass-verify ------------------------------------------
 
-  public record VpnVerification(boolean allowed, String reason) {}
+  public record VpnVerification(boolean allowed, String reason, String pendingId) {
+    public VpnVerification(boolean allowed, String reason) {
+      this(allowed, reason, null);
+    }
+  }
 
   /**
    * Verifies a VPN connect attempt (username/password + optional TOTP). Never reveals whether the
-   * account exists.
+   * account exists. When the account requires MFA and no code was supplied, a single-use {@code
+   * pendingId} is issued so phase 2 ({@link #verifyVpnOtp}) can be bound to this attempt.
    */
   @Transactional
   public VpnVerification verifyVpnLogin(
       String username, String password, String otp, String remoteIp) {
+    if (ipFailureTracker.isBlocked(remoteIp)) {
+      return new VpnVerification(false, "ip_blocked");
+    }
     User user = userRepository.findByUsername(username == null ? "" : username.trim()).orElse(null);
     if (user == null || user.getPasswordHash() == null) {
       return new VpnVerification(false, "invalid_credentials");
@@ -260,6 +280,7 @@ public class AuthService {
     }
     if (!authProvider.verifyCredentials(username, password)) {
       recordFailure(user);
+      ipFailureTracker.recordFailure(remoteIp);
       return new VpnVerification(false, "invalid_credentials");
     }
     boolean mfaRequired =
@@ -269,15 +290,20 @@ public class AuthService {
       if (user.getMfaSecret() == null) {
         return new VpnVerification(false, "mfa_required");
       }
+      if (otp == null || otp.isBlank()) {
+        String pendingId = createPendingVpnAuth(user.getUsername(), remoteIp);
+        return new VpnVerification(false, "mfa_required", pendingId);
+      }
       if (!totpService.verify(user.getMfaSecret(), otp)) {
         recordFailure(user);
-        return new VpnVerification(
-            false, otp == null || otp.isBlank() ? "mfa_required" : "invalid_code");
+        ipFailureTracker.recordFailure(remoteIp);
+        return new VpnVerification(false, "invalid_code");
       }
     }
     user.setFailedAttempts(0);
     user.setLockedUntil(null);
     userRepository.save(user);
+    ipFailureTracker.reset(remoteIp);
     postAuthHookService.run(username, remoteIp);
     return new VpnVerification(true, null);
   }
@@ -285,9 +311,14 @@ public class AuthService {
   /**
    * Verifies the second factor (TOTP) of an OpenVPN auth-pending session (client-crresponse). The
    * password has already been accepted by {@link #verifyVpnLogin}; only the code is checked here.
+   * The {@code pendingId} issued in phase 1 must be presented and is consumed (fail-closed).
    */
   @Transactional
-  public VpnVerification verifyVpnOtp(String username, String otp, String remoteIp) {
+  public VpnVerification verifyVpnOtp(
+      String username, String otp, String remoteIp, String pendingId) {
+    if (ipFailureTracker.isBlocked(remoteIp)) {
+      return new VpnVerification(false, "ip_blocked");
+    }
     User user = userRepository.findByUsername(username == null ? "" : username.trim()).orElse(null);
     if (user == null || user.getPasswordHash() == null) {
       return new VpnVerification(false, "invalid_credentials");
@@ -298,6 +329,11 @@ public class AuthService {
     Instant now = Instant.now();
     if (user.isLocked(now)) {
       return new VpnVerification(false, "account_locked");
+    }
+    if (!consumePendingVpnAuth(pendingId, user.getUsername())) {
+      recordFailure(user);
+      ipFailureTracker.recordFailure(remoteIp);
+      return new VpnVerification(false, "missing_pending");
     }
     boolean mfaRequired =
         requiresMfa(user)
@@ -310,11 +346,13 @@ public class AuthService {
         || otp.isBlank()
         || !totpService.verify(user.getMfaSecret(), otp)) {
       recordFailure(user);
+      ipFailureTracker.recordFailure(remoteIp);
       return new VpnVerification(false, "invalid_code");
     }
     user.setFailedAttempts(0);
     user.setLockedUntil(null);
     userRepository.save(user);
+    ipFailureTracker.reset(remoteIp);
     postAuthHookService.run(username, remoteIp);
     return new VpnVerification(true, null);
   }
@@ -323,6 +361,37 @@ public class AuthService {
 
   private void pruneExpiredChallenges(long now) {
     redeemedChallenges.entrySet().removeIf(e -> now - e.getValue() > MFA_CHALLENGE_TTL_SECONDS);
+  }
+
+  /** Creates a single-use nonce binding a phase-1 VPN auth to its TOTP phase 2. */
+  private String createPendingVpnAuth(String username, String remoteIp) {
+    prunePendingVpnAuths();
+    String pendingId = UUID.randomUUID().toString().replace("-", "");
+    pendingVpnAuths.put(
+        pendingId,
+        new PendingVpnAuth(
+            username, remoteIp, Instant.now().plusSeconds(PENDING_VPN_AUTH_TTL_SECONDS)));
+    return pendingId;
+  }
+
+  /** Consumes the nonce when it matches the username and is still valid; fail-closed otherwise. */
+  private boolean consumePendingVpnAuth(String pendingId, String username) {
+    prunePendingVpnAuths();
+    if (pendingId == null || pendingId.isBlank()) {
+      return false;
+    }
+    PendingVpnAuth pending = pendingVpnAuths.remove(pendingId);
+    if (pending == null
+        || !pending.username().equals(username)
+        || pending.expiresAt().isBefore(Instant.now())) {
+      return false;
+    }
+    return true;
+  }
+
+  private void prunePendingVpnAuths() {
+    Instant cutoff = Instant.now().minusSeconds(PENDING_VPN_AUTH_TTL_SECONDS);
+    pendingVpnAuths.entrySet().removeIf(e -> e.getValue().expiresAt().isBefore(cutoff));
   }
 
   /** Marks a pre-auth challenge single-use; concurrent/replayed use is rejected. */

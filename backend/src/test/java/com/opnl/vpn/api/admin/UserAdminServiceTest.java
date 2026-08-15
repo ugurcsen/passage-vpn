@@ -201,7 +201,7 @@ class UserAdminServiceTest {
             .createdAt(Instant.now())
             .build();
     when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
-    service.setBanned("u2", true);
+    service.setBanned(admin(), "u2", true);
     assertThat(bob.isBanned()).isTrue();
     verify(userRepository).save(bob);
   }
@@ -216,7 +216,7 @@ class UserAdminServiceTest {
             .createdAt(Instant.now())
             .build();
     when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
-    service.resetPassword("u2", "brandnewpass1");
+    service.resetPassword(admin(), "u2", "brandnewpass1");
     assertThat(bob.getPasswordHash()).isNotBlank();
     verify(userRepository).save(bob);
   }
@@ -344,9 +344,47 @@ class UserAdminServiceTest {
   void lastAdminCannotBeBanned() {
     when(userRepository.findById("admin1")).thenReturn(Optional.of(admin()));
     when(userRepository.countByRole(User.Role.ADMIN)).thenReturn(1L);
-    assertThatThrownBy(() -> service.setBanned("admin1", true))
+    assertThatThrownBy(() -> service.setBanned(admin(), "admin1", true))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("last_admin"));
+  }
+
+  @Test
+  void resellerCannotManageAdminOrResellerAccounts() {
+    when(userRepository.findById("admin1")).thenReturn(Optional.of(admin()));
+    when(userRepository.findById("res1")).thenReturn(Optional.of(reseller()));
+
+    assertThatThrownBy(() -> service.resetPassword(reseller(), "admin1", "pwned123!"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
+    assertThatThrownBy(() -> service.setBanned(reseller(), "admin1", true))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
+    assertThatThrownBy(() -> service.deleteUser(reseller(), "admin1"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
+    assertThatThrownBy(() -> service.resetPassword(reseller(), "res1", "pwned123!"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
+    assertThatThrownBy(() -> service.setStaticIp(reseller(), "res1", "10.8.0.200"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
+  }
+
+  @Test
+  void resellerCanManageUserAccounts() {
+    User bob =
+        User.builder()
+            .id("u2")
+            .username("bob")
+            .role(User.Role.USER)
+            .createdAt(Instant.now())
+            .build();
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
+
+    service.resetPassword(reseller(), "u2", "brandnewpass1");
+    service.setBanned(reseller(), "u2", true);
+    verify(userRepository, org.mockito.Mockito.times(2)).save(bob);
   }
 
   @Test

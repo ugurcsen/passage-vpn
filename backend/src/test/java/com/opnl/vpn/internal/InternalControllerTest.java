@@ -21,6 +21,7 @@ import com.opnl.vpn.common.GlobalExceptionHandler;
 import com.opnl.vpn.monitor.ConnectionLogService;
 import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.network.DaemonService;
+import com.opnl.vpn.security.SeedGuard;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.setup.SetupService;
 import com.opnl.vpn.system.DemoSeedService;
@@ -50,6 +51,7 @@ class InternalControllerTest {
   private ConnectionLogService connectionLogService;
   private DaemonService daemonService;
   private DemoSeedService demoSeedService;
+  private SeedGuard seedGuard;
   private MockMvc mvc;
 
   private User user(boolean banned, boolean locked) {
@@ -75,6 +77,7 @@ class InternalControllerTest {
     connectionLogService = mock(ConnectionLogService.class);
     daemonService = mock(DaemonService.class);
     demoSeedService = mock(DemoSeedService.class);
+    seedGuard = mock(SeedGuard.class);
     when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user(false, false)));
     when(settingsService.effectiveForUser("u1")).thenReturn(Map.of());
     when(daemonService.ipv6Enabled(anyInt())).thenReturn(false);
@@ -98,7 +101,8 @@ class InternalControllerTest {
                     settingsService,
                     connectionLogService,
                     daemonService,
-                    demoSeedService))
+                    demoSeedService,
+                    seedGuard))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -213,14 +217,90 @@ class InternalControllerTest {
   @Test
   void authVerifyOtpDelegatesToAuthService() throws Exception {
     when(setupService.complete()).thenReturn(true);
-    when(authService.verifyVpnOtp("alice", "123456", "1.2.3.4"))
+    when(authService.verifyVpnOtp("alice", "123456", "1.2.3.4", "pending-1"))
         .thenReturn(new VpnVerification(true, null));
+    mvc.perform(
+            post("/internal/auth/verify-otp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"username\":\"alice\",\"otp\":\"123456\",\"remoteIp\":\"1.2.3.4\",\"pendingId\":\"pending-1\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.allowed").value(true));
+  }
+
+  @Test
+  void authVerifyOtpDeniedWithoutPendingId() throws Exception {
+    when(setupService.complete()).thenReturn(true);
+    when(authService.verifyVpnOtp("alice", "123456", "1.2.3.4", null))
+        .thenReturn(new VpnVerification(false, "missing_pending"));
     mvc.perform(
             post("/internal/auth/verify-otp")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"alice\",\"otp\":\"123456\",\"remoteIp\":\"1.2.3.4\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.allowed").value(true));
+        .andExpect(jsonPath("$.allowed").value(false))
+        .andExpect(jsonPath("$.reason").value("missing_pending"))
+        .andExpect(jsonPath("$.pendingId").doesNotExist());
+  }
+
+  @Test
+  void authVerifyNormalizesLockedAccountReason() throws Exception {
+    when(setupService.complete()).thenReturn(true);
+    when(authService.verifyVpnLogin("alice", "pass", null, "1.2.3.4"))
+        .thenReturn(new VpnVerification(false, "account_locked"));
+    mvc.perform(
+            post("/internal/auth/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"alice\",\"password\":\"pass\",\"remoteIp\":\"1.2.3.4\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.allowed").value(false))
+        .andExpect(jsonPath("$.reason").value("invalid_credentials"));
+  }
+
+  @Test
+  void authVerifyExposesPendingIdForMfaPendingFlow() throws Exception {
+    when(setupService.complete()).thenReturn(true);
+    when(authService.verifyVpnLogin("alice", "pass", null, "1.2.3.4"))
+        .thenReturn(new VpnVerification(false, "mfa_required", "pending-1"));
+    mvc.perform(
+            post("/internal/auth/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"alice\",\"password\":\"pass\",\"remoteIp\":\"1.2.3.4\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.allowed").value(false))
+        .andExpect(jsonPath("$.reason").value("mfa_required"))
+        .andExpect(jsonPath("$.pendingId").value("pending-1"));
+  }
+
+  @Test
+  void seedEndpointsRequireBootstrapTokenWhenConfigured() throws Exception {
+    var guarded =
+        MockMvcBuilders.standaloneSetup(
+                new InternalController(
+                    userRepository,
+                    passwordEncoder,
+                    setupService,
+                    authService,
+                    ruleService,
+                    connectionRegistry,
+                    settingsService,
+                    connectionLogService,
+                    daemonService,
+                    demoSeedService,
+                    new SeedGuard("bootstrap-secret")))
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
+    guarded
+        .perform(post("/internal/seed-admin").contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("bootstrap_token_required"));
+    guarded
+        .perform(
+            post("/internal/seed-demo")
+                .header("X-Bootstrap-Token", "bootstrap-secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isOk());
   }
 
   @Test
@@ -297,7 +377,8 @@ class InternalControllerTest {
                     settingsService,
                     connectionLogService,
                     daemonService,
-                    demoSeedService))
+                    demoSeedService,
+                    seedGuard))
             .setControllerAdvice(new GlobalExceptionHandler())
             .addFilters(filter)
             .build();
@@ -325,7 +406,8 @@ class InternalControllerTest {
                     settingsService,
                     connectionLogService,
                     daemonService,
-                    demoSeedService))
+                    demoSeedService,
+                    seedGuard))
             .setControllerAdvice(new GlobalExceptionHandler())
             .addFilters(filter)
             .build();
@@ -357,7 +439,8 @@ class InternalControllerTest {
                     settingsService,
                     connectionLogService,
                     daemonService,
-                    demoSeedService))
+                    demoSeedService,
+                    seedGuard))
             .setControllerAdvice(new GlobalExceptionHandler())
             .addFilters(filter)
             .build();

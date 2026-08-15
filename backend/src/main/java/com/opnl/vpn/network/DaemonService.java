@@ -13,6 +13,7 @@ import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -232,8 +233,16 @@ public class DaemonService {
   /** Returns the daemon entity serving the given profile type, falling back to the primary. */
   @Transactional
   public Daemon entityForProfile(ProfileType type) {
-    List<Daemon> daemons = list();
-    Daemon match =
+    return findMatchingForProfile(type).orElseGet(() -> primary(list()));
+  }
+
+  /**
+   * The first enabled daemon whose flags match the given profile type, without the primary
+   * fallback. Used by the portal to hide profile types that no daemon can actually serve.
+   */
+  @Transactional(readOnly = true)
+  public Optional<Daemon> findMatchingForProfile(ProfileType type) {
+    return Optional.ofNullable(
         switch (type) {
           case GENERIC -> firstMatching(d -> d.isEnabled() && d.isClientCertNotRequired());
           case AUTO_LOGIN ->
@@ -242,11 +251,7 @@ public class DaemonService {
           case USER_LOCKED, SERVER_LOCKED ->
               firstMatching(
                   d -> d.isEnabled() && !d.isClientCertNotRequired() && d.isAuthUserPass());
-        };
-    if (match == null) {
-      match = primary(daemons);
-    }
-    return match;
+        });
   }
 
   /** Maps an entity to the shared config shape used by generators and writers. */

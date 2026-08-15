@@ -228,11 +228,21 @@ authorization via `@PreAuthorize("hasRole('ADMIN')")` etc. and the Swagger
 
 - `install.sh` (single-command) → `docker compose up -d`. `make` targets cover
   build/test/backup/api-docs/migrate/seed.
-- Default exposed ports: frontend `80`, backend `8080`, OpenVPN `1194/udp` +
-  `1195/tcp`, management `7505-7510` (network-internal), Swagger at
-  `/swagger-ui.html`.
+- Default exposed ports: frontend `80`, OpenVPN `1194/udp` + `1195/tcp`,
+  management `7505-7510` (network-internal), Swagger at `/swagger-ui.html`.
+  The backend's HTTP listener is **not published to the host**: all user/API
+  traffic enters through the frontend nginx container (which proxies `/api`,
+  `/share` and `/ws` but deliberately not `/internal/**`), and the OpenVPN
+  container reaches the backend only over the internal docker network at
+  `http://backend:8080`. Local development still runs the backend directly on
+  host `8080` (`make backend-dev`).
 - Secrets come from `.env` (see `.env.example`): JWT secret, internal token,
-  admin password, DB URL. Never commit real secrets.
+  optional bootstrap token, admin password, DB URL. Never commit real secrets.
+- The bootstrap-only seed endpoints (`/internal/seed-admin`,
+  `/internal/seed-demo`) additionally require the `X-Bootstrap-Token` header
+  when `OPNL_BOOTSTRAP_TOKEN` is configured. Unlike `OPNL_INTERNAL_TOKEN` this
+  secret is never exposed to the OpenVPN container, so a compromised gateway
+  cannot re-create an admin account.
 - Backups: `make backup` produces an archive via `BackupService`.
 - **Never run a full-tunnel VPN client on the VPN server host itself.** A
   full-tunnel profile installs default routes via the tunnel; on the server

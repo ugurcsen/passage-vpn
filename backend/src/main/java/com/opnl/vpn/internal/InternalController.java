@@ -8,6 +8,7 @@ import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.monitor.ConnectionLogService;
 import com.opnl.vpn.network.ConnectionRegistry;
 import com.opnl.vpn.network.DaemonService;
+import com.opnl.vpn.security.SeedGuard;
 import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.setup.SetupService;
@@ -23,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -48,6 +50,7 @@ public class InternalController {
   private final ConnectionLogService connectionLogService;
   private final DaemonService daemonService;
   private final DemoSeedService demoSeedService;
+  private final SeedGuard seedGuard;
 
   public InternalController(
       UserRepository userRepository,
@@ -59,7 +62,8 @@ public class InternalController {
       SettingsService settingsService,
       ConnectionLogService connectionLogService,
       DaemonService daemonService,
-      DemoSeedService demoSeedService) {
+      DemoSeedService demoSeedService,
+      SeedGuard seedGuard) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.setupService = setupService;
@@ -70,6 +74,7 @@ public class InternalController {
     this.connectionLogService = connectionLogService;
     this.daemonService = daemonService;
     this.demoSeedService = demoSeedService;
+    this.seedGuard = seedGuard;
   }
 
   /**
@@ -77,7 +82,10 @@ public class InternalController {
    * an admin already exists.
    */
   @PostMapping("/seed-admin")
-  public SeedResult seedAdmin(@RequestBody SeedRequest request) {
+  public SeedResult seedAdmin(
+      @RequestHeader(value = "X-Bootstrap-Token", required = false) String bootstrapToken,
+      @RequestBody SeedRequest request) {
+    seedGuard.assertSeedAllowed(bootstrapToken);
     if (userRepository.countByRole(User.Role.ADMIN) > 0) {
       throw ApiException.conflict("admin_exists", "An admin account already exists");
     }
@@ -104,7 +112,10 @@ public class InternalController {
    * already loaded unless {@code force} is set, which wipes and re-seeds.
    */
   @PostMapping("/seed-demo")
-  public DemoSeedResult seedDemo(@RequestBody(required = false) SeedDemoRequest request) {
+  public DemoSeedResult seedDemo(
+      @RequestHeader(value = "X-Bootstrap-Token", required = false) String bootstrapToken,
+      @RequestBody(required = false) SeedDemoRequest request) {
+    seedGuard.assertSeedAllowed(bootstrapToken);
     int users = demoSeedService.seed(request != null && request.force());
     return new DemoSeedResult(users);
   }
@@ -123,12 +134,13 @@ public class InternalController {
     AuthService.VpnVerification result =
         authService.verifyVpnLogin(
             request.username(), request.password(), request.otp(), request.remoteIp());
-    return new VerifyResult(result.allowed(), result.reason());
+    return new VerifyResult(result.allowed(), sanitizeReason(result.reason()), result.pendingId());
   }
 
   /**
    * Second factor for the OpenVPN auth-pending flow (client-crresponse). The password was already
-   * accepted in phase 1 ({@link #verify}); only the TOTP code is checked here.
+   * accepted in phase 1 ({@link #verify}); only the TOTP code is checked here. The single-use
+   * {@code pendingId} from phase 1 must be presented.
    */
   @PostMapping("/auth/verify-otp")
   public VerifyResult verifyOtp(@RequestBody VerifyOtpRequest request) {
@@ -136,8 +148,9 @@ public class InternalController {
       return new VerifyResult(false, "setup_incomplete");
     }
     AuthService.VpnVerification result =
-        authService.verifyVpnOtp(request.username(), request.otp(), request.remoteIp());
-    return new VerifyResult(result.allowed(), result.reason());
+        authService.verifyVpnOtp(
+            request.username(), request.otp(), request.remoteIp(), request.pendingId());
+    return new VerifyResult(result.allowed(), sanitizeReason(result.reason()), null);
   }
 
   /**
@@ -257,10 +270,29 @@ public class InternalController {
   public record VerifyRequest(
       String username, String password, String otp, String commonName, String remoteIp) {}
 
-  public record VerifyOtpRequest(String username, String otp, String remoteIp) {}
+  public record VerifyOtpRequest(String username, String otp, String remoteIp, String pendingId) {}
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public record VerifyResult(boolean allowed, String reason) {}
+  public record VerifyResult(boolean allowed, String reason, String pendingId) {
+
+    public VerifyResult(boolean allowed, String reason) {
+      this(allowed, reason, null);
+    }
+  }
+
+  /**
+   * Normalizes account-state reasons before they leave the restricted network so a failing connect
+   * attempt never leaks whether an account is locked or disabled.
+   */
+  private static String sanitizeReason(String reason) {
+    if (reason == null) {
+      return null;
+    }
+    return switch (reason) {
+      case "account_locked", "account_disabled" -> "invalid_credentials";
+      default -> reason;
+    };
+  }
 
   private int maxConnections(User user) {
     Map<String, Object> effective = settingsService.effectiveForUser(user.getId());

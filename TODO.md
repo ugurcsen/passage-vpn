@@ -174,6 +174,35 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Mandatory internal token + fail-fast startup (`InternalTokenFilter`, `SecurityBootstrapCheck`, `NodeSecurityCheck`)
 - [x] Source-IP pinning for agent register/heartbeat + `last_seen_ip` (Flyway V18)
 
+**P0.5 — Security hardening sweep (approved plan A1–A3, B1–B4, C1–C2)**
+- [x] A1 — portal profile availability: portal list/download/QR only expose profile
+      types that are policy-enabled AND map to a matching daemon
+      (`DaemonService.findMatchingForProfile`, `PortalProfileController.list()`
+      `allowed`/`available` flags; PortalPage hides unavailable types + info note)
+- [x] A2 — `portal_profile_types` server setting: default `USER_LOCKED, SERVER_LOCKED`;
+      AUTO_LOGIN/GENERIC require an admin to enable (validation via
+      `SettingValidator`, frontend known-settings entry)
+- [x] A3 — portal certificate self-service: `GET /api/portal/cert` +
+      `POST /api/portal/cert/rotate` (AccountPage "VPN certificate" card)
+- [x] B1 — rate-limit SENSITIVE_PATHS extended (`/internal/auth/verify-otp`,
+      `/internal/seed-admin`, `/internal/seed-demo`)
+- [x] B2 — auth-pending nonce binding: phase-1 verify returns a single-use 120s
+      `pendingId`; `verify-otp` consumes it (fail-closed); `verify-user-pass.sh`
+      stashes it in `/tmp/opnl-pending-<user>` between phases
+- [x] B3 — `OPNL_BOOTSTRAP_TOKEN` + `SeedGuard`: seed-admin/seed-demo require
+      `X-Bootstrap-Token` when configured; Makefile targets pass it
+- [x] B4 — backend HTTP listener no longer published to the host (traffic enters via
+      frontend nginx on :80; `/internal/**` stays network-internal)
+- [x] C1 — verify reason normalization: `account_locked`/`account_disabled` →
+      `invalid_credentials` (no account-state leak to connecting clients)
+- [x] C2 — `IpFailureTracker` per-IP sliding-window lockout on VPN auth failures
+      (reuses `opnl.auth.lockout-*` settings; `ip_blocked` fail-fast)
+- [x] C3 — RESELLER privilege-escalation fix: `assertCanManageUser` limits non-admin
+      actors to managing USER-role accounts only (`resetPassword`/`updateUser`/`deleteUser`/
+      `setBanned`/static-IP/settings now take the acting user and reject ADMIN/RESELLER
+      targets; UI hides those actions for resellers). Found + verified live: a reseller
+      could previously take over the admin account via password reset.
+
 ---
 
 ## Phase 0 — Project Scaffolding

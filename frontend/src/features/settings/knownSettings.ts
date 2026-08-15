@@ -172,6 +172,14 @@ export const KNOWN_SETTINGS: KnownSetting[] = [
     type: "number",
     placeholder: "10",
   },
+  {
+    key: "portal_profile_types",
+    label: "Portal profile types",
+    description:
+      "Profile types that may be downloaded from the client portal. When unset only User-locked and Server-locked are available; add AUTO_LOGIN and GENERIC to enable them.",
+    type: "list",
+    placeholder: "USER_LOCKED, SERVER_LOCKED, AUTO_LOGIN, GENERIC",
+  },
 ];
 
 /** Looks up metadata for a setting key, falling back to a raw JSON editor for unknown keys. */

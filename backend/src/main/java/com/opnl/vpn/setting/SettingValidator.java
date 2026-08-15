@@ -44,6 +44,22 @@ public final class SettingValidator {
       throw ApiException.badRequest(
           "invalid_brand_color", "brand_primary_color must be a hex color like #4f8cff");
     }
+    if (SettingKeys.PORTAL_PROFILE_TYPES.equals(key)) {
+      java.util.Set<String> names =
+          value instanceof java.util.Collection<?> c
+              ? c.stream().map(String::valueOf).collect(java.util.stream.Collectors.toSet())
+              : java.util.Set.of(String.valueOf(value).split(","));
+      for (String name : names) {
+        try {
+          com.opnl.vpn.profile.ProfileType.valueOf(name.trim());
+        } catch (IllegalArgumentException e) {
+          throw ApiException.badRequest(
+              "invalid_portal_profile_types",
+              "portal_profile_types must be a list of profile types: USER_LOCKED, AUTO_LOGIN, "
+                  + "SERVER_LOCKED, GENERIC");
+        }
+      }
+    }
   }
 
   private static boolean isIntInRange(Object value, int min, int max) {

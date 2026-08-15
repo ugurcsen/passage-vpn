@@ -24,7 +24,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class RateLimitFilter extends OncePerRequestFilter {
 
   private static final List<String> SENSITIVE_PATHS =
-      List.of("/api/auth/login", "/api/auth/mfa", "/api/auth/refresh", "/internal/auth/verify");
+      List.of(
+          "/api/auth/login",
+          "/api/auth/mfa",
+          "/api/auth/refresh",
+          "/internal/auth/verify",
+          "/internal/auth/verify-otp",
+          "/internal/seed-admin",
+          "/internal/seed-demo");
   private static final long IDLE_PURGE_MS = Duration.ofMinutes(10).toMillis();
   private static final int MAX_BUCKETS = 10_000;
 

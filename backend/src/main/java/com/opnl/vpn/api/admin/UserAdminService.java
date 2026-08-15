@@ -159,6 +159,7 @@ public class UserAdminService {
   @Transactional
   public UserDto updateUser(User actor, String id, UserUpdateRequest request) {
     User user = requireUser(id);
+    assertCanManageUser(actor, user);
     if (request.role() != null && request.role() != user.getRole()) {
       assertCanAssignRole(actor, request.role());
       if (user.getRole() == User.Role.ADMIN && countAdmins() <= 1) {
@@ -204,6 +205,7 @@ public class UserAdminService {
   @Transactional
   public void deleteUser(User actor, String id, DeleteOptions options) {
     User user = requireUser(id);
+    assertCanManageUser(actor, user);
     if (user.getId().equals(actor.getId())) {
       throw ApiException.badRequest("cannot_delete_self", "You cannot delete your own account");
     }
@@ -265,8 +267,8 @@ public class UserAdminService {
     }
     for (String id : ids) {
       switch (action) {
-        case BAN -> setBanned(id, true);
-        case UNBAN -> setBanned(id, false);
+        case BAN -> setBanned(actor, id, true);
+        case UNBAN -> setBanned(actor, id, false);
         case DELETE -> deleteUser(actor, id, options);
       }
     }
@@ -280,8 +282,9 @@ public class UserAdminService {
   }
 
   @Transactional
-  public void resetPassword(String id, String newPassword) {
+  public void resetPassword(User actor, String id, String newPassword) {
     User user = requireUser(id);
+    assertCanManageUser(actor, user);
     user.setPasswordHash(passwordEncoder.encode(newPassword));
     user.setFailedAttempts(0);
     user.setLockedUntil(null);
@@ -295,8 +298,9 @@ public class UserAdminService {
   }
 
   @Transactional
-  public UserDto setBanned(String id, boolean banned) {
+  public UserDto setBanned(User actor, String id, boolean banned) {
     User user = requireUser(id);
+    assertCanManageUser(actor, user);
     if (banned && user.getRole() == User.Role.ADMIN && countAdmins() <= 1) {
       throw ApiException.badRequest("last_admin", "Cannot disable the last admin");
     }
@@ -312,8 +316,9 @@ public class UserAdminService {
   }
 
   @Transactional
-  public UserDto setStaticIp(String id, String staticIp) {
-    requireUser(id);
+  public UserDto setStaticIp(User actor, String id, String staticIp) {
+    User user = requireUser(id);
+    assertCanManageUser(actor, user);
     ccdService.setStaticIp(id, staticIp);
     auditLogService.record(
         "USER_STATIC_IP_SET", AuditLogService.CAT_USER, id, "user", Map.of("staticIp", staticIp));
@@ -322,24 +327,27 @@ public class UserAdminService {
 
   /** Allocates the next free static IP from the user's group pool. */
   @Transactional
-  public UserDto allocateStaticIp(String id) {
-    requireUser(id);
+  public UserDto allocateStaticIp(User actor, String id) {
+    User user = requireUser(id);
+    assertCanManageUser(actor, user);
     ccdService.allocateFromGroupPool(id);
     auditLogService.record("USER_STATIC_IP_ALLOCATE", AuditLogService.CAT_USER, id, "user", null);
     return getUser(id);
   }
 
   @Transactional
-  public UserDto clearStaticIp(String id) {
-    requireUser(id);
+  public UserDto clearStaticIp(User actor, String id) {
+    User user = requireUser(id);
+    assertCanManageUser(actor, user);
     ccdService.clearStaticIp(id);
     auditLogService.record("USER_STATIC_IP_CLEAR", AuditLogService.CAT_USER, id, "user", null);
     return getUser(id);
   }
 
   @Transactional
-  public UserDto setStaticIpv6(String id, String staticIpv6) {
-    requireUser(id);
+  public UserDto setStaticIpv6(User actor, String id, String staticIpv6) {
+    User user = requireUser(id);
+    assertCanManageUser(actor, user);
     ccdService.setStaticIpv6(id, staticIpv6);
     auditLogService.record(
         "USER_STATIC_IPV6_SET",
@@ -352,8 +360,9 @@ public class UserAdminService {
 
   /** Allocates the next free static IPv6 from the user's group pool. */
   @Transactional
-  public UserDto allocateStaticIpv6(String id) {
-    requireUser(id);
+  public UserDto allocateStaticIpv6(User actor, String id) {
+    User user = requireUser(id);
+    assertCanManageUser(actor, user);
     ccdService.allocateIpv6FromGroupPool(id);
     auditLogService.record("USER_STATIC_IPV6_ALLOCATE", AuditLogService.CAT_USER, id, "user", null);
     return getUser(id);
@@ -439,8 +448,9 @@ public class UserAdminService {
   }
 
   @Transactional
-  public Map<String, Object> setUserSetting(String id, String key, Object value) {
-    requireUser(id);
+  public Map<String, Object> setUserSetting(User actor, String id, String key, Object value) {
+    User user = requireUser(id);
+    assertCanManageUser(actor, user);
     settingsService.setUserSetting(id, key, value);
     auditLogService.record(
         "USER_SETTING_SET", AuditLogService.CAT_USER, id, "user", Map.of("key", key));
@@ -448,8 +458,9 @@ public class UserAdminService {
   }
 
   @Transactional
-  public Map<String, Object> deleteUserSetting(String id, String key) {
-    requireUser(id);
+  public Map<String, Object> deleteUserSetting(User actor, String id, String key) {
+    User user = requireUser(id);
+    assertCanManageUser(actor, user);
     settingsService.deleteUserSetting(id, key);
     auditLogService.record(
         "USER_SETTING_DELETE", AuditLogService.CAT_USER, id, "user", Map.of("key", key));
@@ -495,6 +506,14 @@ public class UserAdminService {
     }
     if (role == User.Role.RESELLER && actor.getRole() != User.Role.ADMIN) {
       throw ApiException.forbidden("forbidden", "Only admins can grant the RESELLER role");
+    }
+  }
+
+  /** Non-admin actors may only manage accounts of the USER role. */
+  private void assertCanManageUser(User actor, User target) {
+    if (actor.getRole() != User.Role.ADMIN && target.getRole() != User.Role.USER) {
+      throw ApiException.forbidden(
+          "forbidden", "Only admins can manage ADMIN or RESELLER accounts");
     }
   }
 }

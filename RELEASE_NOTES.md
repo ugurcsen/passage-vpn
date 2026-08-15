@@ -8,6 +8,60 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.4 — 2026-08-15
+
+Fourth **beta** milestone (SemVer pre-release): client-side and bootstrap-path
+security hardening of the VPN auth and portal flows — profile-availability
+gating, a nonce-bound auth-pending MFA flow, a separate bootstrap token for
+seed endpoints, per-IP VPN-auth failure lockout and removal of the published
+backend port. Includes everything from `v0.1.0-beta.3` plus the changes below.
+
+### Security hardening
+- **Portal profile availability (A1)** — the portal list/download/QR endpoints
+  only expose profile types that are both policy-enabled and map to a matching
+  daemon (`DaemonService.findMatchingForProfile`; `allowed`/`available` flags on
+  `GET /api/portal/profiles`). Unavailable types are hidden in the portal with an
+  explanatory note.
+- **`portal_profile_types` server setting (A2)** — new `portal_profile_types`
+  setting controls which profile types the portal may offer. Default is
+  `USER_LOCKED, SERVER_LOCKED`; `AUTO_LOGIN` and `GENERIC` are now disabled
+  unless an administrator explicitly enables them (behavior change).
+- **Portal certificate self-service (A3)** — users can view and rotate their VPN
+  certificate on the account page (`GET/POST /api/portal/cert`, certificate
+  re-issued on demand when no backing PKI file exists).
+- **Nonce-bound auth-pending MFA (B2)** — phase-1 `/internal/auth/verify`
+  returns a single-use 120s `pendingId` when an MFA challenge starts; the
+  client-crresponse phase (`verify-otp`) consumes it and fails closed on missing
+  or replayed nonces. `verify-user-pass.sh` stashes the nonce between phases
+  (0600, `/tmp/opnl-pending-<user>`).
+- **Bootstrap token for seed endpoints (B3)** — optional `OPNL_BOOTSTRAP_TOKEN`;
+  when set, `/internal/seed-admin` and `/internal/seed-demo` require the
+  `X-Bootstrap-Token` header (`SeedGuard`). Unlike the internal token it is never
+  exposed to the OpenVPN container.
+- **No published backend port (B4)** — the backend HTTP listener is no longer
+  mapped to the host; all user traffic enters via the frontend nginx on :80 and
+  `/internal/**` is reachable only inside the docker network.
+- **No account-state leak (C1)** — `account_locked`/`account_disabled` are
+  normalized to `invalid_credentials` in `/internal/auth/verify` responses.
+- **Per-IP VPN-auth lockout (C2)** — `IpFailureTracker` throttles repeated
+  failed VPN connect attempts per source IP (sliding window reusing the
+  `opnl.auth.lockout-*` settings; `ip_blocked` fail-fast before credential
+  checks). Login rate limiting extended to `verify-otp` and the seed endpoints.
+- **Makefile** — `seed-admin` now sends the internal token (was missing) and
+  both seed targets forward `X-Bootstrap-Token` when set.
+- **Reseller privilege escalation (C3)** — `assertCanManageUser` limits non-admin
+  actors to managing USER-role accounts: `resetPassword`, `updateUser`,
+  `deleteUser`, `setBanned`, static-IP and per-user settings now take the acting
+  user and reject ADMIN/RESELLER targets (`forbidden`). Found and verified live:
+  a reseller could previously take over the admin account via password reset.
+  The users UI hides those actions for resellers.
+
+### Verified
+- Backend suite green (`./gradlew test` + `spotlessCheck` BUILD SUCCESSFUL);
+  frontend 145 tests green, ESLint clean. Release tag: `v0.1.0-beta.4`.
+
+---
+
 ## v0.1.0-beta.3 — 2026-08-15
 
 Third **beta** milestone (SemVer pre-release): on-demand portal share downloads

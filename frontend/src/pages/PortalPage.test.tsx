@@ -10,8 +10,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { PortalPage } from "@/pages/PortalPage";
 
 const profileTypes = [
-  { type: "USER_LOCKED", label: "User locked", locked: false },
-  { type: "AUTO_LOGIN", label: "Auto login", locked: false },
+  { type: "USER_LOCKED", label: "User locked", locked: false, allowed: true, available: true },
+  { type: "AUTO_LOGIN", label: "Auto login", locked: false, allowed: true, available: true },
 ];
 
 const meBody = {
@@ -127,5 +127,28 @@ describe("PortalPage", () => {
     await waitFor(() => {
       expect(container.querySelector("svg")).not.toBeNull();
     });
+  });
+
+  it("hides profile types that are disabled or have no serving daemon and shows a notice", async () => {
+    vi.mocked(fetch).mockImplementation((url: RequestInfo | URL) => {
+      if (url === "/api/auth/me") return Promise.resolve(json(meBody));
+      if (url === "/api/portal/profiles")
+        return Promise.resolve(
+          json([
+            { type: "USER_LOCKED", label: "User locked", locked: false, allowed: true, available: true },
+            { type: "AUTO_LOGIN", label: "Auto login", locked: false, allowed: true, available: false },
+            { type: "SERVER_LOCKED", label: "Server locked", locked: false, allowed: true, available: true },
+            { type: "GENERIC", label: "Generic", locked: false, allowed: false, available: true },
+          ]),
+        );
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
+    renderPage();
+
+    expect(await screen.findByText("USER LOCKED")).toBeInTheDocument();
+    expect(screen.getByText("SERVER LOCKED")).toBeInTheDocument();
+    expect(screen.queryByText("AUTO LOGIN")).not.toBeInTheDocument();
+    expect(screen.queryByText("GENERIC")).not.toBeInTheDocument();
+    expect(screen.getByText(/some profile types are hidden/i)).toBeInTheDocument();
   });
 });
