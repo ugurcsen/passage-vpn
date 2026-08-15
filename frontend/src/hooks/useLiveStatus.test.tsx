@@ -12,6 +12,9 @@ interface FakeWs {
   onopen: (() => void) | null;
   onmessage: ((event: { data: string }) => void) | null;
   onclose: (() => void) | null;
+  emitOpen(): void;
+  emitMessage(data: string): void;
+  emitClose(): void;
 }
 
 function makeFakeWebSocket() {
@@ -65,10 +68,10 @@ function renderHook() {
   return { ...utils, get: () => latest };
 }
 
-const snapshot: MonitorSnapshot = {
-  timestamp: "2026-08-15T12:00:00Z",
+const snapshot = {
+  at: "2026-08-15T12:00:00Z",
   connections: [],
-};
+} satisfies Partial<MonitorSnapshot>;
 
 function json(body: unknown) {
   return new Response(JSON.stringify(body), {
