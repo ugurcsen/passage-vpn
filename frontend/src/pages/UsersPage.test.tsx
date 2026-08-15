@@ -313,13 +313,13 @@ describe("UsersPage", () => {
     });
   });
 
-  it("hides the role selector and MFA management from resellers", async () => {
+  it("hides the role selector and MFA management from group admins", async () => {
     const user = userEvent.setup();
-    const reseller = { ...currentUser, id: "res1", username: "reseller", role: "RESELLER" };
+    const groupAdmin = { ...currentUser, id: "res1", username: "gadmin", role: "GROUP_ADMIN" };
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation((url: string) => {
-        if (url.startsWith("/api/auth/me")) return Promise.resolve(json(reseller));
+        if (url.startsWith("/api/auth/me")) return Promise.resolve(json(groupAdmin));
         if (url.startsWith("/api/admin/groups")) return Promise.resolve(json(groups));
         return Promise.resolve(json(users));
       }),
@@ -335,16 +335,16 @@ describe("UsersPage", () => {
     expect(within(dialog).queryByLabelText(/role/i)).not.toBeInTheDocument();
   });
 
-  it("hides user-management actions on ADMIN/RESELLER rows for resellers", async () => {
-    const reseller = { ...currentUser, id: "res1", username: "reseller", role: "RESELLER" };
+  it("hides user-management actions on ADMIN/GROUP_ADMIN rows for group admins", async () => {
+    const groupAdmin = { ...currentUser, id: "res1", username: "gadmin", role: "GROUP_ADMIN" };
     const rows = [
       ...users,
-      { ...users[1], id: "u3", username: "dave", role: "RESELLER", banned: false },
+      { ...users[1], id: "u3", username: "dave", role: "GROUP_ADMIN", banned: false },
     ];
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation((url: string) => {
-        if (url.startsWith("/api/auth/me")) return Promise.resolve(json(reseller));
+        if (url.startsWith("/api/auth/me")) return Promise.resolve(json(groupAdmin));
         if (url.startsWith("/api/admin/groups")) return Promise.resolve(json(groups));
         return Promise.resolve(json(rows));
       }),

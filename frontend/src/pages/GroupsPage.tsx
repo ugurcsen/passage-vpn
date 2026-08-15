@@ -25,6 +25,7 @@ import GroupIcon from "@mui/icons-material/Group";
 import TuneIcon from "@mui/icons-material/Tune";
 import { api, endpoints } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
+import { useAuth } from "@/hooks/useAuth";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface GroupRow {
@@ -44,6 +45,8 @@ interface UserRow {
 export function GroupsPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === "ADMIN";
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<GroupRow | null>(null);
   const [name, setName] = useState("");
@@ -232,11 +235,13 @@ export function GroupsPage() {
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Delete">
-              <IconButton size="small" onClick={() => setConfirm(row)}>
-                <DeleteIcon fontSize="small" color="error" />
-              </IconButton>
-            </Tooltip>
+            {(!row.parentId || isAdmin) && (
+              <Tooltip title="Delete">
+                <IconButton size="small" onClick={() => setConfirm(row)}>
+                  <DeleteIcon fontSize="small" color="error" />
+                </IconButton>
+              </Tooltip>
+            )}
           </Stack>
         );
       },
@@ -281,9 +286,15 @@ export function GroupsPage() {
               label="Parent group"
               value={parentId}
               onChange={(e) => setParentId(e.target.value)}
-              helperText="Child groups inherit settings, overridden by the more specific group."
+              helperText={
+                isAdmin
+                  ? "Child groups inherit settings, overridden by the more specific group."
+                  : "Group admins can only create subgroups under a managed root group."
+              }
             >
-              <MenuItem value="">None</MenuItem>
+              <MenuItem value="" disabled={!isAdmin}>
+                None
+              </MenuItem>
               {(groups ?? [])
                 .filter((g) => g.id !== editing?.id)
                 .map((g) => (
@@ -312,7 +323,11 @@ export function GroupsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled={!name.trim()} onClick={() => saveMutation.mutate()}>
+          <Button
+            variant="contained"
+            disabled={!name.trim() || (!isAdmin && !parentId)}
+            onClick={() => saveMutation.mutate()}
+          >
             {editing ? "Save" : "Create"}
           </Button>
         </DialogActions>

@@ -1,12 +1,12 @@
 import type { Role } from "@/hooks/useAuth";
 
-/** Landing page per role: admins get the dashboard, resellers their user management,
+/** Landing page per role: admins get the dashboard, group admins their user management,
  *  plain users the self-service portal. */
 export function homePathFor(role: Role): string {
   switch (role) {
     case "ADMIN":
       return "/";
-    case "RESELLER":
+    case "GROUP_ADMIN":
       return "/users";
     case "USER":
       return "/portal";

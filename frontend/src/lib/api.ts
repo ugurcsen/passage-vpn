@@ -425,7 +425,7 @@ export interface ApiToken {
   id: string;
   label: string;
   prefix: string;
-  role: "ADMIN" | "RESELLER";
+  role: "ADMIN";
   expiresAt: string | null;
   createdAt: string;
   lastUsedAt: string | null;

@@ -32,6 +32,7 @@ const BackupsPage = lazy(() => import("@/pages/BackupsPage").then((m) => ({ defa
 const MaintenancePage = lazy(() => import("@/pages/MaintenancePage").then((m) => ({ default: m.MaintenancePage })));
 const AuditLogsPage = lazy(() => import("@/pages/AuditLogsPage").then((m) => ({ default: m.AuditLogsPage })));
 const ApiTokensPage = lazy(() => import("@/pages/ApiTokensPage").then((m) => ({ default: m.ApiTokensPage })));
+const ConnectionLogsPage = lazy(() => import("@/pages/ConnectionLogsPage").then((m) => ({ default: m.ConnectionLogsPage })));
 const PortalPage = lazy(() => import("@/pages/PortalPage").then((m) => ({ default: m.PortalPage })));
 const AccountPage = lazy(() => import("@/pages/AccountPage").then((m) => ({ default: m.AccountPage })));
 
@@ -88,10 +89,10 @@ function ThemedApp() {
                   <Route path="/setup" element={<SetupWizardPage />} />
                   <Route element={<AppLayout darkMode={darkMode} onToggleDarkMode={toggleDarkMode} />}>
                     <Route path="/" element={<RoleRoute roles={["ADMIN"]}><DashboardPage /></RoleRoute>} />
-                    <Route path="/users" element={<RoleRoute roles={["ADMIN", "RESELLER"]}><UsersPage /></RoleRoute>} />
+                    <Route path="/users" element={<RoleRoute roles={["ADMIN", "GROUP_ADMIN"]}><UsersPage /></RoleRoute>} />
                     <Route
                       path="/groups"
-                      element={<RoleRoute roles={["ADMIN"]}><GroupsPage /></RoleRoute>}
+                      element={<RoleRoute roles={["ADMIN", "GROUP_ADMIN"]}><GroupsPage /></RoleRoute>}
                     />
                     <Route
                       path="/certs"
@@ -128,6 +129,10 @@ function ThemedApp() {
                     <Route
                       path="/status"
                       element={<RoleRoute roles={["ADMIN"]}><StatusPage /></RoleRoute>}
+                    />
+                    <Route
+                      path="/connection-logs"
+                      element={<RoleRoute roles={["ADMIN", "GROUP_ADMIN"]}><ConnectionLogsPage /></RoleRoute>}
                     />
                     <Route
                       path="/settings"

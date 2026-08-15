@@ -34,7 +34,7 @@ export function ApiTokensPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState("");
-  const [role, setRole] = useState<"ADMIN" | "RESELLER">("ADMIN");
+  const [role, setRole] = useState<"ADMIN">("ADMIN");
   const [expiresAt, setExpiresAt] = useState("");
   const [created, setCreated] = useState<ApiTokenCreated | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; text: string; action: () => void } | null>(null);
@@ -198,12 +198,11 @@ export function ApiTokensPage() {
               select
               label="Role"
               value={role}
-              onChange={(e) => setRole(e.target.value as "ADMIN" | "RESELLER")}
+              onChange={(e) => setRole(e.target.value as "ADMIN")}
               fullWidth
-              helperText="ADMIN for full panel access; RESELLER for scoped automation."
+              helperText="API tokens always carry the ADMIN role."
             >
               <MenuItem value="ADMIN">ADMIN</MenuItem>
-              <MenuItem value="RESELLER">RESELLER</MenuItem>
             </TextField>
             <TextField
               label="Expiry (optional)"

@@ -53,6 +53,8 @@ interface UserRow {
   banned: boolean;
   mustChangePassword: boolean;
   groups: string[];
+  adminGroupIds?: string[];
+  adminGroupNames?: string[];
   createdAt?: string;
   lastLoginAt?: string;
   staticIp?: string;
@@ -86,6 +88,7 @@ interface UserForm {
   email: string;
   role: Role;
   groupIds: string[];
+  adminGroupIds: string[];
 }
 
 const EMPTY_FORM: UserForm = {
@@ -95,6 +98,7 @@ const EMPTY_FORM: UserForm = {
   email: "",
   role: "USER",
   groupIds: [],
+  adminGroupIds: [],
 };
 
 function formatDateTime(iso?: string) {
@@ -172,6 +176,7 @@ export function UsersPage() {
         email: form.email || null,
         role: form.role,
         groupIds: form.groupIds,
+        adminGroupIds: form.role === "GROUP_ADMIN" ? form.adminGroupIds : null,
       };
       if (editing) {
         return api(endpoints.users + `/${editing}`, { method: "PUT", body: JSON.stringify(payload) });
@@ -460,6 +465,7 @@ export function UsersPage() {
       email: row.email ?? "",
       role: row.role,
       groupIds: groups?.filter((g) => row.groups.includes(g.name)).map((g) => g.id) ?? [],
+      adminGroupIds: row.adminGroupIds ?? [],
     });
     setDialogOpen(true);
   };
@@ -481,6 +487,19 @@ export function UsersPage() {
       ),
     },
     {
+      field: "adminGroupNames",
+      headerName: "Manages",
+      width: 160,
+      valueGetter: (_, row) => (row as UserRow).adminGroupNames?.join(", ") ?? "",
+      renderCell: (params) => (
+        <Stack direction="row" spacing={0.5} sx={{ py: 0.5, flexWrap: "wrap" }}>
+          {(params.value as string).split(", ").filter(Boolean).slice(0, 2).map((g) => (
+            <Chip key={g} label={g} size="small" variant="outlined" color="warning" />
+          ))}
+        </Stack>
+      ),
+    },
+    {
       field: "role",
       headerName: "Role",
       width: 100,
@@ -488,7 +507,7 @@ export function UsersPage() {
         <Chip
           label={params.value as string}
           size="small"
-          color={params.value === "ADMIN" ? "secondary" : params.value === "RESELLER" ? "warning" : "default"}
+          color={params.value === "ADMIN" ? "secondary" : params.value === "GROUP_ADMIN" ? "warning" : "default"}
         />
       ),
     },
@@ -750,8 +769,27 @@ export function UsersPage() {
                 onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
               >
                 <MenuItem value="USER">User</MenuItem>
-                <MenuItem value="RESELLER">Reseller</MenuItem>
+                <MenuItem value="GROUP_ADMIN">Group admin</MenuItem>
                 <MenuItem value="ADMIN">Admin</MenuItem>
+              </TextField>
+            )}
+            {isAdmin && form.role === "GROUP_ADMIN" && (
+              <TextField
+                select
+                label="Managed groups"
+                value={form.adminGroupIds}
+                onChange={(e) =>
+                  setForm({ ...form, adminGroupIds: e.target.value as unknown as string[] })
+                }
+                SelectProps={{ multiple: true }}
+                required
+                helperText="Root groups this account manages, including all subgroups."
+              >
+                {(groups ?? []).map((g) => (
+                  <MenuItem key={g.id} value={g.id}>
+                    {g.name}
+                  </MenuItem>
+                ))}
               </TextField>
             )}
             <TextField

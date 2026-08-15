@@ -9,7 +9,7 @@ import {
 } from "react";
 import { api, apiPublic, endpoints, tokenStore } from "@/lib/api";
 
-export type Role = "ADMIN" | "RESELLER" | "USER";
+export type Role = "ADMIN" | "GROUP_ADMIN" | "USER";
 
 export interface CurrentUser {
   id: string;

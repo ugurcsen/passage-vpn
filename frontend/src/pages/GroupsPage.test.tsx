@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
+import { AuthProvider } from "@/hooks/useAuth";
 import { ToastProvider } from "@/hooks/useToast";
 import { GroupsPage } from "@/pages/GroupsPage";
 
@@ -13,6 +14,16 @@ const groups = [
 ];
 
 const users = [{ id: "u1", username: "alice" }];
+
+const me = {
+  id: "admin1",
+  username: "admin",
+  role: "ADMIN",
+  mfaEnabled: false,
+  banned: false,
+  mustChangePassword: false,
+  groups: [],
+};
 
 function json(body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -26,9 +37,11 @@ function renderPage() {
   return render(
     <ThemeProvider theme={darkTheme}>
       <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <GroupsPage />
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <GroupsPage />
+          </ToastProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>,
   );
@@ -37,9 +50,11 @@ function renderPage() {
 describe("GroupsPage", () => {
   beforeEach(() => {
     localStorage.clear();
+    localStorage.setItem("opnl.access", "test-token");
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+        if (url.startsWith("/api/auth/me")) return Promise.resolve(json(me));
         if (url === "/api/admin/users") return Promise.resolve(json(users));
         if (url.endsWith("/members")) {
           if (opts?.method === "PUT") return Promise.resolve(json({ ok: true }));
@@ -78,6 +93,9 @@ describe("GroupsPage", () => {
     fireEvent.change(within(dialog).getByLabelText(/name/i), {
       target: { value: "security" },
     });
+    await waitFor(() =>
+      expect(within(dialog).getByRole("button", { name: /^create$/i })).toBeEnabled(),
+    );
     await user.click(within(dialog).getByRole("button", { name: /^create$/i }));
 
     const fetchMock = vi.mocked(fetch);
@@ -159,6 +177,9 @@ describe("GroupsPage", () => {
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByLabelText(/tunnel mode/i));
     await user.click(await screen.findByRole("option", { name: /split tunnel/i }));
+    await waitFor(() =>
+      expect(within(dialog).getByRole("button", { name: /^save$/i })).toBeEnabled(),
+    );
     await user.click(within(dialog).getByRole("button", { name: /^save$/i }));
 
     const fetchMock = vi.mocked(fetch);
@@ -184,6 +205,9 @@ describe("GroupsPage", () => {
     await user.click(actions[3]);
 
     const dialog = screen.getByRole("dialog");
+    await waitFor(() =>
+      expect(within(dialog).getByRole("button", { name: /^save$/i })).toBeEnabled(),
+    );
     await user.click(within(dialog).getByRole("button", { name: /^save$/i }));
 
     const fetchMock = vi.mocked(fetch);

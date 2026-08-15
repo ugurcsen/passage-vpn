@@ -93,17 +93,19 @@ describe("AppLayout navigation by role", () => {
     present("API Tokens");
   });
 
-  it("restricts resellers to user management and the portal", async () => {
-    role = "RESELLER";
+  it("restricts group admins to user management, groups, connection logs and the portal", async () => {
+    role = "GROUP_ADMIN";
     renderLayout();
     await screen.findAllByText("My Profiles");
 
     present("Users");
+    present("Groups");
+    present("Connection Logs");
     present("My Account");
     absent("Dashboard");
-    absent("Groups");
     absent("Settings");
     absent("API Tokens");
+    absent("Live Status");
   });
 
   it("shows plain users only the self-service pages", async () => {

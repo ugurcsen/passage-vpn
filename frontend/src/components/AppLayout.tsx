@@ -55,8 +55,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", path: "/", icon: <DashboardIcon />, roles: ["ADMIN"] },
-  { label: "Users", path: "/users", icon: <PeopleIcon />, roles: ["ADMIN", "RESELLER"] },
-  { label: "Groups", path: "/groups", icon: <GroupIcon />, roles: ["ADMIN"] },
+  { label: "Users", path: "/users", icon: <PeopleIcon />, roles: ["ADMIN", "GROUP_ADMIN"] },
+  { label: "Groups", path: "/groups", icon: <GroupIcon />, roles: ["ADMIN", "GROUP_ADMIN"] },
   { label: "Certificates", path: "/certs", icon: <VpnKeyIcon />, roles: ["ADMIN"] },
   { label: "Access Rules", path: "/rules", icon: <SecurityIcon />, roles: ["ADMIN"] },
   { label: "DNS Overrides", path: "/dns", icon: <LanguageIcon />, roles: ["ADMIN"] },
@@ -66,6 +66,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "My Profiles", path: "/portal", icon: <PersonIcon /> },
   { label: "My Account", path: "/portal/account", icon: <SecurityIcon /> },
   { label: "Live Status", path: "/status", icon: <MonitorHeartIcon />, roles: ["ADMIN"] },
+  { label: "Connection Logs", path: "/connection-logs", icon: <HistoryIcon />, roles: ["ADMIN", "GROUP_ADMIN"] },
   { label: "Settings", path: "/settings", icon: <SettingsIcon />, roles: ["ADMIN"] },
   { label: "Branding", path: "/branding", icon: <PaletteIcon />, roles: ["ADMIN"] },
   { label: "Config Report", path: "/config-report", icon: <FactCheckIcon />, roles: ["ADMIN"] },

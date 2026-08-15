@@ -94,8 +94,8 @@ describe("role-based route guarding", () => {
     expect(screen.queryByText(/server settings/i)).not.toBeInTheDocument();
   });
 
-  it("redirects a reseller from the dashboard to the users page", async () => {
-    role = "RESELLER";
+  it("redirects a group admin from the dashboard to the users page", async () => {
+    role = "GROUP_ADMIN";
     setPath("/");
     render(<App />);
 
