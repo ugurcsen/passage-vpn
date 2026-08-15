@@ -55,7 +55,8 @@ class DashboardAdminServiceTest {
                 "http://backend:8080",
                 "easyrsa",
                 tempDir.resolve("logs").toString(),
-                "mgmt-pass"));
+                "mgmt-pass",
+                730));
     registry = new ConnectionRegistry();
     aggregator = new TrafficAggregator();
     daemonService = mock(DaemonService.class);

@@ -43,7 +43,8 @@ class WsAuthHandshakeInterceptorTest {
                 "http://backend:8080",
                 "easyrsa",
                 "logs",
-                "mgmt-pass"));
+                "mgmt-pass",
+                730));
     jwtService = new JwtService(properties);
     interceptor = new WsAuthHandshakeInterceptor(jwtService);
     handler = mock(WebSocketHandler.class);

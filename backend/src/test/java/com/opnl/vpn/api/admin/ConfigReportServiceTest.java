@@ -66,7 +66,8 @@ class ConfigReportServiceTest {
                     "http://backend:8080",
                     "easyrsa",
                     "./data/config/logs",
-                    "mgmt-pass")),
+                    "mgmt-pass",
+                    730)),
             environment);
   }
 

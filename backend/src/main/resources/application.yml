@@ -86,6 +86,7 @@ opnl:
     scripts-dir: ${OPNL_SCRIPTS_DIR:./data/config/scripts}
     scripts-src-dir: ${OPNL_SCRIPTS_SRC_DIR:./openvpn/scripts}
     easyrsa-bin: ${OPNL_EASY_RSA_BIN:easyrsa}
+    cert-expire-days: ${OPNL_PKI_CERT_EXPIRE:730}
     log-dir: ${OPNL_LOG_DIR:./data/config/logs}
     internal-base-url: ${OPNL_INTERNAL_BASE_URL:http://backend:8080}
   internal:

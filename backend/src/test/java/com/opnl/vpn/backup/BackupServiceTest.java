@@ -67,7 +67,8 @@ class BackupServiceTest {
                 "http://backend:8080",
                 "easyrsa",
                 tempDir.resolve("logs").toString(),
-                "mgmt-pass"));
+                "mgmt-pass",
+                730));
 
     Files.createDirectories(tempDir.resolve("pki"));
     Files.createDirectories(tempDir.resolve("ccd"));

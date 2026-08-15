@@ -18,6 +18,7 @@ import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 /**
@@ -37,9 +38,13 @@ import org.springframework.stereotype.Service;
  * <p>Refreshed on application startup and after access-rule or DNS-override mutations (see {@link
  * com.opnl.vpn.access.AccessRuleService} and {@link com.opnl.vpn.dns.DnsOverrideService}).
  * Best-effort: resolution or write failures are logged and never fail the calling mutation.
+ *
+ * <p>Disabled on node agents: a remote gateway receives its dnsmasq configs via the config-bundle
+ * pull, and the agent has no local rule database to render from.
  */
 @Slf4j
 @Service
+@Profile("!agent")
 public class DnsmasqConfigService implements ApplicationRunner {
 
   public static final String DOMAINS_FILE_NAME = "opnl-domains.conf";

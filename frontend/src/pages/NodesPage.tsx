@@ -30,6 +30,7 @@ interface NodeForm {
   mgmtHost: string;
   mgmtPortBase: string;
   adminIp: string;
+  adminHost: string;
   enabled: boolean;
 }
 
@@ -38,6 +39,7 @@ const EMPTY_FORM: NodeForm = {
   mgmtHost: "",
   mgmtPortBase: "7505",
   adminIp: "",
+  adminHost: "",
   enabled: true,
 };
 
@@ -63,6 +65,7 @@ export function NodesPage() {
         mgmtHost: form.mgmtHost.trim(),
         mgmtPortBase: Number(form.mgmtPortBase),
         adminIp: form.adminIp.trim() || null,
+        adminHost: form.adminHost.trim() || null,
         enabled: form.enabled,
       };
       if (editing) {
@@ -110,6 +113,7 @@ export function NodesPage() {
       mgmtHost: row.mgmtHost,
       mgmtPortBase: String(row.mgmtPortBase),
       adminIp: row.adminIp ?? "",
+      adminHost: row.adminHost ?? "",
       enabled: row.enabled,
     });
     setDialogOpen(true);
@@ -124,6 +128,20 @@ export function NodesPage() {
       headerName: "Admin IP",
       width: 130,
       valueGetter: (_, row) => (row as OpenVpnNode).adminIp ?? "",
+      renderCell: (params) =>
+        params.value ? (
+          <Typography variant="body2">{params.value as string}</Typography>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            —
+          </Typography>
+        ),
+    },
+    {
+      field: "adminHost",
+      headerName: "Admin host",
+      width: 150,
+      valueGetter: (_, row) => (row as OpenVpnNode).adminHost ?? "",
       renderCell: (params) =>
         params.value ? (
           <Typography variant="body2">{params.value as string}</Typography>
@@ -274,6 +292,15 @@ export function NodesPage() {
               onChange={(e) => setForm({ ...form, adminIp: e.target.value })}
               placeholder="e.g. 10.0.0.5"
               helperText="Network address used for management plane access to this gateway."
+            />
+            <TextField
+              id="node-admin-host"
+              name="adminHost"
+              label="Admin host (optional)"
+              value={form.adminHost}
+              onChange={(e) => setForm({ ...form, adminHost: e.target.value })}
+              placeholder="e.g. vpn-eu.example.com"
+              helperText="Public host advertised in connection profiles for this node's daemons. Falls back to the global VPN host."
             />
             <FormControlLabel
               control={

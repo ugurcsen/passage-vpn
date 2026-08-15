@@ -18,6 +18,7 @@ public record AgentProperties(
     String adminIp,
     String mgmtPassword,
     long heartbeatSeconds,
+    long syncSeconds,
     String tlsCa,
     String tlsCert,
     String tlsKey) {}

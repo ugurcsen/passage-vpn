@@ -29,11 +29,18 @@ public class EasyRsaService {
   private final Path pkiDir;
   private final ProcessRunner runner;
   private final String easyrsaBin;
+  private final int certExpireDays;
 
   public EasyRsaService(OpnlProperties properties, ProcessRunner runner) {
     this.pkiDir = Path.of(properties.openvpn().pkiDir()).toAbsolutePath();
     this.runner = runner;
     this.easyrsaBin = properties.openvpn().easyrsaBin();
+    this.certExpireDays = properties.openvpn().certExpireDays();
+  }
+
+  /** Client/server certificate validity in days (Easy-RSA {@code EASYRSA_CERT_EXPIRE}). */
+  public int certExpireDays() {
+    return certExpireDays;
   }
 
   public Path pkiDir() {
@@ -266,8 +273,10 @@ public class EasyRsaService {
     env.put("EASYRSA_BATCH", "1");
     env.put("EASYRSA_ALGO", "rsa");
     env.put("EASYRSA_KEY_SIZE", "2048");
-    env.put("EASYRSA_CERT_EXPIRE", "3650");
-    env.put("EASYRSA_CRL_DAYS", "1800");
+    env.put("EASYRSA_CERT_EXPIRE", String.valueOf(certExpireDays));
+    // The CRL must stay valid at least as long as the longest issued certificate, or clients could
+    // silently accept revoked certificates once the CRL lapses.
+    env.put("EASYRSA_CRL_DAYS", String.valueOf(Math.max(1800, certExpireDays + 30)));
     return env;
   }
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -26,6 +26,8 @@ import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 /** Self-service account page: TOTP MFA management, certificate and password change (client portal). */
+const CERT_EXPIRY_WARNING_DAYS = 30;
+
 export function AccountPage() {
   const toast = useToast();
   const { user, refreshMe, logout } = useAuth();
@@ -123,6 +125,12 @@ export function AccountPage() {
     queryFn: () => api<CertificateInfo>(endpoints.portalCert),
   });
 
+  const certExpiring =
+    certQuery.data?.status === "VALID" && certQuery.data.expiresAt != null
+      ? new Date(certQuery.data.expiresAt).getTime() - Date.now() <
+        CERT_EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000
+      : false;
+
   const [certConfirmOpen, setCertConfirmOpen] = useState(false);
 
   const rotateCertMutation = useMutation({
@@ -206,6 +214,19 @@ export function AccountPage() {
           <Skeleton width={260} />
         ) : certQuery.data && certQuery.data.status !== "NONE" ? (
           <Stack spacing={1} sx={{ mb: 2 }}>
+            {certExpiring && (
+              <Alert severity="warning" sx={{ mb: 1 }}>
+                Your VPN certificate expires on{" "}
+                {certQuery.data?.expiresAt
+                  ? new Date(certQuery.data.expiresAt).toLocaleDateString()
+                  : "—"}
+                . Download a new profile from the{" "}
+                <Link to="/portal" style={{ color: "inherit" }}>
+                  profiles
+                </Link>{" "}
+                page before then so you do not lose access.
+              </Alert>
+            )}
             <Typography variant="body2">
               <strong>Status:</strong> {certQuery.data.status.toLowerCase()}
             </Typography>

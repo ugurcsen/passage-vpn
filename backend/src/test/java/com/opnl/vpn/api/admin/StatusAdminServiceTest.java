@@ -54,7 +54,8 @@ class StatusAdminServiceTest {
                 "http://backend:8080",
                 "easyrsa",
                 tempDir.resolve("logs").toString(),
-                "mgmt-pass"));
+                "mgmt-pass",
+                730));
     return new StatusAdminService(daemonService, connectionRegistry, clientManager, properties);
   }
 

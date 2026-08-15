@@ -26,6 +26,8 @@ class DaemonServiceTest {
   private DaemonRepository repository;
   private ServerSettingRepository settingRepository;
   private ConfigWriter configWriter;
+  private NodeRegistryService nodeRegistryService;
+  private OpnlProperties properties;
   private DaemonService service;
 
   private Daemon primary() {
@@ -63,15 +65,17 @@ class DaemonServiceTest {
     repository = mock(DaemonRepository.class);
     settingRepository = mock(ServerSettingRepository.class);
     configWriter = mock(ConfigWriter.class);
+    nodeRegistryService = mock(NodeRegistryService.class);
+    properties = mock(OpnlProperties.class);
     service =
         new DaemonService(
             repository,
             settingRepository,
             new ServerConfigGenerator(new ObjectMapper()),
             configWriter,
-            mock(OpnlProperties.class),
+            properties,
             mock(com.opnl.vpn.audit.AuditLogService.class),
-            mock(com.opnl.vpn.network.NodeRegistryService.class));
+            nodeRegistryService);
   }
 
   @Test
@@ -317,5 +321,87 @@ class DaemonServiceTest {
     service.writeAll();
 
     verify(configWriter).writeDaemon(any(), any(), any(), eq("nat"));
+  }
+
+  @Test
+  void resolveAllForProfileReturnsEveryMatchingDaemon() {
+    Daemon second = daemon("d1", 1, "Second", 1195, "10.9.0.0", false, true);
+    stubNonEmpty();
+    when(repository.findByEnabledTrueOrderByDaemonIndexAsc())
+        .thenReturn(List.of(primary(), second));
+
+    List<DaemonService.ProfileEndpoint> endpoints =
+        service.resolveAllForProfile(ProfileType.USER_LOCKED);
+
+    assertThat(endpoints).hasSize(2);
+    assertThat(endpoints.get(0).config().port()).isEqualTo(1194);
+    assertThat(endpoints.get(1).config().port()).isEqualTo(1195);
+  }
+
+  @Test
+  void resolveAllForProfileFallsBackToPrimaryWhenNoMatch() {
+    stubNonEmpty();
+    when(repository.findByEnabledTrueOrderByDaemonIndexAsc()).thenReturn(List.of(primary()));
+
+    List<DaemonService.ProfileEndpoint> endpoints =
+        service.resolveAllForProfile(ProfileType.AUTO_LOGIN);
+
+    assertThat(endpoints).hasSize(1);
+    assertThat(endpoints.get(0).config().port()).isEqualTo(1194);
+  }
+
+  @Test
+  void resolveAllForProfileSkipsDaemonsOnDisabledNodes() {
+    stubNonEmpty();
+    Daemon remote = daemon("r1", 1, "Remote", 1195, "10.9.0.0", false, true);
+    remote.setNodeId("n1");
+    OpenVpnNode node = new OpenVpnNode();
+    node.setEnabled(false);
+    when(nodeRegistryService.findNode("n1")).thenReturn(Optional.of(node));
+    when(repository.findByEnabledTrueOrderByDaemonIndexAsc())
+        .thenReturn(List.of(primary(), remote));
+
+    List<DaemonService.ProfileEndpoint> endpoints =
+        service.resolveAllForProfile(ProfileType.USER_LOCKED);
+
+    assertThat(endpoints).hasSize(1);
+    assertThat(endpoints.get(0).config().port()).isEqualTo(1194);
+  }
+
+  @Test
+  void effectiveAdminHostPrefersDaemonThenNodeThenGlobal() {
+    OpnlProperties.OpenVpn openvpn = mock(OpnlProperties.OpenVpn.class);
+    when(properties.openvpn()).thenReturn(openvpn);
+
+    OpenVpnNode node = new OpenVpnNode();
+    node.setAdminHost("node.example.com");
+    when(nodeRegistryService.findNode("n1")).thenReturn(Optional.of(node));
+
+    Daemon remote = daemon("r1", 1, "Remote", 1195, "10.9.0.0", false, true);
+    remote.setAdminHost(null);
+    remote.setNodeId("n1");
+
+    assertThat(service.effectiveAdminHost(remote)).isEqualTo("node.example.com");
+
+    remote.setAdminHost("daemon.example.com");
+    assertThat(service.effectiveAdminHost(remote)).isEqualTo("daemon.example.com");
+
+    remote.setAdminHost(null);
+    node.setAdminHost(null);
+    when(openvpn.adminHost()).thenReturn("global.example.com");
+    assertThat(service.effectiveAdminHost(remote)).isEqualTo("global.example.com");
+  }
+
+  @Test
+  void effectiveAdminHostIgnoresNodeHostForLocalDaemons() {
+    OpnlProperties.OpenVpn openvpn = mock(OpnlProperties.OpenVpn.class);
+    when(properties.openvpn()).thenReturn(openvpn);
+    when(openvpn.adminHost()).thenReturn("global.example.com");
+
+    Daemon local = daemon("d0", 0, "Primary", 1194, "10.8.0.0", false, true);
+    local.setAdminHost(null);
+    local.setNodeId(null);
+
+    assertThat(service.effectiveAdminHost(local)).isEqualTo("global.example.com");
   }
 }

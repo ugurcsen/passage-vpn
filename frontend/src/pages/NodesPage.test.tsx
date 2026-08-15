@@ -14,6 +14,7 @@ const nodes = [
     mgmtHost: "vpn-eu.example.com",
     mgmtPortBase: 7505,
     adminIp: "10.0.0.5",
+    adminHost: "vpn-eu.example.com",
     enabled: true,
     createdAt: "2026-08-13T00:00:00Z",
     lastSeenAt: "2026-08-13T00:00:00Z",
@@ -25,6 +26,7 @@ const nodes = [
     mgmtHost: "vpn-us.example.com",
     mgmtPortBase: 7505,
     adminIp: null,
+    adminHost: null,
     enabled: false,
     createdAt: "2026-08-13T00:00:00Z",
     lastSeenAt: null,
@@ -67,7 +69,7 @@ describe("NodesPage", () => {
     renderPage();
 
     expect(await screen.findByText("edge-eu")).toBeInTheDocument();
-    expect(screen.getByText("vpn-eu.example.com")).toBeInTheDocument();
+    expect(screen.getAllByText("vpn-eu.example.com").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Online")).toBeInTheDocument();
     expect(screen.getByText("Disabled")).toBeInTheDocument();
   });
@@ -92,6 +94,9 @@ describe("NodesPage", () => {
     fireEvent.change(within(dialog).getByLabelText(/^admin ip/i), {
       target: { value: "10.0.0.9" },
     });
+    fireEvent.change(within(dialog).getByLabelText(/^admin host/i), {
+      target: { value: "vpn-ap.example.com" },
+    });
     await user.click(within(dialog).getByRole("button", { name: /^register$/i }));
 
     const fetchMock = vi.mocked(fetch);
@@ -109,6 +114,7 @@ describe("NodesPage", () => {
       mgmtHost: "vpn-ap.example.com",
       mgmtPortBase: 7506,
       adminIp: "10.0.0.9",
+      adminHost: "vpn-ap.example.com",
       enabled: true,
     });
   });

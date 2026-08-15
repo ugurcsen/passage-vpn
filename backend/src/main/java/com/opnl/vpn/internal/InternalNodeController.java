@@ -5,6 +5,7 @@ import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.config.InternalProperties;
 import com.opnl.vpn.network.NodeRegistryService;
 import com.opnl.vpn.network.OpenVpnNode;
+import com.opnl.vpn.node.NodeConfigBundleService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -29,14 +30,17 @@ public class InternalNodeController {
   private final NodeRegistryService nodeRegistryService;
   private final ClientCertReader clientCertReader;
   private final InternalProperties internalProperties;
+  private final NodeConfigBundleService nodeConfigBundleService;
 
   public InternalNodeController(
       NodeRegistryService nodeRegistryService,
       ClientCertReader clientCertReader,
-      InternalProperties internalProperties) {
+      InternalProperties internalProperties,
+      NodeConfigBundleService nodeConfigBundleService) {
     this.nodeRegistryService = nodeRegistryService;
     this.clientCertReader = clientCertReader;
     this.internalProperties = internalProperties;
+    this.nodeConfigBundleService = nodeConfigBundleService;
   }
 
   /** Registers (or re-registers) the calling agent's gateway node and returns its id. */
@@ -71,6 +75,25 @@ public class InternalNodeController {
     nodeRegistryService.heartbeat(request.nodeId(), servletRequest.getRemoteAddr());
   }
 
+  /**
+   * Returns the config bundle (daemon configs, PKI incl. the CRL, CCD, scripts, dnsmasq) for the
+   * calling node. The caller must present a client certificate for the node and, when the node has
+   * a pinned admin IP, connect from that address.
+   */
+  @PostMapping("/config")
+  public NodeConfigBundleService.NodeConfigBundle config(
+      HttpServletRequest servletRequest, @RequestBody ConfigRequest request) {
+    requireMtls(servletRequest);
+    String cn = requireCertCn(servletRequest);
+    OpenVpnNode node =
+        nodeRegistryService
+            .findNode(request.nodeId())
+            .orElseThrow(() -> ApiException.notFound("node_not_found", "VPN node not found"));
+    requireCertForNode(cn, node.getName());
+    nodeRegistryService.checkSourceIp(node.getId(), servletRequest.getRemoteAddr());
+    return nodeConfigBundleService.bundleForNode(node.getId());
+  }
+
   private void requireMtls(HttpServletRequest request) {
     if (request.getLocalPort() != internalProperties.mtlsPort()) {
       throw ApiException.forbidden(
@@ -101,6 +124,8 @@ public class InternalNodeController {
       String name, String mgmtHost, int mgmtPortBase, String adminIp, String mgmtPassword) {}
 
   public record HeartbeatRequest(String nodeId) {}
+
+  public record ConfigRequest(String nodeId) {}
 
   public record RegisterResult(String nodeId) {}
 }

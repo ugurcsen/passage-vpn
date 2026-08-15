@@ -11,6 +11,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -43,6 +44,12 @@ public class AgentRegistrationService {
     return nodeId;
   }
 
+  /** The registered node id, or null until registration succeeds. */
+  public String currentNodeId() {
+    return nodeId;
+  }
+
+  @Autowired
   public AgentRegistrationService(
       AgentProperties properties,
       OpnlProperties opnlProperties,
@@ -129,7 +136,7 @@ public class AgentRegistrationService {
                 properties.adminIp() == null ? "" : properties.adminIp(),
                 "mgmtPassword",
                 properties.mgmtPassword()));
-    String response = post("/internal/node/register", body);
+    String response = postJson("/internal/node/register", body);
     if (response == null) {
       return;
     }
@@ -144,7 +151,7 @@ public class AgentRegistrationService {
 
   private void heartbeat() throws IOException, InterruptedException {
     String body = objectMapper.writeValueAsString(Map.of("nodeId", nodeId));
-    if (post("/internal/node/heartbeat", body) == null) {
+    if (postJson("/internal/node/heartbeat", body) == null) {
       return;
     }
     log.debug("Agent heartbeat sent for node {}", nodeId);
@@ -152,8 +159,9 @@ public class AgentRegistrationService {
 
   /**
    * POSTs JSON to a central /internal/node endpoint; returns the response body or null on error.
+   * Shared with the config-sync service so both agent callbacks use the same mTLS client.
    */
-  private String post(String path, String body) throws IOException, InterruptedException {
+  String postJson(String path, String body) throws IOException, InterruptedException {
     HttpRequest request =
         HttpRequest.newBuilder(URI.create(properties.centralBaseUrl() + path))
             .timeout(HTTP_TIMEOUT)

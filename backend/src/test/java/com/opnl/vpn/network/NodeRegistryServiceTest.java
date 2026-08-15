@@ -34,7 +34,8 @@ class NodeRegistryServiceTest {
   }
 
   private NodeRegistryService.NodeRequest request(String name, String host, int port) {
-    return new NodeRegistryService.NodeRequest(name, host, port, "10.0.0.5", "mgmt-pass", true);
+    return new NodeRegistryService.NodeRequest(
+        name, host, port, "10.0.0.5", null, "mgmt-pass", true);
   }
 
   private OpenVpnNode node(String id, String name, String host, int port) {
@@ -107,12 +108,19 @@ class NodeRegistryServiceTest {
         service.update(
             "n1",
             new NodeRegistryService.NodeRequest(
-                "edge-us", "vpn-us.example.com", 7506, null, "mgmt-pass", true));
+                "edge-us",
+                "vpn-us.example.com",
+                7506,
+                null,
+                "vpn-us-public.example.com",
+                "mgmt-pass",
+                true));
 
     assertThat(result.name()).isEqualTo("edge-us");
     assertThat(result.mgmtHost()).isEqualTo("vpn-us.example.com");
     assertThat(result.mgmtPortBase()).isEqualTo(7506);
     assertThat(result.adminIp()).isNull();
+    assertThat(result.adminHost()).isEqualTo("vpn-us-public.example.com");
     assertThat(result.mgmtPasswordSet()).isTrue();
     verify(auditLogService).record("NODE_UPDATE", AuditLogService.CAT_NODE, "n1", "vpn_node", null);
   }
@@ -127,7 +135,7 @@ class NodeRegistryServiceTest {
     service.update(
         "n1",
         new NodeRegistryService.NodeRequest(
-            "edge-eu", "vpn-eu.example.com", 7505, null, null, true));
+            "edge-eu", "vpn-eu.example.com", 7505, null, null, null, true));
 
     assertThat(existing.getMgmtPassword()).isEqualTo("old-pass");
   }
@@ -138,7 +146,7 @@ class NodeRegistryServiceTest {
             () ->
                 service.create(
                     new NodeRegistryService.NodeRequest(
-                        "edge-eu", "vpn-eu.example.com", 7505, null, null, true)))
+                        "edge-eu", "vpn-eu.example.com", 7505, null, null, null, true)))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("Management password");
     verify(nodeRepository, never()).save(any());
@@ -156,7 +164,7 @@ class NodeRegistryServiceTest {
                 service.update(
                     "n1",
                     new NodeRegistryService.NodeRequest(
-                        "edge-us", "vpn-us.example.com", 7506, null, "mgmt-pass", true)))
+                        "edge-us", "vpn-us.example.com", 7506, null, null, "mgmt-pass", true)))
         .isInstanceOf(ApiException.class);
     verify(nodeRepository, never()).save(any());
   }

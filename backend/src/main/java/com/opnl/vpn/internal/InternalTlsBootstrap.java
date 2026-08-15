@@ -204,20 +204,26 @@ public final class InternalTlsBootstrap {
     if (Files.exists(tlsDir.resolve(TRUSTSTORE))) {
       return;
     }
+    // Built with keytool, not `openssl pkcs12 -export -nokeys`: the latter produces a PKCS12 that
+    // Java's SunPKCS12 provider reads as empty (0 trust anchors), which makes the Tomcat mTLS
+    // connector fail with "the trustAnchors parameter must be non-empty".
     ProcessRunner.Result run =
         run(
             runner,
             List.of(
-                "openssl",
-                "pkcs12",
-                "-export",
-                "-in",
+                "keytool",
+                "-importcert",
+                "-noprompt",
+                "-alias",
+                "internal-ca",
+                "-file",
                 tlsDir.resolve(CA_CERT).toString(),
-                "-nokeys",
-                "-out",
+                "-keystore",
                 tlsDir.resolve(TRUSTSTORE).toString(),
-                "-passout",
-                "pass:" + password));
+                "-storetype",
+                "PKCS12",
+                "-storepass",
+                password));
     if (!run.ok()) {
       throw new IllegalStateException("Cannot create internal truststore: " + run.stderr());
     }

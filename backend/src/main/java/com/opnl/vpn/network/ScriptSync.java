@@ -9,6 +9,7 @@ import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 /**
@@ -18,9 +19,13 @@ import org.springframework.stereotype.Component;
  * <p>Scripts are read from {@code OPNL_SCRIPTS_SRC_DIR} (bundled into the image or the repo in dev)
  * and written to {@code OPNL_CONFIG_DIR}/scripts. This keeps secrets out of the repository while
  * allowing the container to mount scripts read-only.
+ *
+ * <p>Disabled on node agents: a remote gateway gets its scripts via the config-bundle pull,
+ * rendered by the central backend, so the agent never self-writes into the shared volume.
  */
 @Slf4j
 @Component
+@Profile("!agent")
 public class ScriptSync implements ApplicationRunner {
 
   private final Path srcDir;

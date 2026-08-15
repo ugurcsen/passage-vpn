@@ -40,6 +40,13 @@ public class OpenVpnNode {
   @Column(name = "admin_ip")
   private String adminIp;
 
+  /**
+   * Public admin hostname/IP of this gateway, advertised as the remote endpoint in connection
+   * profiles (used when a daemon on this node has no adminHost of its own).
+   */
+  @Column(name = "admin_host")
+  private String adminHost;
+
   /** Management interface password for this gateway (used to open management sessions). */
   @Column(name = "mgmt_password")
   private String mgmtPassword;

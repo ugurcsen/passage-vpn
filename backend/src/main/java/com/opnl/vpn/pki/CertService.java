@@ -2,6 +2,8 @@ package com.opnl.vpn.pki;
 
 import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
+import com.opnl.vpn.setting.SettingKeys;
+import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
@@ -30,20 +32,29 @@ public class CertService {
   /** Certificates expiring within this window are reported by {@link #expiringSoon()}. */
   public static final int EXPIRY_WARNING_DAYS = 30;
 
+  /** Default certificate rotation policy when the server setting is unset. */
+  public static final String DEFAULT_AUTO_ROTATE_POLICY = "notify";
+
+  /** Default rotation horizon (days before expiry) when the server setting is unset. */
+  public static final int DEFAULT_ROTATE_DAYS_BEFORE = 14;
+
   private final EasyRsaService easyRsaService;
   private final CertificateRepository certificateRepository;
   private final UserRepository userRepository;
   private final AuditLogService auditLogService;
+  private final SettingsService settingsService;
 
   public CertService(
       EasyRsaService easyRsaService,
       CertificateRepository certificateRepository,
       UserRepository userRepository,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService,
+      SettingsService settingsService) {
     this.easyRsaService = easyRsaService;
     this.certificateRepository = certificateRepository;
     this.userRepository = userRepository;
     this.auditLogService = auditLogService;
+    this.settingsService = settingsService;
   }
 
   /** Returns the user's current valid certificate, issuing one when missing. */
@@ -77,6 +88,7 @@ public class CertService {
       return certificateRepository.save(certificate);
     }
     String cn = user.getUsername();
+    purgeStaleForCommonName(cn, userId);
     if (!easyRsaService.hasClientCert(cn)) {
       easyRsaService.issueClientCert(cn);
     }
@@ -97,6 +109,29 @@ public class CertService {
         "certificate",
         Map.of("commonName", cn));
     return certificateRepository.save(certificate);
+  }
+
+  /**
+   * Removes any certificate left behind by a previous account that used the same common name (e.g.
+   * the old user was deleted without certificate cleanup). The stale cert is revoked so the CRL
+   * rejects it, the on-disk artifacts are removed best-effort, and the bookkeeping row is deleted.
+   * This keeps certificate issuance idempotent when a username is re-created.
+   */
+  private void purgeStaleForCommonName(String cn, String currentUserId) {
+    Certificate stale = certificateRepository.findByCommonName(cn).orElse(null);
+    if (stale == null || currentUserId.equals(stale.getUserId())) {
+      return;
+    }
+    if (stale.getStatus() == Certificate.Status.VALID
+        && easyRsaService.hasClientCert(stale.getCommonName())) {
+      easyRsaService.revokeCert(stale.getCommonName());
+    }
+    try {
+      easyRsaService.deleteClientCert(stale.getCommonName());
+    } catch (ApiException ignored) {
+      // best effort on re-issue
+    }
+    certificateRepository.delete(stale);
   }
 
   /** Revokes the user's valid certificate and generates a fresh CRL. */
@@ -240,6 +275,85 @@ public class CertService {
     expired.forEach(c -> c.setStatus(Certificate.Status.EXPIRED));
     certificateRepository.saveAll(expired);
     log.info("Marked {} certificates as expired", expired.size());
+  }
+
+  /**
+   * Applies the certificate rotation policy to certificates nearing expiry; runs daily after the
+   * expiry scan. With policy {@code auto} every valid certificate expiring within the configured
+   * horizon is rotated (revoke + reissue, same common name); {@code notify} and {@code off} only
+   * report. Only certificates bound to an existing account are considered — orphaned rows and the
+   * infrastructure server certificate are never rotated.
+   */
+  @Scheduled(cron = "0 35 3 * * *")
+  @Transactional
+  public void applyRotationPolicy() {
+    if (!"auto".equalsIgnoreCase(rotationPolicy())) {
+      return;
+    }
+    int daysBefore = rotationDaysBefore();
+    Instant horizon = Instant.now().plus(daysBefore, ChronoUnit.DAYS);
+    List<Certificate> candidates =
+        certificateRepository.findByStatusAndExpiresAtBetween(
+            Certificate.Status.VALID, Instant.now(), horizon);
+    if (candidates.isEmpty()) {
+      return;
+    }
+    int rotated = 0;
+    int skipped = 0;
+    for (Certificate candidate : candidates) {
+      if (candidate.getUserId() == null || !userRepository.existsById(candidate.getUserId())) {
+        skipped++;
+        continue;
+      }
+      try {
+        rotate(candidate.getUserId());
+        auditLogService.record(
+            "CERT_ROTATE_AUTO",
+            AuditLogService.CAT_CERT,
+            candidate.getId(),
+            "certificate",
+            Map.of("commonName", candidate.getCommonName(), "userId", candidate.getUserId()));
+        rotated++;
+      } catch (ApiException e) {
+        skipped++;
+        log.warn(
+            "Skipped auto-rotation of certificate {} ({}): {}",
+            candidate.getId(),
+            candidate.getCommonName(),
+            e.getMessage());
+      }
+    }
+    log.info("Auto-rotation run: rotated {} certificates, skipped {}", rotated, skipped);
+  }
+
+  /**
+   * The configured rotation policy: {@code off}, {@code notify} or {@code auto} (default notify).
+   */
+  public String rotationPolicy() {
+    Object value = settingsService.serverSettings().get(SettingKeys.CERT_AUTO_ROTATE);
+    return value instanceof String s && isPolicy(s) ? s.toLowerCase() : DEFAULT_AUTO_ROTATE_POLICY;
+  }
+
+  /** The configured rotation horizon in days, clamped to a sane range (default 14). */
+  public int rotationDaysBefore() {
+    Object value = settingsService.serverSettings().get(SettingKeys.CERT_ROTATE_DAYS_BEFORE);
+    if (value instanceof Number n) {
+      return Math.max(1, Math.min(3650, n.intValue()));
+    }
+    if (value instanceof String s) {
+      try {
+        return Math.max(1, Math.min(3650, Integer.parseInt(s.trim())));
+      } catch (NumberFormatException ignored) {
+        // fall through to default
+      }
+    }
+    return DEFAULT_ROTATE_DAYS_BEFORE;
+  }
+
+  private static boolean isPolicy(String value) {
+    return "off".equalsIgnoreCase(value)
+        || "notify".equalsIgnoreCase(value)
+        || "auto".equalsIgnoreCase(value);
   }
 
   /**

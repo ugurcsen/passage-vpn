@@ -87,10 +87,47 @@ services:
     ports:
       - "${OPNL_FRONTEND_PORT:-80}:80"
 
-  # --- Remote node agent (opt-in; start on a gateway node with --profile node) ---
-  # Registers/heartbeats to the central backend over the internal mTLS endpoint and must
-  # present an agent client certificate (see /api/admin/nodes/{id}/agent-cert).
-  #   docker compose --profile node up -d opnl-agent
+  # --- Remote node gateway (opt-in; start on a gateway node with --profile node) ---
+  # Registers/heartbeats to the central backend over the internal mTLS endpoint, must
+  # present an agent client certificate (see /api/admin/nodes/{id}/agent-cert), and pulls
+  # its config bundle (daemon configs, PKI incl. the CRL, CCD, scripts, dnsmasq) from the
+  # central backend so its OpenVPN daemons are provisioned and updated like the local ones.
+  #   docker compose --profile node up -d opnl-node-openvpn opnl-agent
+  opnl-node-openvpn:
+    profiles: ["node"]
+    build: ./openvpn
+    container_name: opnl-node-openvpn
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    devices:
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv6.conf.all.forwarding=1
+      - net.ipv6.conf.default.forwarding=1
+      - net.ipv6.conf.all.disable_ipv6=0
+    volumes:
+      - opnl-node-pki:/etc/opnl/pki
+      - opnl-node-ccd:/etc/opnl/ccd
+      - opnl-node-config:/etc/opnl/config
+      - opnl-node-logs:/var/log/opnl
+    environment:
+      OPNL_PKI_DIR: /etc/opnl/pki/run
+      # Script callbacks (verify-user-pass, client-connect, ...) reach the CENTRAL backend.
+      # Defaults to the compose-internal URL for single-host testing; on a real remote gateway
+      # point this at the central backend's reachable address (e.g. https://vpn.example.com:9443).
+      OPNL_INTERNAL_BASE_URL: ${OPNL_NODE_INTERNAL_BASE_URL:-http://backend:8080}
+    networks:
+      - opnl-net
+    ports:
+      - "${OPNL_NODE_OPENVPN_PORT:-1196}:1194/udp"
+      - "${OPNL_NODE_OPENVPN_TCP_PORT:-1197}:1195/tcp"
+    expose:
+      - "7505-7510"        # management interface per daemon (daemon 0 = 7505)
+
   opnl-agent:
     profiles: ["node"]
     build:
@@ -109,13 +146,31 @@ services:
       OPNL_AGENT_ADMIN_IP: ${OPNL_AGENT_ADMIN_IP:-}
       OPNL_AGENT_MGMT_PASSWORD: ${OPNL_AGENT_MGMT_PASSWORD:-}
       OPNL_AGENT_HEARTBEAT_SECONDS: ${OPNL_AGENT_HEARTBEAT_SECONDS:-30}
+      OPNL_AGENT_SYNC_SECONDS: ${OPNL_AGENT_SYNC_SECONDS:-60}
       OPNL_AGENT_TLS_CA: ${OPNL_AGENT_TLS_CA:-/etc/opnl/agent/tls/ca.crt}
       OPNL_AGENT_TLS_CERT: ${OPNL_AGENT_TLS_CERT:-/etc/opnl/agent/tls/client.crt}
       OPNL_AGENT_TLS_KEY: ${OPNL_AGENT_TLS_KEY:-/etc/opnl/agent/tls/client.key}
       OPNL_INTERNAL_TOKEN: ${OPNL_INTERNAL_TOKEN:-change-me-internal-token}
+      # Core secrets the agent image needs to pass its own startup checks (SecurityBootstrapCheck
+      # and JwtService are profile-independent). Same values as the central backend.
+      OPNL_JWT_SECRET: ${OPNL_JWT_SECRET:?set OPNL_JWT_SECRET for the agent}
+      OPNL_OPENVPN_MGMT_PASSWORD: ${OPNL_OPENVPN_MGMT_PASSWORD:?set OPNL_OPENVPN_MGMT_PASSWORD for the agent}
       OPNL_SERVER_PORT: ${OPNL_SERVER_PORT:-8080}
+      # The gateway volumes the agent provisions for its own openvpn container (same layout
+      # as the central stack, so the pulled daemon configs are valid here verbatim).
+      OPNL_PKI_DIR: /etc/opnl/pki/run
+      OPNL_CCD_DIR: /etc/opnl/ccd
+      OPNL_CONFIG_DIR: /etc/opnl/config
+      OPNL_SCRIPTS_DIR: /etc/opnl/config/scripts
+      OPNL_LOG_DIR: /var/log/opnl
     volumes:
       - ${OPNL_AGENT_TLS_DIR:-./data/agent-tls}:/etc/opnl/agent/tls:ro
+      - opnl-node-pki:/etc/opnl/pki
+      - opnl-node-ccd:/etc/opnl/ccd
+      - opnl-node-config:/etc/opnl/config
+      - opnl-node-logs:/var/log/opnl
+    depends_on:
+      - opnl-node-openvpn
     networks:
       - opnl-net
     expose:
@@ -160,3 +215,7 @@ volumes:
   opnl-ccd:
   opnl-config:
   opnl-logs:
+  opnl-node-pki:
+  opnl-node-ccd:
+  opnl-node-config:
+  opnl-node-logs:

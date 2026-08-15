@@ -15,7 +15,7 @@ The panel is a set of cooperating containers deployed with Docker Compose:
 | `frontend` | React 18 + TypeScript SPA served by nginx; static bundle that calls `/api/**`, `/api/portal/**` and consumes `/ws` WebSocket events. Vite build. |
 | `openvpn` | Alpine container running OpenVPN 2.6 (one daemon per generated config), Easy-RSA 3.1 (hosted in the backend via subprocess), dnsmasq (VPN DNS + domain pinning) and the iptables/ip6tables firewall that enforces access rules. Requires `NET_ADMIN`. |
 | `db` | Not a separate container for SQLite — the database is a file in the shared `opnl-data` volume. A PostgreSQL profile (`OPNL_PROFILE=postgres`) swaps in a real database service. |
-| `opnl-agent` | Optional (compose `--profile node`): the backend's `agent` Spring profile running on a remote gateway node; registers and heartbeats to the central backend so the node's daemons appear in the panel. |
+| `opnl-agent` | Optional (compose `--profile node`): the backend's `agent` Spring profile running on a remote gateway node; registers and heartbeats to the central backend and pulls + provisions its config bundle (daemon configs, PKI incl. the CRL, CCD, scripts, dnsmasq) so the node's daemons appear in the panel and run like the local ones. |
 
 ```
                     +--------------------------------------------+
@@ -202,6 +202,45 @@ authorization via `@PreAuthorize("hasRole('ADMIN')")` etc. and the Swagger
     `heartbeat` are only accepted from that address (403
     `source_ip_mismatch`), hardening the registration path even before the
     certificate is provisioned.
+  - **Config distribution (config-pull)**: `POST /internal/node/config`
+    (`NodeConfigBundleService`, same mTLS/CN/source-IP protection as
+    `register`) returns the node's full gateway bundle: rendered daemon
+    configs + per-daemon management passwords, PKI (`ca.crt`, `server.crt`,
+    `server.key`, `ta.key`, **`crl.pem`** — so revocations reach remote
+    gateways), CCD overrides, connect scripts and dnsmasq domains. The bundle
+    carries a content hash (`version`, SHA-256 over all entries). The remote
+    agent (`AgentConfigSyncService`, `@Profile("agent")`) polls it on a fixed
+    schedule (`opnl.agent.sync-seconds`, default 60s) and skips applying when
+    the hash is unchanged; otherwise it writes everything atomically (temp file
+    + atomic move) into the shared gateway volumes, pins management passwords
+    and `server.key` to owner-read/write, marks scripts executable, deletes
+    stale managed files it previously owned, and rejects any entry whose name
+    would escape its directory. Central-rendered daemon configs embed the
+    central instance's volume paths, so this contract only holds because the
+    gateway containers mount the **same layout** (`/etc/opnl/pki`,
+    `/etc/opnl/ccd`, `/etc/opnl/config`, `/var/log/opnl`) — enforced by the
+    compose `node` profile, documented in `docs/configuration.md`. Script
+    callbacks (`verify-user-pass`, `client-connect`, ...) on the remote gateway
+    reach the central backend via `OPNL_NODE_INTERNAL_BASE_URL`.
+- **Multi-remote profiles**: the server setting `profile_multi_remote` (default
+  on) makes `.ovpn` generation embed **every** enabled daemon serving the
+  requested profile type as a `remote <host> <port> <proto>` line plus
+  `remote-random`, so clients load-balance across gateways. Disabling it pins a
+  profile to a single endpoint (first match by daemon index). A daemon bound to
+  a disabled or unknown node is never advertised. The advertised host resolves
+  as daemon `adminHost` → node `adminHost` → `OPNL_ADMIN_HOST`.
+- **Certificate lifetime & auto-rotation**: certificates are issued with a
+  configurable lifetime (`OPNL_PKI_CERT_EXPIRE`, default 730 days) and the CRL
+  is generated for at least that long so a revoked cert cannot outlive the CRL
+  window. A daily scheduler (`CertService.applyRotationPolicy`, 03:35 UTC) acts
+  on the server settings `cert_auto_rotate` (`off` | `notify` | `auto`,
+  default `notify`) and `cert_rotate_days_before` (default 14): in `auto` mode
+  any VALID, user-bound certificate within `cert_rotate_days_before` days of
+  expiry is rotated (new cert issued, old revoked, audit `CERT_ROTATE_AUTO`);
+  orphaned or non-user certificates are never auto-rotated. In `notify` mode
+  the same scan only flags candidates via the existing expiry-warning query
+  (`GET /api/admin/certs?expiring=true`). The portal AccountPage surfaces a
+  "certificate expires soon" warning for the signed-in user.
 - **Per-client firewall**: see `docs/access-rules.md`.
 
 ## 6. Frontend

@@ -52,9 +52,15 @@ class EasyRsaServiceTest {
                 "http://backend:8080",
                 easyrsaBin.toString(),
                 tempDir.resolve("logs").toString(),
-                "mgmt-pass"));
+                "mgmt-pass",
+                730));
     service = new EasyRsaService(properties, new ProcessRunner());
     indexFile = pkiDir.resolve("index.txt");
+  }
+
+  @Test
+  void certExpireDaysComesFromProperties() {
+    assertThat(service.certExpireDays()).isEqualTo(730);
   }
 
   private String indexWithRevoked(String serial, String revocationDate) {

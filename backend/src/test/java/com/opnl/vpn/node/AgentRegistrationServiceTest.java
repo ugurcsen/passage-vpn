@@ -67,6 +67,7 @@ class AgentRegistrationServiceTest {
             null,
             "mgmt-pass",
             30,
+            60,
             null,
             null,
             null);
@@ -119,6 +120,7 @@ class AgentRegistrationServiceTest {
             null,
             "mgmt-pass",
             30,
+            60,
             null,
             null,
             null);
@@ -143,6 +145,7 @@ class AgentRegistrationServiceTest {
             "10.0.0.5",
             "mgmt-pass",
             30,
+            60,
             null,
             null,
             null);

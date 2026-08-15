@@ -25,7 +25,8 @@ class SecurityBootstrapCheckTest {
             "http://localhost",
             "easyrsa",
             "/logs",
-            mgmtPassword);
+            mgmtPassword,
+            730);
     return new OpnlProperties("./data", "OpenVPN Panel", token, jwt, auth, openvpn);
   }
 

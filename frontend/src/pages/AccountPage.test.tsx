@@ -248,4 +248,30 @@ describe("AccountPage", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
   });
+
+  it("warns when the VPN certificate expires soon", async () => {
+    const expiring = {
+      ...certInfo,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url.startsWith("/api/auth/me")) return Promise.resolve(json(me()));
+        if (url === "/api/portal/cert") return Promise.resolve(json(expiring));
+        return Promise.resolve(json({}));
+      }),
+    );
+    renderPage();
+
+    expect(await screen.findByText(/expires on/i)).toBeInTheDocument();
+    expect(screen.getByText(/download a new profile/i)).toBeInTheDocument();
+  });
+
+  it("does not warn when the VPN certificate is far from expiry", async () => {
+    renderPage();
+    await screen.findByText(/vpn certificate/i);
+
+    expect(screen.queryByText(/download a new profile/i)).not.toBeInTheDocument();
+  });
 });

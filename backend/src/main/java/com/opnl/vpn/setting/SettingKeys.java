@@ -95,4 +95,22 @@ public final class SettingKeys {
    * (USER_LOCKED, SERVER_LOCKED); AUTO_LOGIN and GENERIC must be explicitly enabled by an admin.
    */
   public static final String PORTAL_PROFILE_TYPES = "portal_profile_types";
+
+  /**
+   * True when generated .ovpn profiles embed every daemon serving the profile type as a {@code
+   * remote} endpoint (with {@code remote-random}) instead of only the first one. Defaults to on so
+   * multi-node deployments load-balance automatically; set to false to always pin profiles to a
+   * single endpoint.
+   */
+  public static final String PROFILE_MULTI_REMOTE = "profile_multi_remote";
+
+  /**
+   * Certificate rotation policy for certificates nearing expiry: {@code "off"} (never rotate
+   * automatically), {@code "notify"} (warn only, the default) or {@code "auto"} (rotate
+   * automatically; the user's downloaded profiles become invalid and must be re-downloaded).
+   */
+  public static final String CERT_AUTO_ROTATE = "cert_auto_rotate";
+
+  /** Days before expiry at which the auto-rotate policy applies (default 14). */
+  public static final String CERT_ROTATE_DAYS_BEFORE = "cert_rotate_days_before";
 }

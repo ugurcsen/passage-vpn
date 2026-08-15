@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +25,7 @@ public class AccessRuleService {
   private final GroupRepository groupRepository;
   private final RuleEngine ruleEngine;
   private final AuditLogService auditLogService;
-  private final DnsmasqConfigService dnsmasqConfigService;
+  private final @Nullable DnsmasqConfigService dnsmasqConfigService;
   private final DnsScopeConflictService conflictService;
 
   public AccessRuleService(
@@ -33,7 +34,7 @@ public class AccessRuleService {
       GroupRepository groupRepository,
       RuleEngine ruleEngine,
       AuditLogService auditLogService,
-      DnsmasqConfigService dnsmasqConfigService,
+      @Nullable DnsmasqConfigService dnsmasqConfigService,
       DnsScopeConflictService conflictService) {
     this.ruleRepository = ruleRepository;
     this.userRepository = userRepository;
@@ -182,7 +183,9 @@ public class AccessRuleService {
 
   private void refreshDnsmasq() {
     try {
-      dnsmasqConfigService.refresh();
+      if (dnsmasqConfigService != null) {
+        dnsmasqConfigService.refresh();
+      }
     } catch (RuntimeException e) {
       // A dnsmasq render/write failure must never break rule CRUD.
     }

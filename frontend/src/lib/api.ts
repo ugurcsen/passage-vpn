@@ -468,6 +468,8 @@ export interface OpenVpnNode {
   mgmtHost: string;
   mgmtPortBase: number;
   adminIp: string | null;
+  /** Public host advertised as the remote endpoint for this node's daemons (fallback). */
+  adminHost: string | null;
   enabled: boolean;
   createdAt: string;
   lastSeenAt: string | null;

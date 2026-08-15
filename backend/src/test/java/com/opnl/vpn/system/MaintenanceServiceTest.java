@@ -90,7 +90,8 @@ class MaintenanceServiceTest {
                 "http://backend:8080",
                 "easyrsa",
                 tempDir.resolve("logs").toString(),
-                "mgmt-pass"));
+                "mgmt-pass",
+                730));
     this.properties = properties;
 
     Files.createDirectories(tempDir.resolve("pki"));

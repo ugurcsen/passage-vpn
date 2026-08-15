@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +34,7 @@ public class DnsOverrideService {
   private final UserRepository userRepository;
   private final GroupRepository groupRepository;
   private final AuditLogService auditLogService;
-  private final DnsmasqConfigService dnsmasqConfigService;
+  private final @Nullable DnsmasqConfigService dnsmasqConfigService;
   private final DnsScopeConflictService conflictService;
 
   public DnsOverrideService(
@@ -41,7 +42,7 @@ public class DnsOverrideService {
       UserRepository userRepository,
       GroupRepository groupRepository,
       AuditLogService auditLogService,
-      DnsmasqConfigService dnsmasqConfigService,
+      @Nullable DnsmasqConfigService dnsmasqConfigService,
       DnsScopeConflictService conflictService) {
     this.recordRepository = recordRepository;
     this.userRepository = userRepository;
@@ -234,7 +235,9 @@ public class DnsOverrideService {
 
   private void refreshDnsmasq() {
     try {
-      dnsmasqConfigService.refresh();
+      if (dnsmasqConfigService != null) {
+        dnsmasqConfigService.refresh();
+      }
     } catch (RuntimeException e) {
       // A dnsmasq render/write failure must never break DNS record CRUD.
       log.warn("Cannot refresh dnsmasq config after DNS override mutation: {}", e.getMessage());

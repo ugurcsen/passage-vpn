@@ -7,7 +7,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.common.ApiException;
-import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.network.DaemonService;
 import com.opnl.vpn.network.ServerConfig;
 import com.opnl.vpn.pki.CertService;
@@ -33,8 +32,6 @@ class ProfileServiceTest {
   private UserRepository userRepository;
   private ProfileTokenRepository tokenRepository;
   private SettingsService settingsService;
-  private OpnlProperties properties;
-  private OpnlProperties.OpenVpn openvpn;
   private ProfileService service;
 
   private User alice() {
@@ -54,9 +51,6 @@ class ProfileServiceTest {
     userRepository = mock(UserRepository.class);
     tokenRepository = mock(ProfileTokenRepository.class);
     settingsService = mock(SettingsService.class);
-    properties = mock(OpnlProperties.class);
-    openvpn = mock(OpnlProperties.OpenVpn.class);
-    when(properties.openvpn()).thenReturn(openvpn);
     when(settingsService.serverSettings()).thenReturn(java.util.Map.of());
     service =
         new ProfileService(
@@ -66,11 +60,11 @@ class ProfileServiceTest {
             daemonService,
             userRepository,
             tokenRepository,
-            settingsService,
-            properties);
+            settingsService);
 
     ServerConfig config = ServerConfig.defaults();
-    when(daemonService.resolveForProfile(org.mockito.ArgumentMatchers.any())).thenReturn(config);
+    when(daemonService.resolveAllForProfile(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(List.of(new DaemonService.ProfileEndpoint(config, "vpn.example.com")));
     when(easyRsa.caCert()).thenReturn("CA-CERT");
     when(easyRsa.taKey()).thenReturn("TA-KEY");
     when(easyRsa.clientCert("alice")).thenReturn("CERT");
@@ -96,7 +90,8 @@ class ProfileServiceTest {
             "vpn.example.com",
             false,
             null);
-    when(daemonService.resolveForProfile(ProfileType.AUTO_LOGIN)).thenReturn(certOnly);
+    when(daemonService.resolveAllForProfile(ProfileType.AUTO_LOGIN))
+        .thenReturn(List.of(new DaemonService.ProfileEndpoint(certOnly, "vpn.example.com")));
 
     OvpnFile file = service.downloadForUser("u1", ProfileType.AUTO_LOGIN);
 
@@ -186,12 +181,111 @@ class ProfileServiceTest {
   }
 
   @Test
-  void configuredAdminHostOverridesServerConfigHost() {
-    when(openvpn.adminHost()).thenReturn("65.21.108.250");
+  void profileUsesResolvedEndpointHost() {
+    when(daemonService.resolveAllForProfile(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(
+            List.of(new DaemonService.ProfileEndpoint(ServerConfig.defaults(), "65.21.108.250")));
 
     OvpnFile file = service.downloadForUser("u1", ProfileType.USER_LOCKED);
 
     assertThat(file.content()).contains("remote 65.21.108.250 1194");
+  }
+
+  @Test
+  void profileEmbedsAllEndpointsWhenMultiRemoteEnabled() {
+    ServerConfig second =
+        new ServerConfig(
+            1,
+            1195,
+            ServerConfig.Protocol.tcp,
+            "10.9.0.0",
+            "255.255.255.0",
+            List.of("1.1.1.1"),
+            null,
+            List.of(),
+            true,
+            false,
+            true,
+            "vpn-us.example.com",
+            false,
+            null);
+    when(settingsService.serverSettings())
+        .thenReturn(java.util.Map.of(SettingKeys.PROFILE_MULTI_REMOTE, true));
+    when(daemonService.resolveAllForProfile(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(
+            List.of(
+                new DaemonService.ProfileEndpoint(ServerConfig.defaults(), "vpn-eu.example.com"),
+                new DaemonService.ProfileEndpoint(second, "vpn-us.example.com")));
+
+    OvpnFile file = service.downloadForUser("u1", ProfileType.USER_LOCKED);
+
+    assertThat(file.content())
+        .contains("remote vpn-eu.example.com 1194 udp")
+        .contains("remote vpn-us.example.com 1195 tcp")
+        .contains("remote-random");
+  }
+
+  @Test
+  void profileDefaultsToMultiRemoteWhenSettingUnset() {
+    ServerConfig second =
+        new ServerConfig(
+            1,
+            1195,
+            ServerConfig.Protocol.udp,
+            "10.9.0.0",
+            "255.255.255.0",
+            List.of("1.1.1.1"),
+            null,
+            List.of(),
+            true,
+            false,
+            true,
+            "vpn-us.example.com",
+            false,
+            null);
+    when(daemonService.resolveAllForProfile(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(
+            List.of(
+                new DaemonService.ProfileEndpoint(ServerConfig.defaults(), "vpn-eu.example.com"),
+                new DaemonService.ProfileEndpoint(second, "vpn-us.example.com")));
+
+    OvpnFile file = service.downloadForUser("u1", ProfileType.USER_LOCKED);
+
+    assertThat(file.content()).contains("remote vpn-us.example.com 1195 udp");
+  }
+
+  @Test
+  void profilePinsFirstEndpointWhenMultiRemoteDisabled() {
+    ServerConfig second =
+        new ServerConfig(
+            1,
+            1195,
+            ServerConfig.Protocol.tcp,
+            "10.9.0.0",
+            "255.255.255.0",
+            List.of("1.1.1.1"),
+            null,
+            List.of(),
+            true,
+            false,
+            true,
+            "vpn-us.example.com",
+            false,
+            null);
+    when(settingsService.serverSettings())
+        .thenReturn(java.util.Map.of(SettingKeys.PROFILE_MULTI_REMOTE, false));
+    when(daemonService.resolveAllForProfile(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(
+            List.of(
+                new DaemonService.ProfileEndpoint(ServerConfig.defaults(), "vpn-eu.example.com"),
+                new DaemonService.ProfileEndpoint(second, "vpn-us.example.com")));
+
+    OvpnFile file = service.downloadForUser("u1", ProfileType.USER_LOCKED);
+
+    assertThat(file.content())
+        .contains("remote vpn-eu.example.com 1194")
+        .doesNotContain("remote vpn-us.example.com")
+        .doesNotContain("remote-random");
   }
 
   @Test

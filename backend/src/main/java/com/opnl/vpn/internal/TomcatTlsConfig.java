@@ -59,6 +59,9 @@ public class TomcatTlsConfig implements WebServerFactoryCustomizer<TomcatServlet
     connector.setPort(internalProperties.mtlsPort());
     connector.setSecure(true);
     connector.setScheme("https");
+    // Adding an SSLHostConfig alone does not flip the connector into TLS mode; without this the
+    // connector would serve plaintext HTTP on the mTLS port.
+    connector.setProperty("SSLEnabled", "true");
     connector.addSslHostConfig(sslHostConfig);
     factory.addAdditionalTomcatConnectors(connector);
   }

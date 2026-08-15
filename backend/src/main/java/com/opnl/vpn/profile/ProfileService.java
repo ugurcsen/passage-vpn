@@ -1,9 +1,7 @@
 package com.opnl.vpn.profile;
 
 import com.opnl.vpn.common.ApiException;
-import com.opnl.vpn.config.OpnlProperties;
 import com.opnl.vpn.network.DaemonService;
-import com.opnl.vpn.network.ServerConfig;
 import com.opnl.vpn.pki.CertService;
 import com.opnl.vpn.pki.EasyRsaService;
 import com.opnl.vpn.setting.SettingKeys;
@@ -39,7 +37,6 @@ public class ProfileService {
   private final UserRepository userRepository;
   private final ProfileTokenRepository tokenRepository;
   private final SettingsService settingsService;
-  private final OpnlProperties properties;
 
   public ProfileService(
       OvpnGenerator generator,
@@ -48,8 +45,7 @@ public class ProfileService {
       DaemonService daemonService,
       UserRepository userRepository,
       ProfileTokenRepository tokenRepository,
-      SettingsService settingsService,
-      OpnlProperties properties) {
+      SettingsService settingsService) {
     this.generator = generator;
     this.certService = certService;
     this.easyRsa = easyRsa;
@@ -57,7 +53,6 @@ public class ProfileService {
     this.userRepository = userRepository;
     this.tokenRepository = tokenRepository;
     this.settingsService = settingsService;
-    this.properties = properties;
   }
 
   /** Downloads a profile for a user; locked types ensure a client certificate exists. */
@@ -237,18 +232,30 @@ public class ProfileService {
   }
 
   private OvpnFile build(User user, ProfileType type, String[] certMaterial) {
-    ServerConfig config = daemonService.resolveForProfile(type);
-    String adminHost = properties.openvpn().adminHost();
+    List<DaemonService.ProfileEndpoint> endpoints = daemonService.resolveAllForProfile(type);
+    if (endpoints.isEmpty()) {
+      throw ApiException.badRequest("no_daemon", "No daemon serves this profile type");
+    }
+    List<OvpnGenerator.Endpoint> targets =
+        endpoints.stream()
+            .map(
+                e ->
+                    new OvpnGenerator.Endpoint(
+                        e.host(), e.config().port(), e.config().proto(), e.config().ipv6Enabled()))
+            .toList();
+    boolean multiRemote =
+        !Boolean.FALSE.equals(
+            settingsService.serverSettings().get(SettingKeys.PROFILE_MULTI_REMOTE));
     String content =
         generator.render(
             type,
-            config,
-            adminHost,
+            targets,
             easyRsa.caCert(),
             easyRsa.taKey(),
             certMaterial == null ? null : certMaterial[0],
             certMaterial == null ? null : certMaterial[1],
-            requiresMfaChallenge(user, type));
+            requiresMfaChallenge(user, type),
+            multiRemote);
     String daemonSuffix = type == ProfileType.GENERIC ? "-generic" : "";
     String filename =
         type.name().toLowerCase().replace('_', '-')

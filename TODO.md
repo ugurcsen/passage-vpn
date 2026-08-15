@@ -210,6 +210,31 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       public because the state machine guards transitions. `SetupControllerSecurityTest`
       added.
 
+**P5 — Multi-node cert/config distribution (approved plan: A/B/C)**
+- [x] A — shorter certificate lifetime + rotation policy: `EASYRSA_CERT_EXPIRE` 3650→730
+      (`OPNL_PKI_CERT_EXPIRE`), CRL generated for ≥ cert lifetime; server settings
+      `cert_auto_rotate` (`off`/`notify`/`auto`, default `notify`) + `cert_rotate_days_before`
+      (default 14); daily scheduler auto-rotates (audit `CERT_ROTATE_AUTO`) only
+      account-bound VALID certs; portal "certificate expires soon" warning on AccountPage
+- [x] B — multi-remote profiles: `OpenVpnNode.adminHost` (Flyway V19), all matching
+      daemons across nodes as multiple `remote` lines + `remote-random`;
+      `profile_multi_remote` server setting (default on)
+- [x] C — agent config + CRL pull (Pritunl-link pattern): `GET /internal/node/config`
+      bundle (daemon conf/mgmt-pass rendered for remote paths, ca/crl/ta.key/server
+      cert/key, CCD, scripts, dnsmasq), `AgentConfigSyncService` atomic write +
+      entrypoint-watcher reload, compose `node` profile volumes
+- [x] Live E2E on the staging host: agent mTLS registration + heartbeats, bundle pull
+      (17 files), central→node management connection (opnl-node-openvpn:7508), node
+      openvpn daemon running, CRL revocation propagation (revoke → new bundle →
+      node `crl.pem` matches central). Real bugs found & fixed: agent env vars
+      (`OPNL_JWT_SECRET`/`OPNL_OPENVPN_MGMT_PASSWORD`), `@Nullable DnsmasqConfigService`
+      for the agent profile, `@Autowired AgentRegistrationService`, nginx backend DNS
+      caching (`resolver 127.0.0.11` + variable `proxy_pass`), 9443 connector
+      `SSLEnabled`, keytool-based truststore bootstrap
+- [x] Idempotent cert re-issue on username re-use: `CertService.ensureUserCert` purges
+      stale certs left by a deleted account (revoke → CRL rejects, purge on-disk
+      artifacts, drop bookkeeping row) before issuing a fresh certificate
+
 ---
 
 ## Phase 0 — Project Scaffolding

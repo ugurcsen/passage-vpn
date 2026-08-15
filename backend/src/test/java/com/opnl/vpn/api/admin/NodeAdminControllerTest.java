@@ -52,6 +52,7 @@ class NodeAdminControllerTest {
         "vpn-eu.example.com",
         7505,
         "10.0.0.5",
+        null,
         true,
         null,
         true,

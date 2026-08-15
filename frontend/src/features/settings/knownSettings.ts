@@ -180,6 +180,28 @@ export const KNOWN_SETTINGS: KnownSetting[] = [
     type: "list",
     placeholder: "USER_LOCKED, SERVER_LOCKED, AUTO_LOGIN, GENERIC",
   },
+  {
+    key: "cert_auto_rotate",
+    label: "Certificate auto-rotation",
+    description:
+      "How certificates nearing expiry are handled. notify warns the admin; auto revokes and reissues them automatically, forcing users to download new profiles.",
+    type: "choice",
+    options: ["off", "notify", "auto"],
+  },
+  {
+    key: "cert_rotate_days_before",
+    label: "Rotation lead time",
+    description: "Days before expiry at which the auto-rotation policy applies (1–3650, default 14).",
+    type: "number",
+    placeholder: "14",
+  },
+  {
+    key: "profile_multi_remote",
+    label: "Multi-remote profiles",
+    description:
+      "Embed every daemon serving a profile type as a remote endpoint (with remote-random) in generated .ovpn files so clients load-balance across nodes. Turn off to pin profiles to a single endpoint.",
+    type: "boolean",
+  },
 ];
 
 /** Looks up metadata for a setting key, falling back to a raw JSON editor for unknown keys. */

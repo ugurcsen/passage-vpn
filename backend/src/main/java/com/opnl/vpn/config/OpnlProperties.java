@@ -43,7 +43,8 @@ public record OpnlProperties(
       String internalBaseUrl,
       String easyrsaBin,
       String logDir,
-      String mgmtPassword) {
+      String mgmtPassword,
+      int certExpireDays) {
     public String mgmtEndpoint() {
       return mgmtHost + ":" + mgmtPort;
     }

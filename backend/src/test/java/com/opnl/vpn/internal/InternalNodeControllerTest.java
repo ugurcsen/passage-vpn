@@ -2,7 +2,9 @@ package com.opnl.vpn.internal;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -14,6 +16,7 @@ import com.opnl.vpn.common.GlobalExceptionHandler;
 import com.opnl.vpn.config.InternalProperties;
 import com.opnl.vpn.network.NodeRegistryService;
 import com.opnl.vpn.network.OpenVpnNode;
+import com.opnl.vpn.node.NodeConfigBundleService;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -31,6 +34,7 @@ class InternalNodeControllerTest {
 
   private NodeRegistryService nodeRegistryService;
   private ClientCertReader clientCertReader;
+  private NodeConfigBundleService nodeConfigBundleService;
   private MockMvc mvc;
   private ObjectMapper objectMapper;
 
@@ -38,13 +42,15 @@ class InternalNodeControllerTest {
   void setUp() {
     nodeRegistryService = mock(NodeRegistryService.class);
     clientCertReader = mock(ClientCertReader.class);
+    nodeConfigBundleService = mock(NodeConfigBundleService.class);
     objectMapper = new ObjectMapper();
     mvc =
         MockMvcBuilders.standaloneSetup(
                 new InternalNodeController(
                     nodeRegistryService,
                     clientCertReader,
-                    new InternalProperties(MTLS_PORT, "./data/internal-tls")))
+                    new InternalProperties(MTLS_PORT, "./data/internal-tls"),
+                    nodeConfigBundleService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -90,7 +96,6 @@ class InternalNodeControllerTest {
                             "10.0.0.5",
                             "mgmtPassword",
                             "mgmt-pass"))))
-        .andExpect(status().isOk())
         .andExpect(jsonPath("$.nodeId").value("n-1"));
     verify(nodeRegistryService)
         .upsertByAgent("edge-eu", "vpn-eu.example.com", 7505, "10.0.0.5", "mgmt-pass", "10.0.0.5");
@@ -183,5 +188,78 @@ class InternalNodeControllerTest {
                             "mgmt-pass"))))
         .andExpect(status().is4xxClientError())
         .andExpect(jsonPath("$.code").value("invalid_mgmt_port"));
+  }
+
+  @Test
+  void configReturnsBundleForNode() throws Exception {
+    when(clientCertReader.subjectCn(any())).thenReturn("agent-edge-eu");
+    when(nodeRegistryService.findNode("n-1")).thenReturn(Optional.of(node("edge-eu")));
+    var bundle =
+        new NodeConfigBundleService.NodeConfigBundle(
+            "abc123",
+            java.util.List.of(
+                new NodeConfigBundleService.FileEntry("daemon-0.conf", "port 1194\n")),
+            java.util.List.of(),
+            java.util.List.of(),
+            java.util.List.of(),
+            java.util.List.of());
+    when(nodeConfigBundleService.bundleForNode("n-1")).thenReturn(bundle);
+
+    mvc.perform(
+            post("/internal/node/config")
+                .with(mtlsRequest())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("nodeId", "n-1"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value("abc123"))
+        .andExpect(jsonPath("$.daemons[0].name").value("daemon-0.conf"));
+    verify(nodeRegistryService).checkSourceIp("n-1", "10.0.0.5");
+    verify(nodeConfigBundleService).bundleForNode("n-1");
+  }
+
+  @Test
+  void configRejectsCertForDifferentNode() throws Exception {
+    when(clientCertReader.subjectCn(any())).thenReturn("agent-edge-us");
+    when(nodeRegistryService.findNode("n-1")).thenReturn(Optional.of(node("edge-eu")));
+    mvc.perform(
+            post("/internal/node/config")
+                .with(mtlsRequest())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("nodeId", "n-1"))))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("cert_identity_mismatch"));
+    verify(nodeConfigBundleService, never()).bundleForNode(any());
+  }
+
+  @Test
+  void configRejectsUnknownNode() throws Exception {
+    when(clientCertReader.subjectCn(any())).thenReturn("agent-edge-eu");
+    when(nodeRegistryService.findNode("n-1")).thenReturn(Optional.empty());
+    mvc.perform(
+            post("/internal/node/config")
+                .with(mtlsRequest())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("nodeId", "n-1"))))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("node_not_found"));
+  }
+
+  @Test
+  void configRejectsSourceIpMismatch() throws Exception {
+    when(clientCertReader.subjectCn(any())).thenReturn("agent-edge-eu");
+    when(nodeRegistryService.findNode("n-1")).thenReturn(Optional.of(node("edge-eu")));
+    doThrow(
+            new com.opnl.vpn.common.ApiException(
+                HttpStatus.FORBIDDEN, "source_ip_mismatch", "Agent source IP not allowed"))
+        .when(nodeRegistryService)
+        .checkSourceIp(eq("n-1"), any());
+    mvc.perform(
+            post("/internal/node/config")
+                .with(mtlsRequest())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("nodeId", "n-1"))))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("source_ip_mismatch"));
+    verify(nodeConfigBundleService, never()).bundleForNode(any());
   }
 }

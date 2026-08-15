@@ -60,7 +60,8 @@ class MonitorServiceTest {
                 "http://backend:8080",
                 "easyrsa",
                 tempDir.resolve("logs").toString(),
-                "mgmt-pass"));
+                "mgmt-pass",
+                730));
     registry = new ConnectionRegistry();
     daemonService = mock(DaemonService.class);
     when(daemonService.list()).thenReturn(List.of(daemon(0), daemon(1)));

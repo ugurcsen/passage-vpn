@@ -71,6 +71,7 @@ public class NodeRegistryService {
             .mgmtHost(request.mgmtHost().trim())
             .mgmtPortBase(request.mgmtPortBase())
             .adminIp(blankToNull(request.adminIp()))
+            .adminHost(blankToNull(request.adminHost()))
             .mgmtPassword(request.mgmtPassword())
             .enabled(request.enabled() == null || request.enabled())
             .createdAt(Instant.now())
@@ -99,6 +100,7 @@ public class NodeRegistryService {
     node.setMgmtHost(request.mgmtHost().trim());
     node.setMgmtPortBase(request.mgmtPortBase());
     node.setAdminIp(blankToNull(request.adminIp()));
+    node.setAdminHost(blankToNull(request.adminHost()));
     if (request.mgmtPassword() != null && !request.mgmtPassword().isBlank()) {
       node.setMgmtPassword(request.mgmtPassword());
     }
@@ -245,6 +247,14 @@ public class NodeRegistryService {
 
   /**
    * Rejects a request when the node has a pinned admin IP that does not match the observed source
+   * IP. Used by internal endpoints (config pull) that must stay bound to the node's admin address.
+   */
+  public void checkSourceIp(String nodeId, String sourceIp) {
+    enforceSourceIp(requireNode(nodeId), sourceIp);
+  }
+
+  /**
+   * Rejects a request when the node has a pinned admin IP that does not match the observed source
    * IP. Throws 403 otherwise; a missing admin IP means "allow any" (defense in depth only — the
    * mTLS certificate is the primary identity).
    */
@@ -275,6 +285,7 @@ public class NodeRegistryService {
       String mgmtHost,
       int mgmtPortBase,
       String adminIp,
+      String adminHost,
       String mgmtPassword,
       Boolean enabled) {}
 }

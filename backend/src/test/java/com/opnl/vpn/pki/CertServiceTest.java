@@ -12,10 +12,13 @@ import static org.mockito.Mockito.when;
 import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.pki.Certificate.Status;
+import com.opnl.vpn.setting.SettingKeys;
+import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +28,7 @@ class CertServiceTest {
   private EasyRsaService easyRsa;
   private CertificateRepository certificateRepository;
   private UserRepository userRepository;
+  private SettingsService settingsService;
   private CertService service;
 
   private User user() {
@@ -36,9 +40,15 @@ class CertServiceTest {
     easyRsa = mock(EasyRsaService.class);
     certificateRepository = mock(CertificateRepository.class);
     userRepository = mock(UserRepository.class);
+    settingsService = mock(SettingsService.class);
+    when(settingsService.serverSettings()).thenReturn(Map.of());
     service =
         new CertService(
-            easyRsa, certificateRepository, userRepository, mock(AuditLogService.class));
+            easyRsa,
+            certificateRepository,
+            userRepository,
+            mock(AuditLogService.class),
+            settingsService);
   }
 
   @Test
@@ -152,6 +162,31 @@ class CertServiceTest {
   void ensureUserCertThrowsWhenUserMissing() {
     when(userRepository.findById("missing")).thenReturn(Optional.empty());
     assertThatThrownBy(() -> service.ensureUserCert("missing")).isInstanceOf(ApiException.class);
+  }
+
+  @Test
+  void ensureUserCertPurgesStaleCertFromDeletedAccountWithSameName() {
+    Certificate stale =
+        Certificate.builder()
+            .id("old-c1")
+            .commonName("alice")
+            .userId("deleted-user")
+            .status(Status.VALID)
+            .serial("FF")
+            .build();
+    when(userRepository.findById("u1")).thenReturn(Optional.of(user()));
+    when(certificateRepository.findByUserIdAndStatus("u1", Status.VALID)).thenReturn(List.of());
+    when(certificateRepository.findByCommonName("alice")).thenReturn(Optional.of(stale));
+    when(easyRsa.hasClientCert("alice")).thenReturn(true);
+    when(easyRsa.index()).thenReturn(List.of());
+    when(certificateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    Certificate cert = service.ensureUserCert("u1");
+
+    assertThat(cert.getUserId()).isEqualTo("u1");
+    verify(easyRsa).revokeCert("alice");
+    verify(easyRsa).deleteClientCert("alice");
+    verify(certificateRepository).delete(stale);
   }
 
   @Test
@@ -281,6 +316,103 @@ class CertServiceTest {
         .thenReturn(List.of(soon));
 
     assertThat(service.expiringSoon()).containsExactly(soon);
+  }
+
+  // ---- auto-rotation policy -------------------------------------------------
+
+  @Test
+  void rotationPolicyDefaultsToNotify() {
+    assertThat(service.rotationPolicy()).isEqualTo("notify");
+  }
+
+  @Test
+  void rotationPolicyReadsServerSetting() {
+    when(settingsService.serverSettings()).thenReturn(Map.of(SettingKeys.CERT_AUTO_ROTATE, "auto"));
+    assertThat(service.rotationPolicy()).isEqualTo("auto");
+  }
+
+  @Test
+  void rotationPolicyRejectsUnknownValues() {
+    when(settingsService.serverSettings())
+        .thenReturn(Map.of(SettingKeys.CERT_AUTO_ROTATE, "sometimes"));
+    assertThat(service.rotationPolicy()).isEqualTo("notify");
+  }
+
+  @Test
+  void rotationDaysBeforeDefaultsTo14() {
+    assertThat(service.rotationDaysBefore()).isEqualTo(14);
+  }
+
+  @Test
+  void rotationDaysBeforeIsClamped() {
+    when(settingsService.serverSettings())
+        .thenReturn(Map.of(SettingKeys.CERT_ROTATE_DAYS_BEFORE, -5));
+    assertThat(service.rotationDaysBefore()).isEqualTo(1);
+    when(settingsService.serverSettings())
+        .thenReturn(Map.of(SettingKeys.CERT_ROTATE_DAYS_BEFORE, 99999));
+    assertThat(service.rotationDaysBefore()).isEqualTo(3650);
+  }
+
+  @Test
+  void applyRotationPolicyDoesNothingWhenNotAuto() {
+    service.applyRotationPolicy();
+    verify(certificateRepository, never()).findByStatusAndExpiresAtBetween(any(), any(), any());
+  }
+
+  @Test
+  void applyRotationPolicyRotatesExpiringCertsWhenAuto() {
+    Certificate expiring =
+        Certificate.builder()
+            .id("c1")
+            .commonName("alice")
+            .userId("u1")
+            .serial("OLD")
+            .status(Status.VALID)
+            .build();
+    when(settingsService.serverSettings()).thenReturn(Map.of(SettingKeys.CERT_AUTO_ROTATE, "auto"));
+    when(userRepository.existsById("u1")).thenReturn(true);
+    when(certificateRepository.findByStatusAndExpiresAtBetween(eq(Status.VALID), any(), any()))
+        .thenReturn(List.of(expiring));
+    when(userRepository.findById("u1")).thenReturn(Optional.of(user()));
+    when(certificateRepository.findByUserIdAndStatus("u1", Status.VALID))
+        .thenReturn(List.of(expiring));
+    when(certificateRepository.findById("c1")).thenReturn(Optional.of(expiring));
+    when(certificateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(easyRsa.index())
+        .thenReturn(
+            List.of(
+                new CertIndexEntry(
+                    CertIndexEntry.Status.VALID,
+                    Instant.now().plusSeconds(86400),
+                    "NEW",
+                    "alice.crt",
+                    "alice")));
+
+    service.applyRotationPolicy();
+
+    verify(easyRsa).revokeCert("alice");
+    verify(easyRsa).issueClientCert("alice");
+    assertThat(expiring.getSerial()).isEqualTo("NEW");
+  }
+
+  @Test
+  void applyRotationPolicySkipsOrphanedCertificates() {
+    Certificate orphan =
+        Certificate.builder()
+            .id("c1")
+            .commonName("ghost")
+            .userId(null)
+            .serial("S1")
+            .status(Status.VALID)
+            .build();
+    when(settingsService.serverSettings()).thenReturn(Map.of(SettingKeys.CERT_AUTO_ROTATE, "auto"));
+    when(certificateRepository.findByStatusAndExpiresAtBetween(eq(Status.VALID), any(), any()))
+        .thenReturn(List.of(orphan));
+
+    service.applyRotationPolicy();
+
+    verify(easyRsa, never()).revokeCert(any());
+    verify(easyRsa, never()).issueClientCert(any());
   }
 
   // ---- reconcile ----------------------------------------------------------

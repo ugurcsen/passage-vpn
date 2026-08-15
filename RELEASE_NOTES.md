@@ -8,6 +8,64 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.6 — 2026-08-15
+
+Sixth **beta** milestone (SemVer pre-release): multi-node certificate and config
+distribution (approved P5 plan A/B/C) — shorter certificate lifetimes with an
+automated rotation policy, multi-remote profiles that list every matching
+daemon across nodes, and a full agent config+CRL pull pipeline that keeps remote
+VPN nodes in sync. The whole flow was verified end-to-end live against a real
+remote node (agent registration, bundle pull, central→node management
+connection, CRL revocation propagation). Includes everything from
+`v0.1.0-beta.5` plus the changes below.
+
+### Phase P5 — Multi-node cert/config distribution
+- [x] **A — Shorter certificate lifetime + rotation policy** —
+      `EASYRSA_CERT_EXPIRE` 3650→730 (`OPNL_PKI_CERT_EXPIRE`), CRL generated to
+      cover ≥ cert lifetime; new server settings `cert_auto_rotate`
+      (`off`/`notify`/`auto`, default `notify`) and `cert_rotate_days_before`
+      (default 14); a daily scheduler auto-rotates only account-bound VALID
+      certificates (audit `CERT_ROTATE_AUTO`); the Account page warns the user
+      when their certificate expires soon.
+- [x] **B — Multi-remote profiles** — `OpenVpnNode.adminHost` (Flyway V19);
+      generated `.ovpn` files list every matching enabled daemon across nodes as
+      multiple `remote` lines with `remote-random`; new `profile_multi_remote`
+      server setting (default on).
+- [x] **C — Agent config + CRL pull (Pritunl-link pattern)** —
+      `GET /internal/node/config` returns a config bundle (daemon conf +
+      mgmt-pass rendered for remote paths, ca/crl/ta.key/server cert/key, CCD,
+      scripts, dnsmasq) versioned by content hash; `AgentConfigSyncService`
+      writes it atomically and the node openvpn entrypoint watcher reloads the
+      affected daemons; the compose `node` profile adds `opnl-node-openvpn` +
+      `opnl-agent`.
+
+### Live E2E verification (staging host)
+- Agent mTLS registration + heartbeats (node reports online), bundle pull
+  (17 files), central→node management connection (`opnl-node-openvpn:7508`),
+  remote openvpn daemon running, and CRL revocation propagation verified:
+  revoking a throwaway user's cert updated the central CRL, the agent pulled the
+  new bundle, and the node's `crl.pem` matched the central hash with the revoked
+  serial present.
+- Real bugs found and fixed during the run: missing agent env vars
+  (`OPNL_JWT_SECRET`/`OPNL_OPENVPN_MGMT_PASSWORD`), `@Nullable`
+  `DnsmasqConfigService` for the agent profile, `@Autowired`
+  `AgentRegistrationService`, nginx caching the backend container IP
+  (`resolver 127.0.0.11` + variable `proxy_pass`), the 9443 mTLS connector not
+  enabling `SSLEnabled`, and a keytool-based truststore bootstrap (the openssl
+  PKCS12 export produced a zero-entry store Java rejected).
+- **Idempotent cert re-issue on username re-use** — `CertService.ensureUserCert`
+  now purges stale certificates left by a deleted account (revoke → CRL
+  rejects, purge on-disk artifacts, drop the bookkeeping row) before issuing a
+  fresh certificate, fixing a `UNIQUE constraint (common_name)` 500 when a
+  username was re-created after a delete without certificate cleanup.
+
+### Verified
+- Backend suite green: 589 tests, 0 failures; `./gradlew test` +
+  `spotlessApply` BUILD SUCCESSFUL. Frontend: 28 files / 147 tests green, lint
+  0 errors. Release tag: `v0.1.0-beta.6`.
+
+---
+
 ## v0.1.0-beta.4 — 2026-08-15
 
 Fourth **beta** milestone (SemVer pre-release): client-side and bootstrap-path

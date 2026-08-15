@@ -218,10 +218,34 @@ public class DaemonService {
     return toServerConfig(entityForProfile(type));
   }
 
+  /**
+   * Every daemon that serves the given profile type, local and remote, in daemon-index order. Used
+   * to embed multiple {@code remote} endpoints in a connection profile; falls back to the primary
+   * daemon when nothing matches so single-daemon installs keep working.
+   */
+  @Transactional(readOnly = true)
+  public List<ProfileEndpoint> resolveAllForProfile(ProfileType type) {
+    List<Daemon> daemons = findAllForProfile(type);
+    return daemons.stream()
+        .map(d -> new ProfileEndpoint(toServerConfig(d), effectiveAdminHost(d)))
+        .toList();
+  }
+
   /** Whether the given daemon runs a dual-stack tunnel. */
   @Transactional(readOnly = true)
   public boolean ipv6Enabled(int daemonIndex) {
     return repository.findByDaemonIndex(daemonIndex).map(Daemon::isIpv6Enabled).orElse(false);
+  }
+
+  /**
+   * The enabled daemons assigned to a remote node (nodeId match), in daemon-index order. Used to
+   * assemble the config bundle a node agent pulls to run its gateways.
+   */
+  @Transactional(readOnly = true)
+  public List<Daemon> enabledDaemonsForNode(String nodeId) {
+    return repository.findByEnabledTrueOrderByDaemonIndexAsc().stream()
+        .filter(d -> nodeId != null && nodeId.equals(d.getNodeId()))
+        .toList();
   }
 
   /** Whether the primary daemon runs a dual-stack tunnel (default for panel-wide features). */
@@ -242,17 +266,74 @@ public class DaemonService {
    */
   @Transactional(readOnly = true)
   public Optional<Daemon> findMatchingForProfile(ProfileType type) {
-    return Optional.ofNullable(
-        switch (type) {
-          case GENERIC -> firstMatching(d -> d.isEnabled() && d.isClientCertNotRequired());
-          case AUTO_LOGIN ->
-              firstMatching(
-                  d -> d.isEnabled() && !d.isClientCertNotRequired() && !d.isAuthUserPass());
-          case USER_LOCKED, SERVER_LOCKED ->
-              firstMatching(
-                  d -> d.isEnabled() && !d.isClientCertNotRequired() && d.isAuthUserPass());
-        });
+    return repository.findByEnabledTrueOrderByDaemonIndexAsc().stream()
+        .filter(matchesProfile(type))
+        .findFirst();
   }
+
+  /**
+   * All enabled daemons matching the profile type (on enabled, existing nodes), or the primary as
+   * fallback.
+   */
+  @Transactional(readOnly = true)
+  public List<Daemon> findAllForProfile(ProfileType type) {
+    List<Daemon> matches =
+        repository.findByEnabledTrueOrderByDaemonIndexAsc().stream()
+            .filter(matchesProfile(type))
+            .filter(this::nodeServing)
+            .toList();
+    if (!matches.isEmpty()) {
+      return matches;
+    }
+    Daemon fallback = primary(list());
+    return fallback == null ? List.of() : List.of(fallback);
+  }
+
+  /** A daemon serves traffic only when local or when its node exists and is enabled. */
+  private boolean nodeServing(Daemon daemon) {
+    if (daemon.getNodeId() == null) {
+      return true;
+    }
+    return nodeRegistryService
+        .findNode(daemon.getNodeId())
+        .map(OpenVpnNode::isEnabled)
+        .orElse(false);
+  }
+
+  /**
+   * The effective public host for a daemon's profile endpoint: the daemon-level adminHost wins,
+   * then the owning node's adminHost (remote nodes), then the global {@code OPNL_ADMIN_HOST}.
+   * Returns null when none is set; callers fall back to a sensible default host.
+   */
+  public String effectiveAdminHost(Daemon daemon) {
+    String host = blankToNull(daemon.getAdminHost());
+    if (host == null && daemon.getNodeId() != null) {
+      host =
+          nodeRegistryService
+              .findNode(daemon.getNodeId())
+              .map(n -> blankToNull(n.getAdminHost()))
+              .orElse(null);
+    }
+    if (host == null) {
+      OpnlProperties.OpenVpn openvpn = properties.openvpn();
+      if (openvpn != null) {
+        host = blankToNull(openvpn.adminHost());
+      }
+    }
+    return host;
+  }
+
+  private java.util.function.Predicate<Daemon> matchesProfile(ProfileType type) {
+    return switch (type) {
+      case GENERIC -> d -> d.isEnabled() && d.isClientCertNotRequired();
+      case AUTO_LOGIN -> d -> d.isEnabled() && !d.isClientCertNotRequired() && !d.isAuthUserPass();
+      case USER_LOCKED, SERVER_LOCKED ->
+          d -> d.isEnabled() && !d.isClientCertNotRequired() && d.isAuthUserPass();
+    };
+  }
+
+  /** A single profile-serving endpoint with the effective public host clients should connect to. */
+  public record ProfileEndpoint(ServerConfig config, String host) {}
 
   /** Maps an entity to the shared config shape used by generators and writers. */
   public ServerConfig toServerConfig(Daemon daemon) {
@@ -271,13 +352,6 @@ public class DaemonService {
         daemon.getAdminHost(),
         daemon.isIpv6Enabled(),
         daemon.getIpv6Subnet());
-  }
-
-  private Daemon firstMatching(java.util.function.Predicate<Daemon> predicate) {
-    return repository.findByEnabledTrueOrderByDaemonIndexAsc().stream()
-        .filter(predicate)
-        .findFirst()
-        .orElse(null);
   }
 
   private Daemon primary(List<Daemon> daemons) {
@@ -342,7 +416,7 @@ public class DaemonService {
    * Resolves the server-wide traffic mode from the {@code network_mode} setting. Values are stored
    * JSON-encoded, so surrounding quotes are stripped. Anything other than "routed" means NAT.
    */
-  private String networkMode() {
+  public String networkMode() {
     return settingRepository
         .findById(SettingKeys.NETWORK_MODE)
         .map(ServerSetting::getValue)

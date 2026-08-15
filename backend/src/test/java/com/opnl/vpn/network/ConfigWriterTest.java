@@ -33,7 +33,8 @@ class ConfigWriterTest {
             "http://localhost",
             "easyrsa",
             tempDir.resolve("logs").toString(),
-            mgmtPassword);
+            mgmtPassword,
+            730);
     return new OpnlProperties(tempDir.toString(), "OpenVPN Panel", "token", jwt, auth, openvpn);
   }
 
@@ -65,6 +66,22 @@ class ConfigWriterTest {
 
     assertThat(tempDir.resolve("config/daemon-0.conf")).doesNotExist();
     assertThat(tempDir.resolve("config/daemon-0.mgmt-pass")).doesNotExist();
+  }
+
+  @Test
+  void renderDaemonReturnsConfAndPasswordWithoutWriting() {
+    OpnlProperties props = props("mgmt-secret");
+    ConfigWriter writer = new ConfigWriter(props);
+
+    ConfigWriter.DaemonRender render =
+        writer.renderDaemon(
+            ServerConfig.defaults(), new ServerConfigGenerator(new ObjectMapper()), props, "nat");
+
+    assertThat(render.daemonIndex()).isZero();
+    assertThat(render.mgmtPassword()).isEqualTo("mgmt-secret");
+    assertThat(render.conf())
+        .contains("management 0.0.0.0 7505 " + tempDir.resolve("config/daemon-0.mgmt-pass"));
+    assertThat(tempDir.resolve("config/daemon-0.conf")).doesNotExist();
   }
 
   @Test

@@ -1340,6 +1340,21 @@ Exchanges the current refreshToken for a fresh accessToken/refreshToken pair. A 
 
 ---
 
+### `POST /internal/node/config`
+
+Returns the node's config bundle (rendered daemon configs + management
+passwords, PKI incl. the CRL, CCD, scripts, dnsmasq) for the agent to apply to
+its gateway volumes. mTLS-only; the client cert `CN` must match the node and,
+when the node has `adminIp` set, the source IP must equal it.
+
+**Tags**: Node agent
+
+**Request body**: `ConfigRequest` — `{ "nodeId": "..." }`
+
+**Responses**: 200, 403 (`cert_identity_mismatch` / `source_ip_mismatch`), 404 (`node_not_found`)
+
+---
+
 ### `POST /internal/seed-admin`
 
 **Tags**: Internal

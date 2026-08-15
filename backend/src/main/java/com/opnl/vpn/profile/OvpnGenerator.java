@@ -1,7 +1,7 @@
 package com.opnl.vpn.profile;
 
-import com.opnl.vpn.network.ServerConfig;
 import com.opnl.vpn.network.ServerConfig.Protocol;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 /** Renders OpenVPN client profile text (.ovpn) for the four Access Server-style profile types. */
@@ -12,8 +12,7 @@ public class OvpnGenerator {
       """
       client
       dev tun
-      proto __PROTO__
-      remote __HOST__ __PORT__
+      __REMOTE_BLOCK__
       resolv-retry infinite
       nobind
       persist-key
@@ -31,33 +30,38 @@ public class OvpnGenerator {
       verb 3
       """;
 
+  /** One endpoint a profile can connect to. */
+  public record Endpoint(String host, int port, Protocol proto, boolean ipv6Enabled) {}
+
   /**
    * Generates the profile. Locked types embed the client certificate and key; GENERIC uses
    * username/password against a client-cert-not-required daemon.
    *
-   * @param adminHost override for the remote endpoint host; falls back to the server config when
-   *     blank/null.
+   * <p>When {@code multiRemote} is true and more than one endpoint is given, every endpoint is
+   * emitted as a {@code remote HOST PORT PROTO} line and {@code remote-random} is added so clients
+   * load-balance across all daemons serving the profile type. Otherwise only the first endpoint is
+   * used and a single {@code proto} + {@code remote} pair is rendered.
+   *
+   * @param endpoints candidate endpoints in daemon-index order; the effective public host is
+   *     already resolved by the caller.
    * @param mfaChallenge when true and the profile uses password auth, an interactive {@code
    *     static-challenge} prompt is added so the client can supply a TOTP code. A blank response is
    *     tolerated by the backend when MFA is not required.
    */
   public String render(
       ProfileType type,
-      ServerConfig config,
-      String adminHost,
+      List<Endpoint> endpoints,
       String caCert,
       String taKey,
       String cert,
       String key,
-      boolean mfaChallenge) {
-    String host =
-        adminHost == null || adminHost.isBlank()
-            ? (config.adminHost() == null || config.adminHost().isBlank()
-                ? "vpn.example.com"
-                : config.adminHost())
-            : adminHost;
-    int port = config.port();
-    Protocol proto = config.proto();
+      boolean mfaChallenge,
+      boolean multiRemote) {
+    if (endpoints == null || endpoints.isEmpty()) {
+      throw new IllegalArgumentException("At least one remote endpoint is required");
+    }
+    List<Endpoint> effective =
+        multiRemote && endpoints.size() > 1 ? endpoints : List.of(endpoints.get(0));
 
     String authUserPass =
         type == ProfileType.AUTO_LOGIN
@@ -76,17 +80,34 @@ public class OvpnGenerator {
     // the server runs dual-stack. Server pushes alone are ignored by several
     // clients (notably OpenVPN Connect), so the directives are embedded in the
     // profile itself.
-    String ipv6 = config.ipv6Enabled() ? "tun-ipv6\nredirect-gateway ipv6" : "";
+    String ipv6 = effective.get(0).ipv6Enabled() ? "tun-ipv6\nredirect-gateway ipv6" : "";
 
     return CLIENT_PREAMBLE
-        .replace("__PROTO__", proto.name())
-        .replace("__HOST__", host)
-        .replace("__PORT__", String.valueOf(port))
+        .replace("__REMOTE_BLOCK__", remoteBlock(effective))
         .replace("__AUTH_USER_PASS__", authUserPass)
         .replace("__IPV6__", ipv6)
         .replace("__TLS_CRYPT__", taKey.trim())
         .replace("__CERT_BLOCK__", certBlock)
         .replace("\n\n\n", "\n\n");
+  }
+
+  private String remoteBlock(List<Endpoint> endpoints) {
+    if (endpoints.size() == 1) {
+      Endpoint only = endpoints.get(0);
+      return "proto " + only.proto().name() + "\nremote " + only.host() + " " + only.port();
+    }
+    StringBuilder sb = new StringBuilder();
+    for (Endpoint e : endpoints) {
+      sb.append("remote ")
+          .append(e.host())
+          .append(" ")
+          .append(e.port())
+          .append(" ")
+          .append(e.proto().name())
+          .append("\n");
+    }
+    sb.append("remote-random");
+    return sb.toString();
   }
 
   private String block(String tag, String content) {

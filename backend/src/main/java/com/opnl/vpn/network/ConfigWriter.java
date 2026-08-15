@@ -34,12 +34,6 @@ public class ConfigWriter {
       ServerConfigGenerator generator,
       OpnlProperties props,
       String networkMode) {
-    String mgmtPassword = props.openvpn().mgmtPassword();
-    if (mgmtPassword == null || mgmtPassword.isBlank()) {
-      throw ApiException.internal(
-          "mgmt_password_missing",
-          "OPNL_OPENVPN_MGMT_PASSWORD is required before daemon configs can be written");
-    }
     try {
       Files.createDirectories(configDir);
       Files.createDirectories(logDir);
@@ -49,7 +43,35 @@ public class ConfigWriter {
       throw ApiException.internal("config_write", "Cannot create config dirs: " + e.getMessage());
     }
 
-    Path mgmtPassFile = writeMgmtPassword(config.daemonIndex(), mgmtPassword);
+    DaemonRender render = renderDaemon(config, generator, props, networkMode);
+    writeMgmtPassword(config.daemonIndex(), render.mgmtPassword());
+
+    Path file = configDir.resolve("daemon-" + config.daemonIndex() + ".conf");
+    try {
+      Files.writeString(file, render.conf(), StandardCharsets.UTF_8);
+      log.info("Wrote {}", file);
+    } catch (IOException e) {
+      throw ApiException.internal("config_write", "Cannot write " + file + ": " + e.getMessage());
+    }
+  }
+
+  /**
+   * Renders a daemon config and its management password for distribution without writing to disk.
+   * The embedded paths use this instance's configured volume paths, so the rendered config is valid
+   * in any container that mounts those paths identically (the node-agent compose contract).
+   */
+  public DaemonRender renderDaemon(
+      ServerConfig config,
+      ServerConfigGenerator generator,
+      OpnlProperties props,
+      String networkMode) {
+    String mgmtPassword = props.openvpn().mgmtPassword();
+    if (mgmtPassword == null || mgmtPassword.isBlank()) {
+      throw ApiException.internal(
+          "mgmt_password_missing",
+          "OPNL_OPENVPN_MGMT_PASSWORD is required before daemon configs can be written");
+    }
+    Path mgmtPassFile = configDir.resolve("daemon-" + config.daemonIndex() + ".mgmt-pass");
     String rendered =
         generator.render(
             config,
@@ -59,15 +81,11 @@ public class ConfigWriter {
             logDir.toString(),
             networkMode,
             mgmtPassFile.toString());
-
-    Path file = configDir.resolve("daemon-" + config.daemonIndex() + ".conf");
-    try {
-      Files.writeString(file, rendered, StandardCharsets.UTF_8);
-      log.info("Wrote {}", file);
-    } catch (IOException e) {
-      throw ApiException.internal("config_write", "Cannot write " + file + ": " + e.getMessage());
-    }
+    return new DaemonRender(config.daemonIndex(), rendered, mgmtPassword);
   }
+
+  /** A rendered daemon config plus the management password the daemon's config points at. */
+  public record DaemonRender(int daemonIndex, String conf, String mgmtPassword) {}
 
   /** Removes a daemon config file (used when disabling a daemon). */
   public synchronized void removeDaemon(int daemonIndex) {

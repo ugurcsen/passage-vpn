@@ -42,7 +42,8 @@ class MgmtClientManagerTest {
             "http://backend:8080",
             "easyrsa",
             tempDir.resolve("logs").toString(),
-            "mgmt-pass"));
+            "mgmt-pass",
+            730));
   }
 
   private OpenVpnNode node(String id, String host, int portBase, boolean enabled) {

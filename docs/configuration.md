@@ -42,6 +42,7 @@ through `${VAR:-default}` substitutions for the rest.
 | `OPNL_SCRIPTS_SRC_DIR` | `./openvpn/scripts` (dev) / `/app/openvpn-scripts` (image) | Source tree the backend syncs scripts from (keeps secrets out of the repo). |
 | `OPNL_LOG_DIR` | `./data/config/logs` / `/var/log/opnl` | OpenVPN daemon logs, status files, PIDs. |
 | `OPNL_EASY_RSA_BIN` | `easyrsa` | Path to the Easy-RSA binary used by the PKI service. |
+| `OPNL_PKI_CERT_EXPIRE` | `730` | Validity of newly issued client/server certificates in days. Shorter lifetimes mean a revocation window limited to the CRL is kept short; the CRL is always generated for at least this long. |
 | `OPNL_INTERNAL_TLS_DIR` | `./data/internal-tls` / `/var/lib/opnl/internal-tls` | Internal control-plane CA + keystores (agents' mTLS), bootstrapped on first start. Keep inside the data volume. |
 
 ## Security & auth
@@ -86,9 +87,24 @@ through `${VAR:-default}` substitutions for the rest.
 | `OPNL_OPENVPN_PORT` | `1194` | Host port mapped to the OpenVPN UDP listener. |
 | `OPNL_OPENVPN_TCP_PORT` | `1195` | Host port mapped to the OpenVPN TCP listener. |
 
-## Node agent (`OPNL_PROFILE=agent`, compose profile `node`)
+## Remote node gateway (`OPNL_PROFILE=agent`, compose profile `node`)
 
-Start on a gateway node with `docker compose --profile node up -d opnl-agent`.
+A gateway node runs two containers: `opnl-node-openvpn` (the local OpenVPN
+daemons) and `opnl-agent` (the backend in `agent` profile, which registers the
+node, heartbeats, and pulls its config bundle from the central backend). Start
+both on the gateway host with
+
+```bash
+docker compose --profile node up -d opnl-node-openvpn opnl-agent
+```
+
+The gateway containers share the `opnl-node-pki`/`opnl-node-ccd`/
+`opnl-node-config`/`opnl-node-logs` volumes. The agent provisions those volumes
+from the central bundle; the openvpn container consumes them read-only, exactly
+like the central stack, so the pulled daemon configs are valid verbatim. The
+pulled bundle is applied atomically and only when its content hash changes; the
+agent also reconciles stale managed files (previous daemon configs, revoked
+client CCD entries, etc.).
 
 | Variable | Default | Description |
 |---|---|---|
@@ -99,10 +115,14 @@ Start on a gateway node with `docker compose --profile node up -d opnl-agent`.
 | `OPNL_AGENT_MGMT_PASSWORD` | *(required)* | Password of the remote gateway's own management interface. |
 | `OPNL_AGENT_ADMIN_IP` | *(empty)* | Admin IP reported for the node. |
 | `OPNL_AGENT_HEARTBEAT_SECONDS` | `30` | Heartbeat interval to the central backend. |
+| `OPNL_AGENT_SYNC_SECONDS` | `60` | Config-bundle pull interval. The agent downloads the node's bundle (daemon configs, PKI incl. the CRL, CCD, scripts, dnsmasq) from `POST /internal/node/config` and applies it atomically only when its content hash changed. |
 | `OPNL_AGENT_TLS_CA` | `/etc/opnl/agent/tls/ca.crt` | mTLS client CA file (issued by the central backend via `POST /api/admin/nodes/{id}/agent-cert`). |
 | `OPNL_AGENT_TLS_CERT` | `/etc/opnl/agent/tls/client.crt` | mTLS client certificate. |
 | `OPNL_AGENT_TLS_KEY` | `/etc/opnl/agent/tls/client.key` | mTLS client private key. |
 | `OPNL_AGENT_TLS_DIR` | `./data/agent-tls` | **Host** directory holding the agent TLS files; mounted read-only into the agent container at `/etc/opnl/agent/tls`. |
+| `OPNL_NODE_INTERNAL_BASE_URL` | `http://backend:8080` | Base URL the remote gateway's OpenVPN scripts (`verify-user-pass`, `client-connect`, ...) use to call back into the **central** backend. The default only works when the gateway shares the central Docker network; a real remote gateway must point this at a reachable central address (e.g. `https://vpn.example.com:9443`). |
+| `OPNL_NODE_OPENVPN_PORT` | `1196` | Host port mapped to the remote gateway's UDP listener. |
+| `OPNL_NODE_OPENVPN_TCP_PORT` | `1197` | Host port mapped to the remote gateway's TCP listener. |
 
 ## OpenVPN container firewall (runtime-injected)
 
