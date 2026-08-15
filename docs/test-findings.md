@@ -32,6 +32,8 @@ case with wrong status code / masking, `[LOW]` polish / hardening.
 | 12 | LOW | Pre-fix invalid access rule remains in production data | data hygiene |
 | 13 | MED | Demo-seeded cert rows have no backing PKI files | demo mode |
 | 14 | HIGH | Full-tunnel VPN client on the server host black-holes host routing | operational |
+| 15 | HIGH | Cert restore flips the index to VALID without restoring on-disk artifacts | PKI / Easy-RSA |
+| 16 | HIGH | Web-login lockout never triggers (`@Transactional` rollback) | authentication |
 
 ---
 
@@ -448,6 +450,79 @@ equals the server host.
 
 ---
 
+### 2.15 HIGH — Cert restore flips the index to VALID without restoring on-disk artifacts
+
+**Location**
+- `backend/src/main/java/com/opnl/vpn/pki/CertService.java` (`unrevokeCert` / `restore`)
+- `backend/src/main/java/com/opnl/vpn/pki/EasyRsaService.java`
+
+**Repro** (live staging, OpenVPN 2.6.20 stack):
+```
+issue → revoke → restore (200, status back to VALID)
+then rotate  → HTTP 500 {"code":"pki_command", "message":"Unable to revoke as no
+                certificate was found"}
+also: restore → revoke → HTTP 500 pki_command (same message)
+```
+
+**Root cause** `restore()` flips the `index.txt` status byte V and regenerates the CRL,
+but does not restore the physical artifacts (`issued/<cn>.crt`, `private/<cn>.key`) that
+Easy-RSA needs for `revoke`/`renew`. After a revoke those files are gone (moved to
+`revoked/certs_by_serial/`), so any subsequent `revoke`/`rotate` cannot find the cert and
+fails with a `pki_command` 500.
+
+**Impact** An admin who restores a revoked certificate to re-enable a user cannot then
+revoke or rotate it; the certificate's lifecycle is stuck. The status reads VALID but the
+artifact is unusable — a silent data/artifact mismatch.
+
+**Fix**
+1. On `restore()`, also copy the revoked artifact back from
+   `revoked/certs_by_serial/<serial>/` (or regenerate from the index) into
+   `issued/` + `private/` before flipping the index, and re-sign/restore the `ta.key` CRL
+   state consistently.
+2. Fail fast (4xx with a clear message) if the revoked artifact directory is missing
+   instead of producing a half-VALID row.
+3. Add a `CertServiceTest` regression: issue → revoke → restore → rotate must succeed,
+   and restore → revoke must succeed.
+
+---
+
+### 2.16 HIGH — Web-login lockout never triggers (`@Transactional` rollback)
+
+**Location** `backend/src/main/java/com/opnl/vpn/auth/AuthService.java` — `login(...)`
+(e.g. `@Transactional` method that throws `ApiException` after `recordFailure(...)` and
+the `LOGIN_FAILED` audit write).
+
+**Repro** (live staging): 5+ wrong passwords for the same user via
+`POST /api/auth/login`:
+- `failed_attempts` in `users` stays 0, `locked_until` never set — login lockout never
+  engages (`lockoutMaxAttempts: 5`).
+- `audit_logs` contains 0 `LOGIN_FAILED` entries despite many failed attempts.
+
+**Contrast (working path)** `/internal/auth/verify` (`verifyVpnLogin`) is
+**non-transactional** and persists `failed_attempts`/`locked_until` correctly, so the
+VPN auth path does lock accounts. Only the web login path is broken.
+
+**Root cause** On a failed login the method calls `recordFailure(...)` and writes the
+audit event, then throws `ApiException` (a `RuntimeException`). Spring rolls the whole
+transaction back, discarding both the attempt counter and the audit row — so every failed
+attempt starts from zero and no lockout is ever reached.
+
+**Impact** Brute-force protection on the web login is effectively disabled; the
+`LOGIN_FAILED` audit trail is missing, so security monitoring cannot see login
+brute-force attempts.
+
+**Fix**
+1. Do not throw from the transactional method after recording the failure: split login
+   into a non-transactional facade that commits the failure record (and audit) before
+   returning the error to the controller, or
+2. persist failure + audit in a separate `REQUIRES_NEW`/non-transactional component called
+   before the exception path.
+3. Add an `AuthServiceTest` regression: N failed web logins increment `failed_attempts`,
+   write `LOGIN_FAILED` audit rows, and at the threshold set `locked_until`; the
+   subsequent attempt is rejected with a locked reason.
+
+---
+
 ## 3. Verified non-issues and API notes
 
 Recorded during testing so they are not re-reported as bugs:
@@ -522,6 +597,47 @@ Verified on a clean install (images rebuilt, volumes wiped, `.env` preserved):
   `server_settings` JSON value is harmless. The tunnel connect test must run from a
   **separate** client host (see finding 2.14).
 
+### M7 comprehensive live E2E pass (2026-08-16, staging 65.21.108.250)
+
+Ran the full §6 scenario catalog of `docs/test-plan.md` against the live stack. All
+scenarios `PASS` except findings F15/F16 and E2E-54 (needs an mTLS agent deployment —
+unit/integration covered). Highlights:
+
+- **Auth**: login/wrong-password, full MFA cycle (enroll→enable→login→redeem→disable),
+  refresh rotation (old refresh rejected 401), logout with Authorization header then token
+  reuse → 401, rate limiting (20/60 s → 429, then blocked burst of 26 → 11×429).
+- **API tokens**: create (`label`)/use/list/delete; deleted token → 401.
+- **RBAC**: GROUP_ADMIN sees only its group's users (API *and* UI grid); cross-group
+  user/group updates → 403; own-group updates → 200.
+- **Users/groups CRUD**: create/update/reset-password/login/ban→`account_banned`
+  403/unban/static-ip set+clear, group create/members/delete.
+- **PKI**: issue/re-issue-idempotent/revoke(+CRL)/restore/reconcile. **F15**: rotate or
+  revoke after restore → 500 `pki_command`.
+- **Profiles/share**: USER_LOCKED + AUTO_LOGIN `.ovpn` download (JSON `{filename,
+  content}`), share-link `GET /share/{token}` public and one-time (`usesLeft=1` →
+  409 on second download), QR 200, token revoke.
+- **Rules/DNS/branding**: rule create/disable/re-enable/delete; DNS override create/delete
+  (`ipv4` field); branding via `PUT /api/admin/settings/brand_name` +
+  `GET /api/public/brand`.
+- **Ops/monitoring**: status/dashboard/monitor/system/config-report/audit-logs/
+  connections/daemons (`resolve` mapping SERVER_LOCKED|USER_LOCKED→`test`,
+  AUTO_LOGIN|GENERIC→`Primary`), backups create/list/download, system metrics live
+  (CPU/mem/disk) on the Dashboard.
+- **Live VPN data-plane (real client in the openvpn container, `remote 127.0.0.1 1194`)**:
+  AUTO_LOGIN profile → "Initialization Sequence Completed", TLS handshake,
+  `AES-256-GCM` data channel, virtual IP `10.8.0.2` from the pool; **static IP
+  `10.8.0.199`** applied to the client interface via PUSH `ifconfig`; while connected,
+  `iptables -L -n` shows the per-user chain `OPNL_<hash>` (rule keyed on the static IP)
+  and the `OPNL_DOMAINS` chain; connection log rows record bytes + `disconnected_at`;
+  `POST /api/admin/connections/e2e_live/disconnect` (management interface) terminates the
+  session (200, row closed).
+- **UI (browser)**: login page renders (fresh reload) with branded name; admin login →
+  Dashboard (live stat cards, daemon list, traffic/sys charts); Users grid (RBAC-scoped
+  for GROUP_ADMIN), Certificates grid (issue/rotate/revoke/restore actions, status chips,
+  SYNC WITH PKI), Live Status page (daemon health table, Recent sessions with durations +
+  byte counters). No JS console errors; one a11y warning (form field id/name — see
+  finding 2.11, still flagged count 1–2 on some pages).
+
 ---
 
 ## 4. Verification commands
@@ -557,3 +673,8 @@ Suggested regression run after fixes:
     (finding 2.11).
 12. `GET /api/admin/rules` → no `not-a-cidr` rows remain; `POST` with `not-a-cidr` → 400
     (finding 2.12 / 2.7).
+13. Issue → revoke → restore → rotate a cert; and issue → revoke → restore → revoke: both
+    must succeed without a `pki_command` 500 (finding 2.15).
+14. N failed web logins (`POST /api/auth/login` wrong password) → `failed_attempts`
+    increments, `LOGIN_FAILED` audit rows appear, and at the threshold the account gets
+    `locked_until` and further attempts are rejected (finding 2.16).
