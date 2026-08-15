@@ -5,6 +5,7 @@ import com.opnl.vpn.network.ServerConfig;
 import com.opnl.vpn.setup.SetupService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,7 +38,10 @@ public class SetupController {
   }
 
   @GetMapping("/server-config")
-  @Operation(summary = "Current network/server configuration")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "Current network/server configuration",
+      description = "Admin-only: exposes server network details (subnet, ports, DNS, admin host).")
   public ServerConfig serverConfig() {
     return setupService.currentServerConfig();
   }

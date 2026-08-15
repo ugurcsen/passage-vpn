@@ -62,6 +62,36 @@ backend port. Includes everything from `v0.1.0-beta.3` plus the changes below.
 
 ---
 
+## v0.1.0-beta.5 — 2026-08-15
+
+Fifth **beta** milestone (SemVer pre-release): a role-independence audit of every
+HTTP endpoint after the beta.4 reseller escalation fix, plus the one hole it
+found — the setup wizard's network configuration was readable anonymously forever.
+Includes everything from `v0.1.0-beta.4` plus the changes below.
+
+### Security hardening
+- **Endpoint authorization audit (C4)** — every controller was reviewed for
+  role-independent access. Confirmed clean: all `/api/admin/**` endpoints are
+  role-gated (`@PreAuthorize`), all `/api/portal/**` endpoints act only on the
+  authenticated principal, `/internal/**` stays behind the internal token + mTLS,
+  `/ws/**` requires an admin JWT at the handshake, and profile share tokens are
+  128-bit single-use. 
+- **Admin-only server config (C4)** — `GET /api/setup/server-config` (previously
+  in the public setup allow-list forever) is now `@PreAuthorize("hasRole('ADMIN')")`.
+  It returned the full network configuration — VPN subnet/mask, port/protocol, DNS
+  servers, IPv6 subnet and admin host — to anyone, even after setup completed. The
+  wizard's `state`/`wizard` endpoints stay public because the state machine already
+  guards step transitions (admin creation only from `NOT_STARTED`).
+  `SetupControllerSecurityTest` locks in the behavior (anonymous 403, USER 403,
+  ADMIN 200, `state` public).
+
+### Verified
+- Backend suite green (`./gradlew test` + `spotlessCheck` BUILD SUCCESSFUL);
+  live deployment verified in Chrome (admin + reseller users UI intact, wizard
+  state flow unchanged). Release tag: `v0.1.0-beta.5`.
+
+---
+
 ## v0.1.0-beta.3 — 2026-08-15
 
 Third **beta** milestone (SemVer pre-release): on-demand portal share downloads

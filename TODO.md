@@ -202,6 +202,13 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       `setBanned`/static-IP/settings now take the acting user and reject ADMIN/RESELLER
       targets; UI hides those actions for resellers). Found + verified live: a reseller
       could previously take over the admin account via password reset.
+- [x] C4 — post-C3 endpoint sweep (every controller audited for role-independent access):
+      `/api/admin/**` role-gated, `/api/portal/**` self-scoped, `/internal/**` token+
+      mTLS guarded, `/ws/**` admin-JWT handshake, share tokens single-use. Fix:
+      `GET /api/setup/server-config` (was anonymous forever, leaks subnet/ports/DNS/admin
+      host) is now `@PreAuthorize("hasRole('ADMIN')")`; wizard state/`/wizard` steps stay
+      public because the state machine guards transitions. `SetupControllerSecurityTest`
+      added.
 
 ---
 
