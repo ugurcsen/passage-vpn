@@ -484,12 +484,17 @@ artifact is unusable — a silent data/artifact mismatch.
 3. Add a `CertServiceTest` regression: issue → revoke → restore → rotate must succeed,
    and restore → revoke must succeed.
 
-**Resolved** `9005aa2`. `EasyRsaService.unrevokeCert` now captures the restored serial
-and CN from the matching `index.txt` row and restores the artifacts **before** writing the
+**Resolved** `9005aa2` + `eec3949`. `EasyRsaService.unrevokeCert` now captures the restored
+serial and CN from the matching `index.txt` row and restores the artifacts **before** writing the
 index: the cert is copied back from `certs_by_serial/<serial>.pem` (fallback:
 `revoked/certs_by_serial/<serial>/<cn>.crt`) to `issued/<cn>.crt` (mandatory) and the key
 best-effort from `revoked/private_by_serial/<serial>.key` to `private/<cn>.key`. Missing
 cert artifact now fails fast with `pki_missing` (404) and leaves the index untouched.
+`eec3949` additionally removes the Easy-RSA 3.2.x revoked-archive leftovers
+(`revoked/certs_by_serial/<serial>.crt`, `revoked/private_by_serial/<serial>.key`,
+`revoked/reqs_by_serial/<serial>.req`) after restoring, otherwise a later revoke/rotate
+aborts with "Cannot revoke this certificate, a conflicting file exists". Live-verified on
+staging (M8): rotate and re-revoke after restore both return 200.
 Regressions: `unrevokeCertRestoresIssuedCertAndPrivateKey`,
 `unrevokeCertThrowsWhenRevokedArtifactMissing`, legacy-layout restore, and
 `CertServiceTest` restore→rotate and restore→revoke.
@@ -535,7 +540,9 @@ brute-force attempts.
 and the `LOGIN_FAILED` audit row in its own `REQUIRES_NEW` transaction; `AuthService.login`
 and the web MFA step call it **before** throwing the auth `ApiException`, so the record
 survives the enclosing rollback. The web MFA invalid-code path now also counts toward
-lockout, matching the VPN OTP path. Regressions: `loginRejectsWrongPassword`,
+lockout, matching the VPN OTP path. Live-verified on staging (M8): 5 wrong web logins
+persist 5 `LOGIN_FAILED` audit rows, set `locked_until`, and the next (correct-password)
+attempt is rejected with `account_locked`. Regressions: `loginRejectsWrongPassword`,
 `loginLocksAccountAfterMaxAttempts`, `mfaRejectsWrongCodeAndRecordsFailure`.
 
 ---
@@ -654,6 +661,33 @@ unit/integration covered). Highlights:
   SYNC WITH PKI), Live Status page (daemon health table, Recent sessions with durations +
   byte counters). No JS console errors; one a11y warning (form field id/name — see
   finding 2.11, still flagged count 1–2 on some pages).
+
+### M8 live re-verification of F15 + F16 fixes (2026-08-16, staging)
+
+Fixes deployed to the staging stack (`66d97c0`, `9005aa2`, `eec3949`) and both findings
+re-run against the live API:
+
+- **F16 (web-login lockout)** — fresh throwaway user `f16_repro`:
+  - 5× wrong password via `POST /api/auth/login` → each `401 invalid_credentials`.
+  - DB after the burst: `users.failed_attempts = 0` (reset at threshold) and
+    `users.locked_until` set (epoch millis).
+  - `audit_logs` holds exactly **5 `LOGIN_FAILED`** rows for that user (`detail`
+    contains `username` + `remoteIp`), committed despite the thrown exception.
+  - 6th attempt with the **correct** password → `401 account_locked`. Lockout engages.
+- **F15 (restore artifacts / re-revoke)** — fresh throwaway user `f15_repro`:
+  - issue → `VALID`; revoke → `REVOKED`; restore → `VALID`;
+  - **rotate → HTTP 200** `VALID` with a new serial (previously 500
+    `pki_command` "no certificate was found");
+  - restore → revoke again → **HTTP 200** `REVOKED` (previously 500
+    "conflicting file exists", the Easy-RSA 3.2.x revoked archive leftover removed by
+    `eec3949`).
+
+**Minor note (data hygiene, not blocking):** the admin DELETE user endpoint
+(`DeleteOptions.none()` by default, `UserAdminService.deleteUser`) removes the user but
+leaves the `certificates` row orphaned (its `common_name` is UNIQUE), so re-creating a
+user with the same username then fails cert issue with a SQLite unique-constraint 500
+(`internal_error`). Workaround: pass the cleanup flag (UI checkbox) or clear the orphan
+row. Out of scope for F15/F16; tracked as low-priority.
 
 ---
 
