@@ -55,6 +55,15 @@ frontend-dev: ## Run frontend Vite dev server
 test: ## Backend + frontend tests
 	$(MAKE) test-backend test-frontend
 
+coverage: ## Backend + frontend tests with coverage reports
+	$(MAKE) coverage-backend coverage-frontend
+
+coverage-backend: ## Backend coverage (jacoco; report in backend/build/reports/jacoco)
+	cd $(BACKEND_DIR) && ./gradlew test jacocoTestReport
+
+coverage-frontend: ## Frontend coverage (vitest v8; report in frontend/coverage)
+	cd $(FRONTEND_DIR) && npm run test:coverage
+
 test-backend: ## Backend tests (gradle)
 	cd $(BACKEND_DIR) && ./gradlew test
 

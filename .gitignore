@@ -40,3 +40,6 @@ logs/
 # TS incremental builds
 *.tsbuildinfo
 ._*
+
+# Test coverage reports
+coverage/

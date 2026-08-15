@@ -46,5 +46,15 @@ export default defineConfig({
     setupFiles: ["src/test/setup.ts"],
     css: false,
     testTimeout: 30000,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "json-summary"],
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/test/**",
+        "src/main.tsx",
+        "src/**/*.d.ts",
+      ],
+    },
   },
 });

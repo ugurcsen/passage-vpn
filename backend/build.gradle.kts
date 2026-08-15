@@ -5,6 +5,7 @@ plugins {
     id("org.springframework.boot") version "3.5.4"
     id("io.spring.dependency-management") version "1.1.7"
     id("com.diffplug.spotless") version "6.25.0"
+    id("jacoco")
 }
 
 group = "com.opnl"
@@ -83,6 +84,16 @@ tasks.withType<Test> {
     // A fresh DB each run avoids Flyway checksum drift across builds.
     doFirst {
         fileTree(layout.buildDirectory.get().asFile).matching { include("testdb.sqlite*") }.forEach { it.delete() }
+    }
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
     }
 }
 
