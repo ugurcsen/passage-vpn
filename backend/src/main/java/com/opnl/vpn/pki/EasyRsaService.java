@@ -251,6 +251,30 @@ public class EasyRsaService {
             "pki_restore", "Cannot restore private key for " + commonName + ": " + e.getMessage());
       }
     }
+    // Easy-RSA keeps the revoked archive copies under revoked/; a later revoke/rotate refuses to
+    // run while a conflicting file exists there, so clean the archive of this serial up.
+    deleteRevokedArchive(serial, certSource);
+  }
+
+  private void deleteRevokedArchive(String serial, Path certRestoredFrom) {
+    Path revokedDir = pkiDir.resolve("revoked");
+    deleteIfExists(revokedDir.resolve("certs_by_serial").resolve(serial + ".crt"));
+    deleteIfExists(revokedDir.resolve("private_by_serial").resolve(serial + ".key"));
+    deleteIfExists(revokedDir.resolve("reqs_by_serial").resolve(serial + ".req"));
+    if (certRestoredFrom.getParent() != null
+        && certRestoredFrom.getParent().getFileName() != null
+        && certRestoredFrom.getParent().getFileName().toString().equals(serial)) {
+      // Legacy layout restored from revoked/certs_by_serial/<serial>/<cn>.crt
+      deleteIfExists(certRestoredFrom);
+    }
+  }
+
+  private void deleteIfExists(Path path) {
+    try {
+      Files.deleteIfExists(path);
+    } catch (IOException e) {
+      log.warn("Cannot remove revoked archive file {} during restore: {}", path, e.getMessage());
+    }
   }
 
   /** Regenerates the CRL from the current index.txt. */

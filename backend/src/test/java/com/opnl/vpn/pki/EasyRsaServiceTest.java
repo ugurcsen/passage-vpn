@@ -85,13 +85,21 @@ class EasyRsaServiceTest {
   /** Simulates the artifact layout Easy-RSA leaves behind after a revoke. */
   private void writeRevokedArtifacts(String serial, String cn) throws Exception {
     Path certsBySerial = pkiDir.resolve("certs_by_serial");
+    Path revokedCerts = pkiDir.resolve("revoked").resolve("certs_by_serial");
     Path revokedKeys = pkiDir.resolve("revoked").resolve("private_by_serial");
+    Path revokedReqs = pkiDir.resolve("revoked").resolve("reqs_by_serial");
     Files.createDirectories(certsBySerial);
+    Files.createDirectories(revokedCerts);
     Files.createDirectories(revokedKeys);
+    Files.createDirectories(revokedReqs);
     Files.writeString(
         certsBySerial.resolve(serial + ".pem"), "-----BEGIN CERTIFICATE-----\n" + cn + "\n");
     Files.writeString(
+        revokedCerts.resolve(serial + ".crt"), "-----BEGIN CERTIFICATE-----\n" + cn + "\n");
+    Files.writeString(
         revokedKeys.resolve(serial + ".key"), "-----BEGIN PRIVATE KEY-----\n" + cn + "\n");
+    Files.writeString(
+        revokedReqs.resolve(serial + ".req"), "-----BEGIN CERTIFICATE REQUEST-----\n" + cn + "\n");
   }
 
   @Test
@@ -120,6 +128,14 @@ class EasyRsaServiceTest {
         .isEqualTo("-----BEGIN CERTIFICATE-----\nbob\n");
     assertThat(Files.readString(pkiDir.resolve("private").resolve("bob.key")))
         .isEqualTo("-----BEGIN PRIVATE KEY-----\nbob\n");
+    // The revoked archive must not keep copies or a later revoke/rotate fails with
+    // "a conflicting file exists" (Easy-RSA 3.2.x layout).
+    assertThat(pkiDir.resolve("revoked").resolve("certs_by_serial").resolve("02.crt"))
+        .doesNotExist();
+    assertThat(pkiDir.resolve("revoked").resolve("private_by_serial").resolve("02.key"))
+        .doesNotExist();
+    assertThat(pkiDir.resolve("revoked").resolve("reqs_by_serial").resolve("02.req"))
+        .doesNotExist();
   }
 
   @Test
@@ -145,6 +161,7 @@ class EasyRsaServiceTest {
 
     assertThat(Files.readString(pkiDir.resolve("issued").resolve("bob.crt")))
         .isEqualTo("legacy-cert");
+    assertThat(legacy.resolve("bob.crt")).doesNotExist();
   }
 
   @Test
