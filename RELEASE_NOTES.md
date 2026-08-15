@@ -8,7 +8,15 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
-## Unreleased — Scoped GROUP_ADMIN RBAC
+## v0.1.0-beta.7 — 2026-08-15
+
+Seventh **beta** milestone (SemVer pre-release): scoped `GROUP_ADMIN` RBAC
+(replacing the flat `RESELLER` role) and a **source-free production deployment
+workflow** — a deploy-only release tarball plus prebuilt GHCR images, so servers
+install without the source tree or a build toolchain. Includes everything from
+`v0.1.0-beta.6` plus the changes below.
+
+### Scoped GROUP_ADMIN RBAC
 
 Replaces the flat `RESELLER` role with a scoped `GROUP_ADMIN` role bound to one
 or more **root groups**. A group admin can manage only what an administrator
@@ -47,10 +55,27 @@ new Connection Logs page, API-token page) and docs mirror the same boundary.
 - [x] ApiTokens page: ADMIN role only.
 
 ### Tests
-- [x] Backend 599 green (UserAdminService/GroupAdminService scope suites,
-      ConnectionLogService scoping, DemoSeed assignments, token-role filter).
-- [x] Frontend 148 green (role-based routing/nav, Users/Groups role gating,
-      parent-name rendering, group-admin Delete visibility).
+- [x] Backend 903 green (UserAdminService/GroupAdminService scope suites,
+      ConnectionLogService scoping, DemoSeed assignments, token-role filter,
+      coverage gates enforced in CI).
+- [x] Frontend 169 green (role-based routing/nav, Users/Groups role gating,
+      parent-name rendering, group-admin Delete visibility, `useLiveStatus`
+      WS/REST coverage).
+
+### Deployment & release workflow
+- [x] `install.sh --mode=release` pulls prebuilt images from GHCR instead of
+      building from source — the server never needs the source tree or a build
+      toolchain.
+- [x] Deploy-only release tarball `opnl-vpn-<tag>.tar.gz` (compose files,
+      `.env.example`, installer, deploy doc): built locally with `make release`
+      and attached to the GitHub Release by the CI `package` job on version tags.
+- [x] `docker-compose.yml` services carry env-driven `image:` tags
+      (`OPNL_IMAGE_REGISTRY` / `OPNL_IMAGE_NAMESPACE` / `OPNL_IMAGE_TAG`) so the
+      same compose file serves dev builds and prod pulls.
+- [x] Swagger/OpenAPI off by default in production (`OPNL_API_DOCS_ENABLED=false`);
+      expanded `.dockerignore` keeps the build context lean.
+- [x] Docs: `docs/installation.md` (dev vs. release install), README badges +
+      production install commands, `docs/configuration.md` new variables.
 
 ---
 
