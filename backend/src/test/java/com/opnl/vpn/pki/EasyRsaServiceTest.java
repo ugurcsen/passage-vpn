@@ -2,12 +2,21 @@ package com.opnl.vpn.pki;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.opnl.vpn.common.ApiException;
 import com.opnl.vpn.common.ProcessRunner;
 import com.opnl.vpn.config.OpnlProperties;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -141,5 +150,339 @@ class EasyRsaServiceTest {
         .isInstanceOf(ApiException.class)
         .hasFieldOrPropertyWithValue("code", "pki_index");
     assertThat(Files.readString(indexFile)).isEqualTo(indexWithRevoked("02", "260801000000Z"));
+  }
+
+  // ---------- PKI state ----------
+
+  @Test
+  void isInitializedReflectsCaCrtPresence() throws Exception {
+    Path dir = tempDir.resolve("fresh");
+    Files.createDirectories(dir);
+    EasyRsaService fresh = serviceWithRunner(dir, mock(ProcessRunner.class));
+    assertThat(fresh.isInitialized()).isFalse();
+
+    Files.writeString(dir.resolve("ca.crt"), "dummy");
+    assertThat(fresh.isInitialized()).isTrue();
+  }
+
+  @Test
+  void pkiDirIsAbsolute() {
+    Path dir = tempDir.resolve("rel").toAbsolutePath();
+    assertThat(serviceWithRunner(dir, mock(ProcessRunner.class)).pkiDir()).isEqualTo(dir);
+  }
+
+  // ---------- init ----------
+
+  @Test
+  void initPkiSkipsWhenAlreadyInitialized() {
+    ProcessRunner runner = mock(ProcessRunner.class);
+    serviceWithRunner(pkiDir, runner).initPki();
+
+    verify(runner, never()).run(anyList(), anyMap());
+  }
+
+  @Test
+  void initPkiRunsInitAndBuildCaAndGeneratesTaKey() {
+    ProcessRunner runner = mock(ProcessRunner.class);
+    when(runner.run(anyList(), anyMap())).thenReturn(ok());
+    when(runner.run(anyList(), anyMap(), any())).thenReturn(ok());
+    EasyRsaService s = serviceWithRunner(tempDir.resolve("fresh-init"), runner);
+
+    s.initPki();
+
+    verify(runner, times(2)).run(anyList(), anyMap());
+    verify(runner).run(anyList(), anyMap(), any());
+  }
+
+  @Test
+  void initPkiThrowsWhenEasyrsaStepFails() {
+    ProcessRunner runner = mock(ProcessRunner.class);
+    when(runner.run(anyList(), anyMap())).thenReturn(fail("boom"));
+    EasyRsaService s = serviceWithRunner(tempDir.resolve("fresh-init-fail"), runner);
+
+    assertThatThrownBy(s::initPki)
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_command");
+  }
+
+  @Test
+  void initPkiThrowsWhenTaKeyGenerationFails() {
+    ProcessRunner runner = mock(ProcessRunner.class);
+    when(runner.run(anyList(), anyMap())).thenReturn(ok());
+    when(runner.run(anyList(), anyMap(), any())).thenReturn(fail("boom"));
+    EasyRsaService s = serviceWithRunner(tempDir.resolve("fresh-genkey-fail"), runner);
+
+    assertThatThrownBy(s::initPki)
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_init");
+  }
+
+  // ---------- server cert ----------
+
+  @Test
+  void buildServerCertCopiesExistingFilesWithoutRunning() throws Exception {
+    ProcessRunner runner = mock(ProcessRunner.class);
+    Files.createDirectories(pkiDir.resolve("issued"));
+    Files.createDirectories(pkiDir.resolve("private"));
+    Files.writeString(pkiDir.resolve("issued/server.crt"), "crt body");
+    Files.writeString(pkiDir.resolve("private/server.key"), "key body");
+
+    serviceWithRunner(pkiDir, runner).buildServerCert("server");
+
+    verify(runner, never()).run(anyList(), anyMap());
+    assertThat(Files.readString(pkiDir.resolve("server.crt"))).isEqualTo("crt body");
+    assertThat(Files.readString(pkiDir.resolve("server.key"))).isEqualTo("key body");
+  }
+
+  @Test
+  void buildServerCertRunsEasyrsaWhenMissingAndCopiesToRoot() throws Exception {
+    Path bin = tempDir.resolve("easyrsa-server");
+    Files.writeString(
+        bin,
+        "#!/bin/sh\n"
+            + "mkdir -p \"$EASYRSA_PKI/issued\" \"$EASYRSA_PKI/private\"\n"
+            + "echo crt > \"$EASYRSA_PKI/issued/server.crt\"\n"
+            + "echo key > \"$EASYRSA_PKI/private/server.key\"\n"
+            + "exit 0\n");
+    bin.toFile().setExecutable(true);
+    Path dir = tempDir.resolve("server-fresh");
+    Files.createDirectories(dir);
+    Files.writeString(dir.resolve("ca.crt"), "ca");
+    EasyRsaService s = serviceWith(dir, bin.toString(), new ProcessRunner());
+
+    s.buildServerCert("server");
+
+    assertThat(dir.resolve("server.crt")).exists();
+    assertThat(dir.resolve("server.key")).exists();
+  }
+
+  @Test
+  void buildServerCertThrowsWhenPkiMissing() {
+    ProcessRunner runner = mock(ProcessRunner.class);
+    EasyRsaService s = serviceWithRunner(tempDir.resolve("no-pki"), runner);
+
+    assertThatThrownBy(() -> s.buildServerCert("server"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_not_initialized");
+  }
+
+  // ---------- client certs ----------
+
+  @Test
+  void issueClientCertRunsBuildClientFull() {
+    ProcessRunner runner = mock(ProcessRunner.class);
+    when(runner.run(anyList(), anyMap())).thenReturn(ok());
+    EasyRsaService s = serviceWithRunner(pkiDir, runner);
+
+    s.issueClientCert("alice");
+
+    verify(runner).run(anyList(), anyMap());
+  }
+
+  @Test
+  void issueClientCertThrowsWhenPkiMissing() {
+    ProcessRunner runner = mock(ProcessRunner.class);
+    EasyRsaService s = serviceWithRunner(tempDir.resolve("no-pki"), runner);
+
+    assertThatThrownBy(() -> s.issueClientCert("alice"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_not_initialized");
+  }
+
+  @Test
+  void revokeCertRunsRevokeAndGenCrl() {
+    ProcessRunner runner = mock(ProcessRunner.class);
+    when(runner.run(anyList(), anyMap())).thenReturn(ok());
+    EasyRsaService s = serviceWithRunner(pkiDir, runner);
+
+    s.revokeCert("alice");
+
+    verify(runner, times(2)).run(anyList(), anyMap());
+  }
+
+  @Test
+  void genCrlThrowsWhenEasyrsaFails() {
+    ProcessRunner runner = mock(ProcessRunner.class);
+    when(runner.run(anyList(), anyMap())).thenReturn(fail("boom"));
+    EasyRsaService s = serviceWithRunner(pkiDir, runner);
+
+    assertThatThrownBy(s::genCrl)
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_command");
+  }
+
+  @Test
+  void hasClientCertReflectsIssuedCertificatePresence() throws Exception {
+    assertThat(service.hasClientCert("alice")).isFalse();
+    Files.createDirectories(pkiDir.resolve("issued"));
+    Files.writeString(pkiDir.resolve("issued/alice.crt"), "x");
+    assertThat(service.hasClientCert("alice")).isTrue();
+  }
+
+  // ---------- index ----------
+
+  @Test
+  void indexParsesEntries() throws Exception {
+    Files.writeString(indexFile, indexWithRevoked("02", "260801000000Z"));
+
+    List<CertIndexEntry> entries = service.index();
+
+    assertThat(entries).hasSize(2);
+  }
+
+  @Test
+  void indexThrowsWhenIndexFileMissing() {
+    assertThatThrownBy(service::index)
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_index");
+  }
+
+  @Test
+  void unrevokeCertThrowsWhenIndexUnreadable() throws Exception {
+    Files.createDirectories(indexFile);
+
+    assertThatThrownBy(() -> service.unrevokeCert("02", "bob"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_index");
+  }
+
+  // ---------- file accessors ----------
+
+  @Test
+  void fileAccessorsReadArtifacts() throws Exception {
+    Files.createDirectories(pkiDir.resolve("issued"));
+    Files.createDirectories(pkiDir.resolve("private"));
+    Files.writeString(pkiDir.resolve("ca.crt"), "ca content");
+    Files.writeString(pkiDir.resolve("issued/server.crt"), "server crt");
+    Files.writeString(pkiDir.resolve("private/server.key"), "server key");
+    Files.writeString(pkiDir.resolve("ta.key"), "ta content");
+    Files.writeString(pkiDir.resolve("issued/alice.crt"), "alice crt");
+    Files.writeString(pkiDir.resolve("private/alice.key"), "alice key");
+
+    assertThat(service.caCert()).isEqualTo("ca content");
+    assertThat(service.serverCert()).isEqualTo("server crt");
+    assertThat(service.serverKey()).isEqualTo("server key");
+    assertThat(service.taKey()).isEqualTo("ta content");
+    assertThat(service.clientCert("alice")).isEqualTo("alice crt");
+    assertThat(service.clientKey("alice")).isEqualTo("alice key");
+  }
+
+  @Test
+  void fileAccessorsThrowWhenPkiNotInitialized() throws Exception {
+    Files.deleteIfExists(pkiDir.resolve("ca.crt"));
+
+    assertThatThrownBy(service::caCert)
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_not_initialized");
+    assertThatThrownBy(service::serverCert)
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_not_initialized");
+    assertThatThrownBy(service::serverKey)
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_not_initialized");
+    assertThatThrownBy(service::taKey)
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_not_initialized");
+    assertThatThrownBy(() -> service.clientCert("alice"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_not_initialized");
+    assertThatThrownBy(() -> service.clientKey("alice"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_not_initialized");
+  }
+
+  @Test
+  void fileAccessorsThrowPkiMissingWhenArtifactAbsent() throws Exception {
+    Files.createDirectories(pkiDir);
+    Files.writeString(pkiDir.resolve("ca.crt"), "ca content");
+
+    assertThatThrownBy(service::serverCert)
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_missing");
+    assertThatThrownBy(service::serverKey)
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_missing");
+    assertThatThrownBy(service::taKey)
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_missing");
+    assertThatThrownBy(() -> service.clientCert("alice"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_missing");
+    assertThatThrownBy(() -> service.clientKey("alice"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_missing");
+  }
+
+  @Test
+  void crlPemRegeneratesAndReturnsContent() throws Exception {
+    Path bin = tempDir.resolve("easyrsa-crl");
+    Files.writeString(bin, "#!/bin/sh\necho \"CRL CONTENT\" > \"$EASYRSA_PKI/crl.pem\"\nexit 0\n");
+    bin.toFile().setExecutable(true);
+    Path dir = tempDir.resolve("crl-test");
+    Files.createDirectories(dir);
+    Files.writeString(dir.resolve("ca.crt"), "ca");
+    EasyRsaService s = serviceWith(dir, bin.toString(), new ProcessRunner());
+
+    assertThat(s.crlPem()).isEqualTo("CRL CONTENT\n");
+    assertThat(dir.resolve("crl.pem")).exists();
+  }
+
+  @Test
+  void crlPemThrowsWhenRegenerationWritesNothing() {
+    assertThatThrownBy(service::crlPem)
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "pki_missing");
+  }
+
+  @Test
+  void deleteClientCertRemovesIssuedAndPrivateFiles() throws Exception {
+    Files.createDirectories(pkiDir.resolve("issued"));
+    Files.createDirectories(pkiDir.resolve("private"));
+    Files.writeString(pkiDir.resolve("issued/alice.crt"), "x");
+    Files.writeString(pkiDir.resolve("private/alice.key"), "y");
+
+    service.deleteClientCert("alice");
+
+    assertThat(pkiDir.resolve("issued/alice.crt")).doesNotExist();
+    assertThat(pkiDir.resolve("private/alice.key")).doesNotExist();
+  }
+
+  // ---------- helpers ----------
+
+  private EasyRsaService serviceWith(Path pkiDir, String easyrsaBin, ProcessRunner runner) {
+    OpnlProperties properties =
+        new OpnlProperties(
+            tempDir.resolve("data").toString(),
+            "OpenVPN Panel",
+            "internal-token",
+            new OpnlProperties.Jwt("j".repeat(64), 900, 14),
+            new OpnlProperties.Auth("local", 5, 300, 300, 20, 60),
+            new OpnlProperties.OpenVpn(
+                "127.0.0.1",
+                7505,
+                "vpn.example.com",
+                pkiDir.toString(),
+                tempDir.resolve("ccd").toString(),
+                tempDir.resolve("config").toString(),
+                tempDir.resolve("scripts").toString(),
+                "openvpn/scripts",
+                "http://backend:8080",
+                easyrsaBin,
+                tempDir.resolve("logs").toString(),
+                "mgmt-pass",
+                730));
+    return new EasyRsaService(properties, runner);
+  }
+
+  private EasyRsaService serviceWithRunner(Path pkiDir, ProcessRunner runner) {
+    return serviceWith(pkiDir, "/usr/bin/easyrsa", runner);
+  }
+
+  private ProcessRunner.Result ok() {
+    return new ProcessRunner.Result(0, "", "");
+  }
+
+  private ProcessRunner.Result fail(String stderr) {
+    return new ProcessRunner.Result(1, "", stderr);
   }
 }

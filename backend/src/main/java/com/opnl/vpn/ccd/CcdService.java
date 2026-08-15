@@ -467,16 +467,17 @@ public class CcdService {
     }
     int prefix = ipv6Prefix();
     BigInteger addr = toUnsigned(address.getAddress());
-    BigInteger network = toUnsigned(maskToNetwork(address.getAddress(), prefix));
+    BigInteger network = subnetNetwork(prefix);
     BigInteger mask = prefixMask(prefix);
     if (!addr.and(mask).equals(network)) {
       throw ApiException.badRequest(
           "invalid_static_ipv6",
           "IPv6 is outside the VPN subnet " + ipv6SubnetBase() + "/" + prefix);
     }
+    BigInteger hostMask = BigInteger.ONE.shiftLeft(128 - prefix).subtract(BigInteger.ONE);
     if (addr.equals(network)
         || addr.equals(network.add(BigInteger.ONE))
-        || addr.equals(network.or(mask.not()))) {
+        || addr.equals(network.or(hostMask))) {
       throw ApiException.badRequest(
           "invalid_static_ipv6", "IPv6 must not be the network, server or broadcast address");
     }
@@ -499,15 +500,24 @@ public class CcdService {
           "invalid_ipv6_pool", "IPv6 pool start must not be greater than its end");
     }
     int prefix = ipv6Prefix();
-    BigInteger network =
-        toUnsigned(maskToNetwork(ipv6ToUnsigned(parts[0].trim()).toByteArray(), prefix));
-    BigInteger mask = prefixMask(prefix);
-    BigInteger subnetEnd = network.or(mask.not());
+    BigInteger network = subnetNetwork(prefix);
+    BigInteger hostMask = BigInteger.ONE.shiftLeft(128 - prefix).subtract(BigInteger.ONE);
+    BigInteger subnetEnd = network.or(hostMask);
     if (start.compareTo(network.add(BigInteger.ONE)) <= 0 || end.compareTo(subnetEnd) >= 0) {
       throw ApiException.badRequest(
           "invalid_ipv6_pool", "IPv6 pool must be host addresses inside the VPN subnet");
     }
     return new Ipv6PoolRange(start, end);
+  }
+
+  /** The network address (as unsigned BigInteger) of the server's configured IPv6 subnet. */
+  private BigInteger subnetNetwork(int prefix) {
+    try {
+      InetAddress subnet = InetAddress.getByName(ipv6SubnetBase());
+      return toUnsigned(maskToNetwork(subnet.getAddress(), prefix));
+    } catch (Exception e) {
+      throw ApiException.badRequest("invalid_ipv6_subnet", "IPv6 subnet must be a CIDR");
+    }
   }
 
   private BigInteger ipv6ToUnsigned(String ip) {
@@ -555,11 +565,45 @@ public class CcdService {
     } else {
       System.arraycopy(bytes, 0, result, 16 - bytes.length, bytes.length);
     }
-    try {
-      return InetAddress.getByAddress(result).getHostAddress();
-    } catch (Exception e) {
-      throw ApiException.badRequest("invalid_ipv6_pool", "Cannot format IPv6 address");
+    return canonicalIpv6(result);
+  }
+
+  /** RFC 5952 canonical form of a 16-byte IPv6 address (longest zero run compressed). */
+  private static String canonicalIpv6(byte[] address) {
+    int[] groups = new int[8];
+    for (int i = 0; i < 8; i++) {
+      groups[i] = ((address[i * 2] & 0xFF) << 8) | (address[i * 2 + 1] & 0xFF);
     }
+    int bestStart = -1;
+    int bestLen = 1;
+    for (int i = 0; i < 8; ) {
+      if (groups[i] == 0) {
+        int j = i;
+        while (j < 8 && groups[j] == 0) {
+          j++;
+        }
+        if (j - i >= 2 && j - i > bestLen) {
+          bestStart = i;
+          bestLen = j - i;
+        }
+        i = j;
+      } else {
+        i++;
+      }
+    }
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < 8; i++) {
+      if (i == bestStart) {
+        sb.append("::");
+        i += bestLen - 1;
+        continue;
+      }
+      if (sb.length() > 0 && sb.charAt(sb.length() - 1) != ':') {
+        sb.append(':');
+      }
+      sb.append(Integer.toHexString(groups[i]));
+    }
+    return sb.length() == 0 ? "::" : sb.toString();
   }
 
   private static BigInteger toUnsigned(byte[] bytes) {
@@ -568,13 +612,14 @@ public class CcdService {
 
   private static byte[] maskToNetwork(byte[] addressBytes, int prefix) {
     byte[] out = addressBytes.clone();
+    int skip = out.length - 16;
     int fullBytes = prefix / 8;
     int remBits = prefix % 8;
-    for (int i = fullBytes; i < 16; i++) {
+    for (int i = fullBytes + skip; i < 16 + skip; i++) {
       out[i] = 0;
     }
     if (remBits != 0) {
-      out[fullBytes] &= (byte) (0xFF << (8 - remBits));
+      out[fullBytes + skip] &= (byte) (0xFF << (8 - remBits));
     }
     return out;
   }

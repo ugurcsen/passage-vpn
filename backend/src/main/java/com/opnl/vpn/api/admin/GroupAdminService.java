@@ -190,7 +190,11 @@ public class GroupAdminService {
       settingsService.setGroupSetting(id, SettingKeys.STATIC_IP_POOL, pool.trim());
     }
     auditLogService.record(
-        "GROUP_STATIC_IP_POOL_SET", AuditLogService.CAT_GROUP, id, "group", Map.of("pool", pool));
+        "GROUP_STATIC_IP_POOL_SET",
+        AuditLogService.CAT_GROUP,
+        id,
+        "group",
+        Map.of("pool", pool == null ? "" : pool));
     return staticIpPool(actor, id);
   }
 
@@ -211,7 +215,11 @@ public class GroupAdminService {
       settingsService.setGroupSetting(id, SettingKeys.STATIC_IPV6_POOL, pool.trim());
     }
     auditLogService.record(
-        "GROUP_STATIC_IPV6_POOL_SET", AuditLogService.CAT_GROUP, id, "group", Map.of("pool", pool));
+        "GROUP_STATIC_IPV6_POOL_SET",
+        AuditLogService.CAT_GROUP,
+        id,
+        "group",
+        Map.of("pool", pool == null ? "" : pool));
     return staticIpv6Pool(actor, id);
   }
 

@@ -14,20 +14,29 @@ import com.opnl.vpn.audit.AuditLogService;
 import com.opnl.vpn.auth.TotpService;
 import com.opnl.vpn.ccd.CcdService;
 import com.opnl.vpn.common.ApiException;
+import com.opnl.vpn.group.Group;
+import com.opnl.vpn.group.GroupAdminAssignment;
 import com.opnl.vpn.group.GroupAdminAssignmentRepository;
+import com.opnl.vpn.group.GroupMember;
 import com.opnl.vpn.group.GroupMemberRepository;
 import com.opnl.vpn.group.GroupRepository;
 import com.opnl.vpn.group.GroupScope;
 import com.opnl.vpn.pki.CertService;
+import com.opnl.vpn.setting.SettingKeys;
 import com.opnl.vpn.setting.SettingsService;
 import com.opnl.vpn.user.User;
 import com.opnl.vpn.user.UserRepository;
+import dev.samstevens.totp.code.DefaultCodeGenerator;
+import dev.samstevens.totp.code.HashingAlgorithm;
+import dev.samstevens.totp.secret.DefaultSecretGenerator;
+import dev.samstevens.totp.time.SystemTimeProvider;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 class UserAdminServiceTest {
@@ -232,6 +241,11 @@ class UserAdminServiceTest {
         .role(User.Role.USER)
         .createdAt(Instant.now())
         .build();
+  }
+
+  private String currentCode(String secret) throws Exception {
+    return new DefaultCodeGenerator(HashingAlgorithm.SHA1, 6)
+        .generate(secret, new SystemTimeProvider().getTime() / 30L);
   }
 
   @Test
@@ -546,5 +560,391 @@ class UserAdminServiceTest {
     org.mockito.ArgumentCaptor<User> captor = org.mockito.ArgumentCaptor.forClass(User.class);
     verify(userRepository).save(captor.capture());
     assertThat(captor.getValue().getUsername()).isEqualTo("bob");
+  }
+
+  @Test
+  void createUserPersistsMemberships() {
+    java.util.concurrent.atomic.AtomicReference<User> saved =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    when(userRepository.existsByUsername(any())).thenReturn(false);
+    when(userRepository.save(any()))
+        .thenAnswer(
+            inv -> {
+              saved.set(inv.getArgument(0));
+              return inv.getArgument(0);
+            });
+    when(userRepository.findById(any())).thenAnswer(inv -> Optional.ofNullable(saved.get()));
+    when(groupRepository.findById("g1"))
+        .thenReturn(
+            Optional.of(Group.builder().id("g1").name("DevOps").createdAt(Instant.now()).build()));
+
+    UserDto dto =
+        service.createUser(
+            admin(),
+            new UserCreateRequest(
+                "dave", "supersecret1", null, null, User.Role.USER, List.of("g1"), null));
+
+    assertThat(dto.username()).isEqualTo("dave");
+    verify(memberRepository).save(any(GroupMember.class));
+  }
+
+  @Test
+  void createUserRejectsOutOfScopeGroup() {
+    assertThatThrownBy(
+            () ->
+                service.createUser(
+                    groupAdmin(),
+                    new UserCreateRequest(
+                        "dave", "supersecret1", null, null, User.Role.USER, List.of("g2"), null)))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
+  }
+
+  @Test
+  void createUserRejectsUnknownGroup() {
+    assertThatThrownBy(
+            () ->
+                service.createUser(
+                    admin(),
+                    new UserCreateRequest(
+                        "dave", "supersecret1", null, null, User.Role.USER, List.of("g9"), null)))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("group_not_found"));
+  }
+
+  @Test
+  void getUserResolvesMembershipsAndAdminNames() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+    when(memberRepository.findById_UserId("u2")).thenReturn(List.of(new GroupMember("g1", "u2")));
+    when(adminAssignmentRepository.findById_UserId("u2"))
+        .thenReturn(List.of(new GroupAdminAssignment("u2", "g1")));
+    when(groupRepository.findById("g1"))
+        .thenReturn(
+            Optional.of(Group.builder().id("g1").name("DevOps").createdAt(Instant.now()).build()));
+
+    UserDto dto = service.getUser(admin(), "u2");
+
+    assertThat(dto.username()).isEqualTo("bob");
+    assertThat(dto.groups()).containsExactly("DevOps");
+    assertThat(dto.adminGroupIds()).containsExactly("g1");
+    assertThat(dto.adminGroupNames()).containsExactly("DevOps");
+  }
+
+  @Test
+  void getUserThrowsWhenUserNotFound() {
+    assertThatThrownBy(() -> service.getUser(admin(), "u2"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("user_not_found"));
+  }
+
+  @Test
+  void getUserReportsMustChangePassword() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+    java.util.Map<String, Object> settings = new java.util.HashMap<>();
+    settings.put(SettingKeys.MUST_CHANGE_PASSWORD, true);
+    when(settingsService.userSettings("u2")).thenReturn(settings);
+
+    UserDto dto = service.getUser(admin(), "u2");
+
+    assertThat(dto.mustChangePassword()).isTrue();
+  }
+
+  @Test
+  void updateUserUpdatesFieldsAndPassword() {
+    User bob = bob();
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
+    when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service.updateUser(
+        admin(),
+        "u2",
+        new UserUpdateRequest("Robert", "bob@corp.io", null, null, "brandnewpass1", null, null));
+
+    assertThat(bob.getFullName()).isEqualTo("Robert");
+    assertThat(bob.getEmail()).isEqualTo("bob@corp.io");
+    assertThat(bob.getPasswordHash()).isNotBlank();
+    verify(settingsService).setUserSetting("u2", SettingKeys.MUST_CHANGE_PASSWORD, true);
+  }
+
+  @Test
+  void updateUserRejectsDemotingLastAdmin() {
+    when(userRepository.findById("admin1")).thenReturn(Optional.of(admin()));
+    when(userRepository.countByRole(User.Role.ADMIN)).thenReturn(1L);
+
+    assertThatThrownBy(
+            () ->
+                service.updateUser(
+                    admin(),
+                    "admin1",
+                    new UserUpdateRequest(null, null, User.Role.USER, null, null, null, null)))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("last_admin"));
+  }
+
+  @Test
+  void updateUserRejectsBanningLastAdmin() {
+    when(userRepository.findById("admin1")).thenReturn(Optional.of(admin()));
+    when(userRepository.countByRole(User.Role.ADMIN)).thenReturn(1L);
+
+    assertThatThrownBy(
+            () ->
+                service.updateUser(
+                    admin(),
+                    "admin1",
+                    new UserUpdateRequest(null, null, null, true, null, null, null)))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("last_admin"));
+  }
+
+  @Test
+  void updateUserToGroupAdminWithoutGroupsIsRejected() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+
+    assertThatThrownBy(
+            () ->
+                service.updateUser(
+                    admin(),
+                    "u2",
+                    new UserUpdateRequest(
+                        null, null, User.Role.GROUP_ADMIN, null, null, null, null)))
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            e -> assertThat(((ApiException) e).getCode()).isEqualTo("admin_groups_required"));
+  }
+
+  @Test
+  void updateUserPromoteToGroupAdminPersistsAssignments() {
+    User bob = bob();
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
+    when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(groupRepository.findById("g1"))
+        .thenReturn(
+            Optional.of(Group.builder().id("g1").name("DevOps").createdAt(Instant.now()).build()));
+
+    service.updateUser(
+        admin(),
+        "u2",
+        new UserUpdateRequest(null, null, User.Role.GROUP_ADMIN, null, null, null, List.of("g1")));
+
+    assertThat(bob.getRole()).isEqualTo(User.Role.GROUP_ADMIN);
+    verify(adminAssignmentRepository).save(any(GroupAdminAssignment.class));
+  }
+
+  @Test
+  void groupAdminCannotUpdateOutOfScopeUser() {
+    User alice =
+        User.builder()
+            .id("u1")
+            .username("alice")
+            .role(User.Role.USER)
+            .createdAt(Instant.now())
+            .build();
+    when(userRepository.findById("u1")).thenReturn(Optional.of(alice));
+
+    assertThatThrownBy(
+            () ->
+                service.updateUser(
+                    groupAdmin(),
+                    "u1",
+                    new UserUpdateRequest("X", null, null, null, null, null, null)))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
+  }
+
+  @Test
+  void deleteUserDeletesUserSettings() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+    java.util.Map<String, Object> settings = new java.util.HashMap<>();
+    settings.put("key1", "v1");
+    settings.put("key2", "v2");
+    when(settingsService.userSettings("u2")).thenReturn(settings);
+
+    service.deleteUser(admin(), "u2");
+
+    verify(settingsService).deleteUserSetting("u2", "key1");
+    verify(settingsService).deleteUserSetting("u2", "key2");
+    ArgumentCaptor<User> deleted = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).delete(deleted.capture());
+    assertThat(deleted.getValue().getId()).isEqualTo("u2");
+    assertThat(deleted.getValue().getUsername()).isEqualTo("bob");
+  }
+
+  @Test
+  void deleteUserThrowsWhenUserNotFound() {
+    assertThatThrownBy(() -> service.deleteUser(admin(), "u2"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("user_not_found"));
+  }
+
+  @Test
+  void setBannedUnbansUser() {
+    User bob =
+        User.builder()
+            .id("u2")
+            .username("bob")
+            .role(User.Role.USER)
+            .banned(true)
+            .createdAt(Instant.now())
+            .build();
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
+
+    service.setBanned(admin(), "u2", false);
+
+    assertThat(bob.isBanned()).isFalse();
+    verify(userRepository).save(bob);
+  }
+
+  @Test
+  void staticIpOperationsDelegateToCcdService() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+
+    service.setStaticIp(admin(), "u2", "10.8.0.100");
+    service.allocateStaticIp(admin(), "u2");
+    service.clearStaticIp(admin(), "u2");
+    service.setStaticIpv6(admin(), "u2", "fd00:1::10");
+    service.allocateStaticIpv6(admin(), "u2");
+    service.clearStaticIpv6(admin(), "u2");
+
+    verify(ccdService).setStaticIp("u2", "10.8.0.100");
+    verify(ccdService).allocateFromGroupPool("u2");
+    verify(ccdService).clearStaticIp("u2");
+    verify(ccdService).setStaticIpv6("u2", "fd00:1::10");
+    verify(ccdService).allocateIpv6FromGroupPool("u2");
+    verify(ccdService).clearStaticIpv6("u2");
+  }
+
+  @Test
+  void setupMfaGeneratesSecretAndStoresIt() {
+    User bob = bob();
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
+
+    UserAdminService.MfaSetup setup = service.setupMfa("u2");
+
+    assertThat(setup.secret()).isNotBlank();
+    assertThat(setup.otpAuthUrl()).contains("otpauth://");
+    assertThat(setup.qrDataUrl()).startsWith("data:image/png;base64,");
+    assertThat(bob.getMfaSecret()).isEqualTo(setup.secret());
+    assertThat(bob.isMfaEnabled()).isFalse();
+    verify(userRepository).save(bob);
+  }
+
+  @Test
+  void enableMfaActivatesMfaWithValidCode() throws Exception {
+    String secret = new DefaultSecretGenerator(160).generate();
+    User bob = bob();
+    bob.setMfaSecret(secret);
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
+    when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service.enableMfa(admin(), "u2", currentCode(secret));
+
+    assertThat(bob.isMfaEnabled()).isTrue();
+    verify(userRepository).save(bob);
+  }
+
+  @Test
+  void enableMfaRejectsInvalidCode() {
+    User bob = bob();
+    bob.setMfaSecret(new DefaultSecretGenerator(160).generate());
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
+
+    assertThatThrownBy(() -> service.enableMfa(admin(), "u2", "000000"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("invalid_code"));
+  }
+
+  @Test
+  void enableMfaRejectsWhenNoSecretProvisioned() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+
+    assertThatThrownBy(() -> service.enableMfa(admin(), "u2", "000000"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("invalid_code"));
+  }
+
+  @Test
+  void disableMfaClearsSecret() {
+    User bob = bob();
+    bob.setMfaSecret("secret");
+    bob.setMfaEnabled(true);
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob));
+
+    service.disableMfa(admin(), "u2");
+
+    assertThat(bob.isMfaEnabled()).isFalse();
+    assertThat(bob.getMfaSecret()).isNull();
+    verify(userRepository).save(bob);
+  }
+
+  @Test
+  void disableMfaRejectedWhenRequiredByPolicy() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+    when(settingsService.effectiveForUser("u2"))
+        .thenReturn(java.util.Map.of(SettingKeys.REQUIRE_MFA, true));
+
+    assertThatThrownBy(() -> service.disableMfa(admin(), "u2"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("mfa_required"));
+  }
+
+  @Test
+  void userSettingsDelegatesToSettingsService() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+    java.util.Map<String, Object> settings = new java.util.HashMap<>();
+    settings.put("k", "v");
+    when(settingsService.userSettings("u2")).thenReturn(settings);
+
+    assertThat(service.userSettings(admin(), "u2")).containsEntry("k", "v");
+  }
+
+  @Test
+  void effectiveSettingsDelegatesToSettingsService() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+    when(settingsService.effectiveForUser("u2"))
+        .thenReturn(java.util.Map.of(SettingKeys.TUNNEL_MODE, "full"));
+
+    assertThat(service.effectiveSettings(admin(), "u2"))
+        .containsEntry(SettingKeys.TUNNEL_MODE, "full");
+  }
+
+  @Test
+  void setUserSettingDelegatesAndReturnsUpdatedSettings() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+    when(settingsService.userSettings("u2"))
+        .thenReturn(new java.util.HashMap<>(java.util.Map.of("k", "new")));
+
+    java.util.Map<String, Object> result = service.setUserSetting(admin(), "u2", "k", "new");
+
+    verify(settingsService).setUserSetting("u2", "k", "new");
+    assertThat(result).containsEntry("k", "new");
+  }
+
+  @Test
+  void deleteUserSettingDelegatesAndReturnsUpdatedSettings() {
+    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
+
+    service.deleteUserSetting(admin(), "u2", "k");
+
+    verify(settingsService).deleteUserSetting("u2", "k");
+  }
+
+  @Test
+  void listUsersResolvesGroupAndAdminNames() {
+    when(userRepository.findAll()).thenReturn(List.of(bob()));
+    when(groupRepository.findAll())
+        .thenReturn(
+            List.of(Group.builder().id("g1").name("DevOps").createdAt(Instant.now()).build()));
+    when(memberRepository.findAll()).thenReturn(List.of(new GroupMember("g1", "u2")));
+    when(adminAssignmentRepository.findAll())
+        .thenReturn(List.of(new GroupAdminAssignment("u2", "g1")));
+    when(settingsService.effectiveForUsers(any()))
+        .thenReturn(java.util.Map.of("u2", java.util.Map.of()));
+
+    List<UserDto> dtos = service.listUsers(admin(), "  BOB  ");
+
+    assertThat(dtos).extracting(UserDto::username).containsExactly("bob");
+    assertThat(dtos.get(0).groups()).containsExactly("DevOps");
+    assertThat(dtos.get(0).adminGroupIds()).containsExactly("g1");
+    assertThat(dtos.get(0).adminGroupNames()).containsExactly("DevOps");
   }
 }
