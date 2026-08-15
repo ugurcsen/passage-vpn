@@ -32,6 +32,13 @@ function json(body: unknown) {
   });
 }
 
+function rowByName(name: string) {
+  const cell = screen
+    .getAllByRole("gridcell", { name })
+    .find((c) => c.getAttribute("data-field") === "name");
+  return cell!.closest('[role="row"]') as HTMLElement;
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -78,9 +85,13 @@ describe("GroupsPage", () => {
   it("renders groups with parents and member counts", async () => {
     renderPage();
 
-    expect(await screen.findByText("devs")).toBeInTheDocument();
+    expect((await screen.findAllByText("devs")).length).toBeGreaterThan(0);
     expect(screen.getByText("ops")).toBeInTheDocument();
     expect(screen.getByText("Engineering")).toBeInTheDocument();
+
+    const opsRow = rowByName("ops");
+    expect(opsRow).toHaveTextContent("devs");
+    expect(opsRow).not.toHaveTextContent("g1");
   });
 
   it("hides Delete on managed root groups for group admins but keeps it on subgroups", async () => {
@@ -100,21 +111,21 @@ describe("GroupsPage", () => {
     );
 
     renderPage();
-    await screen.findByText("devs");
+    await screen.findAllByText("devs");
 
-    const rootRow = screen.getByRole("row", { name: /devs/i });
+    const rootRow = rowByName("devs");
     expect(
       within(rootRow).queryByRole("button", { name: /^delete$/i }),
     ).not.toBeInTheDocument();
 
-    const subRow = screen.getByRole("row", { name: /ops/i });
+    const subRow = rowByName("ops");
     expect(within(subRow).getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
   });
 
   it("creates a group", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("devs");
+    await screen.findAllByText("devs");
 
     await user.click(screen.getByRole("button", { name: /new group/i }));
     const dialog = screen.getByRole("dialog");
@@ -142,9 +153,9 @@ describe("GroupsPage", () => {
   it("edits members of a group", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("devs");
+    await screen.findAllByText("devs");
 
-    const row = screen.getByRole("row", { name: /devs/i });
+    const row = rowByName("devs");
     const actions = within(row).getAllByRole("button");
     await user.click(actions[0]);
 
@@ -169,7 +180,7 @@ describe("GroupsPage", () => {
   it("sets a static IP pool for a group", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("devs");
+    await screen.findAllByText("devs");
 
     await user.click(screen.getByTestId("edit-pool-devs"));
     await screen.findByText(/static ip pool — devs/i);
@@ -196,9 +207,9 @@ describe("GroupsPage", () => {
   it("sets a tunnel mode for a group", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("devs");
+    await screen.findAllByText("devs");
 
-    const row = screen.getByRole("row", { name: /devs/i });
+    const row = rowByName("devs");
     const actions = within(row).getAllByRole("button");
     await user.click(actions[3]);
 
@@ -226,9 +237,9 @@ describe("GroupsPage", () => {
   it("clears a group tunnel mode when left on inherit default", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("devs");
+    await screen.findAllByText("devs");
 
-    const row = screen.getByRole("row", { name: /devs/i });
+    const row = rowByName("devs");
     const actions = within(row).getAllByRole("button");
     await user.click(actions[3]);
 

@@ -204,7 +204,15 @@ export function GroupsPage() {
     { field: "name", headerName: "Name", flex: 1, minWidth: 140 },
     { field: "description", headerName: "Description", flex: 1.4 },
     { field: "memberCount", headerName: "Members", width: 110 },
-    { field: "parentId", headerName: "Parent", width: 140 },
+    {
+      field: "parentId",
+      headerName: "Parent",
+      width: 140,
+      renderCell: (params) => {
+        const parent = groups?.find((g) => g.id === (params.row as GroupRow).parentId);
+        return <>{parent?.name ?? ""}</>;
+      },
+    },
     {
       field: "actions",
       headerName: "Actions",
