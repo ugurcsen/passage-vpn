@@ -3,7 +3,9 @@ package com.opnl.vpn.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -44,6 +46,8 @@ class AuthServiceTest {
   private BCryptPasswordEncoder encoder;
   private PostAuthHookService postAuthHookService;
   private IpFailureTracker ipFailureTracker;
+  private AuthFailureRecorder authFailureRecorder;
+  private AuditLogService auditLogService;
 
   @BeforeEach
   void setUp() {
@@ -69,6 +73,8 @@ class AuthServiceTest {
             properties, List.of(new LocalAuthProvider(userRepository, encoder)));
     postAuthHookService = mock(PostAuthHookService.class);
     ipFailureTracker = mock(IpFailureTracker.class);
+    auditLogService = mock(AuditLogService.class);
+    authFailureRecorder = new AuthFailureRecorder(userRepository, auditLogService, properties);
     service =
         new AuthService(
             userRepository,
@@ -78,9 +84,10 @@ class AuthServiceTest {
             new TotpService(),
             settingsService,
             properties,
-            mock(AuditLogService.class),
+            auditLogService,
             postAuthHookService,
-            ipFailureTracker);
+            ipFailureTracker,
+            authFailureRecorder);
   }
 
   private User user(String username, boolean mfaEnabled, String mfaSecret) {
@@ -218,22 +225,29 @@ class AuthServiceTest {
 
   @Test
   void loginRejectsWrongPassword() {
-    when(userRepository.findByUsername("alice"))
-        .thenReturn(Optional.of(user("alice", false, null)));
+    User alice = user("alice", false, null);
+    when(userRepository.findByUsername("alice")).thenReturn(Optional.of(alice));
+    when(userRepository.findById("u1")).thenReturn(Optional.of(alice));
     assertThatThrownBy(() -> service.login("alice", "wrongpass1"))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("invalid_credentials"));
+    assertThat(alice.getFailedAttempts()).isEqualTo(1);
     verify(userRepository).save(any());
+    verify(auditLogService)
+        .record(eq("LOGIN_FAILED"), eq(AuditLogService.CAT_AUTH), eq("u1"), eq("user"), anyMap());
   }
 
   @Test
   void loginLocksAccountAfterMaxAttempts() {
-    when(userRepository.findByUsername("alice"))
-        .thenReturn(Optional.of(user("alice", false, null)));
+    User alice = user("alice", false, null);
+    when(userRepository.findByUsername("alice")).thenReturn(Optional.of(alice));
+    when(userRepository.findById("u1")).thenReturn(Optional.of(alice));
     for (int i = 0; i < 3; i++) {
       assertThatThrownBy(() -> service.login("alice", "wrongpass1"))
           .isInstanceOf(ApiException.class);
     }
+    assertThat(alice.getLockedUntil()).isNotNull();
+    assertThat(alice.getFailedAttempts()).isZero();
     assertThatThrownBy(() -> service.login("alice", "supersecret1"))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("account_locked"));
@@ -290,6 +304,24 @@ class AuthServiceTest {
         .isInstanceOf(ApiException.class)
         .satisfies(
             e -> assertThat(((ApiException) e).getCode()).isEqualTo("mfa_challenge_invalid"));
+  }
+
+  @Test
+  void mfaRejectsWrongCodeAndRecordsFailure() {
+    String secret = new TotpService().generateSecret();
+    when(userRepository.findByUsername("alice"))
+        .thenReturn(Optional.of(user("alice", true, secret)));
+    var challenge = service.login("alice", "supersecret1");
+    assertThat(challenge.mfaRequired()).isTrue();
+
+    User alice = user("alice", true, secret);
+    when(userRepository.findById("u1")).thenReturn(Optional.of(alice));
+    assertThatThrownBy(() -> service.mfa(challenge.preAuthToken(), "000000"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("invalid_code"));
+    assertThat(alice.getFailedAttempts()).isEqualTo(1);
+    verify(auditLogService)
+        .record(eq("LOGIN_FAILED"), eq(AuditLogService.CAT_AUTH), eq("u1"), eq("user"), anyMap());
   }
 
   @Test

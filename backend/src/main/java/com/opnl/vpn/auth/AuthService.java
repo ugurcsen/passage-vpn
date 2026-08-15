@@ -41,6 +41,7 @@ public class AuthService {
   private final AuditLogService auditLogService;
   private final PostAuthHookService postAuthHookService;
   private final IpFailureTracker ipFailureTracker;
+  private final AuthFailureRecorder authFailureRecorder;
 
   /** Redeemed MFA challenge ids (jti) → redemption epoch-second, for single-use enforcement. */
   private final Map<String, Long> redeemedChallenges = new ConcurrentHashMap<>();
@@ -60,7 +61,8 @@ public class AuthService {
       OpnlProperties properties,
       AuditLogService auditLogService,
       PostAuthHookService postAuthHookService,
-      IpFailureTracker ipFailureTracker) {
+      IpFailureTracker ipFailureTracker,
+      AuthFailureRecorder authFailureRecorder) {
     this.userRepository = userRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.authProvider = authProviderManager.active();
@@ -71,6 +73,7 @@ public class AuthService {
     this.auditLogService = auditLogService;
     this.postAuthHookService = postAuthHookService;
     this.ipFailureTracker = ipFailureTracker;
+    this.authFailureRecorder = authFailureRecorder;
   }
 
   public record TokenResponse(String accessToken, String refreshToken) {}
@@ -97,9 +100,7 @@ public class AuthService {
     }
     assertAccountUsable(user, Instant.now());
     if (!authProvider.verifyCredentials(username, password)) {
-      recordFailure(user);
-      auditLogService.record(
-          "LOGIN_FAILED", AuditLogService.CAT_AUTH, user.getId(), "user", auditCtx(user));
+      authFailureRecorder.record(user.getId(), user.getUsername(), currentRemoteIp());
       throw ApiException.unauthorized("invalid_credentials", "Invalid username or password");
     }
     user.setFailedAttempts(0);
@@ -140,6 +141,7 @@ public class AuthService {
                         "invalid_credentials", "Invalid username or password"));
     assertAccountUsable(user, Instant.now());
     if (user.getMfaSecret() == null || !totpService.verify(user.getMfaSecret(), code)) {
+      authFailureRecorder.record(user.getId(), user.getUsername(), currentRemoteIp());
       throw ApiException.unauthorized("invalid_code", "Invalid or expired code");
     }
     user.setLastLoginAt(Instant.now());
