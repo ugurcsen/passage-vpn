@@ -8,6 +8,47 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.13 — 2026-08-17
+
+Thirteenth **beta** milestone (SemVer pre-release): makes daemon ports
+manageable across multiple OpenVPN daemons. Docker Compose now publishes a
+configurable UDP/TCP **port range** per gateway, and the backend auto-assigns a
+new daemon the next free port of its protocol range — so extra daemons are
+always reachable from the host and from clients' `.ovpn` files. Includes
+everything from `v0.1.0-beta.12` plus the changes below.
+
+### Auto daemon port allocation
+- Compose publishes ranges instead of single ports: `OPNL_OPENVPN_PORT[_END]` /
+  `OPNL_OPENVPN_TCP_PORT[_END]` for the central gateway and
+  `OPNL_NODE_OPENVPN_PORT[_END]` / `OPNL_NODE_OPENVPN_TCP_PORT[_END]` for remote
+  node gateways (all default to a single port, preserving current behaviour).
+  Host and container sides are identical (`1194-1199:1194-1199`): a daemon's
+  configured port is the container listen port, the host-published port and the
+  port advertised in `.ovpn`.
+- `DaemonRequest.port` is now optional. Creating a daemon without a port
+  auto-assigns the **lowest free port** in the range of its protocol family; an
+  explicit port must fall inside that range (`daemon_port_not_published`), must
+  be free (`daemon_port_taken`), and a fully exhausted range fails with
+  `daemon_port_range_full`.
+- Remote-node daemons are exempt from the central range check (their gateway
+  publishes its own range) but must carry an explicit port
+  (`daemon_port_required`).
+- Daemons page: the Port field is optional with "Empty = auto-assign from
+  published range"; entering a value validates it against the range.
+- **Node gateway port mapping changed from remap to identity**: the remote
+  node's UDP listener moved from `1196:1194` to `1196:1196` (TCP `1197:1195` →
+  `1197:1197`) so the container port equals the advertised one. Existing
+  remote-node daemons must carry their gateway's published port (default base).
+- Docs: `docs/architecture.md` §5.1 "Daemon port allocation",
+  `docs/configuration.md` range rows, `.env.example` `*_END` variables.
+
+### Verified
+- Backend suite green (**925 tests**); frontend **31 files / 176 tests** green.
+- `docker compose config` validated for single-port defaults and widened ranges
+  (central stack and `--profile node`).
+
+---
+
 ## v0.1.0-beta.12 — 2026-08-16
 
 Twelfth **beta** milestone (SemVer pre-release): adds per-daemon profile
