@@ -157,9 +157,11 @@ services:
       OPNL_AGENT_TLS_KEY: ${OPNL_AGENT_TLS_KEY:-/etc/opnl/agent/tls/client.key}
       OPNL_INTERNAL_TOKEN: ${OPNL_INTERNAL_TOKEN:-change-me-internal-token}
       # Core secrets the agent image needs to pass its own startup checks (SecurityBootstrapCheck
-      # and JwtService are profile-independent). Same values as the central backend.
-      OPNL_JWT_SECRET: ${OPNL_JWT_SECRET:?set OPNL_JWT_SECRET for the agent}
-      OPNL_OPENVPN_MGMT_PASSWORD: ${OPNL_OPENVPN_MGMT_PASSWORD:?set OPNL_OPENVPN_MGMT_PASSWORD for the agent}
+      # and JwtService are profile-independent). Same values as the central backend. Soft defaults
+      # keep `docker compose build` usable without a .env; the backend's own fail-fast checks
+      # (SecurityBootstrapCheck / JwtService 32-byte minimum) still refuse to start otherwise.
+      OPNL_JWT_SECRET: ${OPNL_JWT_SECRET:-}
+      OPNL_OPENVPN_MGMT_PASSWORD: ${OPNL_OPENVPN_MGMT_PASSWORD:-}
       OPNL_SERVER_PORT: ${OPNL_SERVER_PORT:-8080}
       # The gateway volumes the agent provisions for its own openvpn container (same layout
       # as the central stack, so the pulled daemon configs are valid here verbatim).

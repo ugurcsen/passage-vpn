@@ -8,6 +8,33 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.10 — 2026-08-16
+
+Tenth **beta** milestone (SemVer pre-release): fixes the CI `docker-build` job,
+which was red because Compose interpolates the whole compose file even when only
+building a subset of services — the `opnl-agent` service's strict
+`${OPNL_JWT_SECRET:?}` / `${OPNL_OPENVPN_MGMT_PASSWORD:?}` variables failed
+file-wide whenever no `.env` was present. The agent now uses soft defaults
+(matching the `backend` service), so `docker compose build backend frontend
+openvpn` works in CI and locally without a `.env`; runtime fail-fast is
+unchanged because the backend's own `SecurityBootstrapCheck` (blank management
+password) and `JwtService` (32-byte secret minimum) still refuse to start with a
+missing secret. Includes everything from `v0.1.0-beta.9` plus the changes below.
+
+### CI/CD fix
+- `opnl-agent` compose env — `OPNL_JWT_SECRET` and
+  `OPNL_OPENVPN_MGMT_PASSWORD` relaxed from `:?` (required) to `:-` soft
+  defaults, keeping `docker compose build` interpolable without a `.env`
+  (`docker-compose.yml`). Verified: `docker compose build backend frontend
+  openvpn` succeeds with no env file; `docker compose --profile node config`
+  still resolves.
+
+### Verified
+- Backend suite green (unchanged); frontend **31 files / 169 tests** green.
+  Tag: `v0.1.0-beta.10`.
+
+---
+
 ## v0.1.0-beta.9 — 2026-08-16
 
 Ninth **beta** milestone (SemVer pre-release): fixes the frontend test suite,
