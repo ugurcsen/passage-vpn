@@ -187,7 +187,18 @@ class CertServiceTest {
     assertThat(cert.getUserId()).isEqualTo("u1");
     verify(easyRsa).revokeCert("alice");
     verify(easyRsa).deleteClientCert("alice");
-    verify(certificateRepository).delete(stale);
+    // Bulk delete runs immediately so the new row's INSERT cannot collide with the stale row.
+    verify(certificateRepository).deleteByCommonNameAndUserIdNot("alice", "u1");
+    verify(certificateRepository, never()).delete(any());
+  }
+
+  @Test
+  void deleteRowsForUserRemovesBookkeepingWithoutPkiPurge() {
+    service.deleteRowsForUser("u2");
+
+    verify(certificateRepository).deleteByUserId("u2");
+    verify(easyRsa, never()).revokeCert(any());
+    verify(easyRsa, never()).deleteClientCert(any());
   }
 
   @Test

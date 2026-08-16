@@ -239,9 +239,11 @@ public class UserAdminService {
   }
 
   /**
-   * Deletes a user. When {@link DeleteOptions} flags are set, related resources are cleaned up
-   * first: certificates are revoked and purged from the PKI, user-targeted access rules are removed
-   * (with the dnsmasq config refreshed) and the user's static IP/CCD file is cleared.
+   * Deletes a user. Certificate bookkeeping rows are always removed (otherwise re-creating the
+   * username would trip the UNIQUE common_name constraint). When {@link DeleteOptions} flags are
+   * set, related resources are cleaned up as well: certificates are also revoked and purged from
+   * the PKI, user-targeted access rules are removed (with the dnsmasq config refreshed) and the
+   * user's static IP/CCD file is cleared.
    */
   @Transactional
   public void deleteUser(User actor, String id, DeleteOptions options) {
@@ -255,6 +257,8 @@ public class UserAdminService {
     }
     if (options.deleteCertificates()) {
       certService.purgeForUser(id);
+    } else {
+      certService.deleteRowsForUser(id);
     }
     if (options.deleteAccessRules()) {
       accessRuleService.deleteForUser(id);

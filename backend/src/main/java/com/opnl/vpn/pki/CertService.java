@@ -131,7 +131,9 @@ public class CertService {
     } catch (ApiException ignored) {
       // best effort on re-issue
     }
-    certificateRepository.delete(stale);
+    // Bulk delete executes immediately (a plain entity delete would be flushed AFTER the new
+    // row's INSERT within the same transaction and hit the UNIQUE common_name constraint).
+    certificateRepository.deleteByCommonNameAndUserIdNot(stale.getCommonName(), currentUserId);
   }
 
   /** Revokes the user's valid certificate and generates a fresh CRL. */
@@ -203,6 +205,16 @@ public class CertService {
         userId,
         "user",
         Map.of("count", certificates.size()));
+  }
+
+  /**
+   * Removes a deleted account's certificate bookkeeping rows without touching the PKI artifacts.
+   * Called on every user delete so re-creating the username never hits the UNIQUE common_name
+   * constraint; the full PKI purge (revoke + delete artifacts) is opt-in via {@link #purgeForUser}.
+   */
+  @Transactional
+  public void deleteRowsForUser(String userId) {
+    certificateRepository.deleteByUserId(userId);
   }
 
   /**

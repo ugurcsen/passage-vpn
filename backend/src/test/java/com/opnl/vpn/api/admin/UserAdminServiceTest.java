@@ -253,6 +253,7 @@ class UserAdminServiceTest {
     when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
     service.deleteUser(admin(), "u2", new UserAdminService.DeleteOptions(true, false, false));
     verify(certService).purgeForUser("u2");
+    verify(certService, never()).deleteRowsForUser(any());
     verify(userRepository).delete(any());
   }
 
@@ -274,9 +275,10 @@ class UserAdminServiceTest {
   }
 
   @Test
-  void deleteUserWithoutOptionsSkipsCleanup() {
+  void deleteUserWithoutOptionsStillRemovesCertificateRows() {
     when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
     service.deleteUser(admin(), "u2");
+    verify(certService).deleteRowsForUser("u2");
     verify(certService, never()).purgeForUser(any());
     verify(accessRuleService, never()).deleteForUser(any());
     verify(ccdService, never()).clearStaticIp(any());
