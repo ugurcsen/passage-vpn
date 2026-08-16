@@ -41,11 +41,11 @@ class MgmtStatusTest {
 
   @Test
   void parsesTabSeparatedStatusVersion3Lines() {
-    // OpenVPN 2.6's `status 3` management command returns --status-version 3
+    // OpenVPN 2.7's `status 3` management command returns --status-version 3
     // (tab-separated) output; mirrors real daemon-0.status content.
     List<String> lines =
         List.of(
-            "TITLE\tOpenVPN 2.6.20 x86_64-alpine-linux-musl [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [MH/PKTINFO] [AEAD]",
+            "TITLE\tOpenVPN 2.7.5 x86_64-alpine-linux-musl [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [MH/PKTINFO] [AEAD]",
             "TIME\t2026-08-11 08:26:25\t1786436785",
             "HEADER\tCLIENT_LIST\tCommon Name\tReal Address\tVirtual Address\tVirtual IPv6 Address\t"
                 + "Bytes Received\tBytes Sent\tConnected Since\tConnected Since (time_t)\tUsername\tClient ID\tPeer ID\tData Channel Cipher",
@@ -58,7 +58,7 @@ class MgmtStatusTest {
 
     MgmtStatus status = MgmtStatus.parse(lines, Instant.parse("2026-01-01T00:00:00Z"));
 
-    assertThat(status.title()).contains("OpenVPN 2.6.20");
+    assertThat(status.title()).contains("OpenVPN 2.7.5");
     assertThat(status.dco()).isFalse();
     assertThat(status.clients()).hasSize(1);
 

@@ -1,10 +1,12 @@
 # OpenVPN Community Edition + tooling for the management panel.
 # Requires NET_ADMIN (or --privileged) for iptables-based access control.
-FROM alpine:3.20
+FROM alpine:3.24
 
-# OpenVPN 2.6, Easy-RSA 3.1, OpenSSL, iptables (nft backend), dnsmasq (domain control), curl (backend callbacks)
+# OpenVPN 2.7 (pinned to the latest Alpine 3.24 build; bump to 2.7.6-r0 when
+# it lands in the Alpine repos), Easy-RSA 3.1, OpenSSL, iptables (nft backend),
+# dnsmasq (domain control), curl (backend callbacks)
 RUN apk add --no-cache \
-        openvpn \
+        openvpn=2.7.5-r0 \
         easy-rsa \
         openssl \
         iptables \

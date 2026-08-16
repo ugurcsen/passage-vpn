@@ -72,7 +72,7 @@ class MgmtClientTest {
                       new BufferedWriter(
                           new OutputStreamWriter(s.getOutputStream(), StandardCharsets.UTF_8));
                   w.write(
-                      "TITLE\tOpenVPN 2.6.20 x86_64-alpine-linux-musl [SSL (OpenSSL)] built on ...\n");
+                      "TITLE\tOpenVPN 2.7.5 x86_64-alpine-linux-musl [SSL (OpenSSL)] built on ...\n");
                   w.write(
                       "CLIENT_LIST\tadmin\t31.223.13.8:27961\t10.8.0.2\t\t148702\t179132\t2026-08-11 08:28:23\t1786436903\tadmin\t0\t0\tAES-256-GCM\n");
                   w.write("END\n");
@@ -88,7 +88,7 @@ class MgmtClientTest {
       daemon.join(3_000);
 
       assertThat(status).isNotNull();
-      assertThat(status.title()).contains("OpenVPN 2.6.20");
+      assertThat(status.title()).contains("OpenVPN 2.7.5");
       assertThat(status.dco()).isFalse();
       assertThat(status.clients()).hasSize(1);
       MgmtStatus.MgmtClientStatus admin = status.clients().get(0);

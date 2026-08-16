@@ -13,7 +13,7 @@ The panel is a set of cooperating containers deployed with Docker Compose:
 |---|---|
 | `backend` | Spring Boot 3.5 application: web API, PKI, config generation, monitoring, access control, node registry. Java 25, Gradle (Kotlin DSL), JPA + Hibernate, SQLite (WAL) with a portable PostgreSQL profile. |
 | `frontend` | React 18 + TypeScript SPA served by nginx; static bundle that calls `/api/**`, `/api/portal/**` and consumes `/ws` WebSocket events. Vite build. |
-| `openvpn` | Alpine container running OpenVPN 2.6 (one daemon per generated config), Easy-RSA 3.1 (hosted in the backend via subprocess), dnsmasq (VPN DNS + domain pinning) and the iptables/ip6tables firewall that enforces access rules. Requires `NET_ADMIN`. |
+| `openvpn` | Alpine container running OpenVPN 2.7 (one daemon per generated config), Easy-RSA 3.1 (hosted in the backend via subprocess), dnsmasq (VPN DNS + domain pinning) and the iptables/ip6tables firewall that enforces access rules. Requires `NET_ADMIN`. |
 | `db` | Not a separate container for SQLite — the database is a file in the shared `opnl-data` volume. A PostgreSQL profile (`OPNL_PROFILE=postgres`) swaps in a real database service. |
 | `opnl-agent` | Optional (compose `--profile node`): the backend's `agent` Spring profile running on a remote gateway node; registers and heartbeats to the central backend and pulls + provisions its config bundle (daemon configs, PKI incl. the CRL, CCD, scripts, dnsmasq) so the node's daemons appear in the panel and run like the local ones. |
 

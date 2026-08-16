@@ -9,7 +9,7 @@ features, built on open source components:
 
 - **Backend**: Java 25, Spring Boot 3.5, Gradle (Kotlin DSL), JPA + Hibernate, SQLite (WAL) with a portable-to-PostgreSQL path
 - **Frontend**: React 18 + TypeScript, Vite, MUI v6 (Material), TanStack Query, React Hook Form + Zod
-- **VPN core**: OpenVPN Community Edition 2.6 + Easy-RSA 3.1 + OpenVPN Management Interface
+- **VPN core**: OpenVPN Community Edition 2.7 + Easy-RSA 3.1 + OpenVPN Management Interface
 - **Deploy**: Docker Compose, Makefile, `install.sh`
 
 **Language rule**: ALL code identifiers, comments, commit messages, UI strings, and
