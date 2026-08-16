@@ -689,6 +689,34 @@ user with the same username then fails cert issue with a SQLite unique-constrain
 (`internal_error`). Workaround: pass the cleanup flag (UI checkbox) or clear the orphan
 row. Out of scope for F15/F16; tracked as low-priority.
 
+### M9 live re-verification of the orphan-cert fix (2026-08-16, staging)
+
+Fix deployed to staging (`4df2588`) and re-run against the live API with a fresh user
+`orphan_repro`:
+
+- create user → issue cert (`POST /api/admin/certs`, `VALID`, serial `93084A…`)
+- `DELETE /api/admin/users/{id}` with **no body** (i.e. no cleanup flags) → `200`
+- `certificates` rows for that `user_id` removed from the DB
+- re-create `orphan_repro` → re-issue cert → **HTTP 200** (previously 500
+  `internal_error` unique-constraint). The on-disk PKI artifact is kept on the no-flag
+  path and the existing cert is reused, so the serial matches — expected.
+
+Root cause had two halves, both fixed in `4df2588`:
+
+1. `UserAdminService.deleteUser` only purged certificate rows when
+   `DeleteOptions.deleteCertificates()` was set; it now always calls
+   `CertService.deleteRowsForUser(id)` (a bulk `deleteByUserId`) and the flag only
+   controls the PKI artifact purge via `purgeForUser`.
+2. `CertService.ensureUserCert` (via `purgeStaleForCommonName`) tried to delete the
+   stale same-CN row with a deferred entity delete that Hibernate flushes *after* the
+   new row's INSERT within the same transaction — tripping the UNIQUE constraint even
+   when the row was deleted. Replaced with an immediate bulk delete
+   `deleteByCommonNameAndUserIdNot`.
+
+Unit tests: `UserAdminServiceTest.deleteUserWithoutOptionsStillRemovesCertificateRows`,
+`CertServiceTest.ensureUserCertPurgesStaleCertFromDeletedAccountWithSameName` (now
+verifies the bulk delete) and `CertServiceTest.deleteRowsForUserRemovesBookkeepingWithoutPkiPurge`.
+
 ---
 
 ## 4. Verification commands
