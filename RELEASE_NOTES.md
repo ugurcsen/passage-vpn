@@ -8,6 +8,51 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.12 — 2026-08-16
+
+Twelfth **beta** milestone (SemVer pre-release): adds per-daemon profile
+pinning (a profile can be bound to a specific OpenVPN daemon, and the choice is
+carried through the portal QR code and the share link) and hardens the share
+link experience. Portal QR tokens are now tracked separately from admin-created
+ones, and the admin links table shows source, expiry (date and time), live
+status (active / used up / expired / revoked) with copy disabled for dead links
+plus status and source filters. Share error pages now tell the visitor *why* a
+link is dead. Includes everything from `v0.1.0-beta.11` plus the changes below.
+
+### Daemon pinning
+- `profile_tokens.daemon_index` column (`V21` migration, sqlite + postgresql
+  variants). `ProfileToken`/DTO carry `daemonIndex`;
+  `DaemonService.resolvePinnedForProfile` resolves the pinned daemon for a
+  profile (validating it serves the type and is reachable) and
+  `ProfileService` persists the choice on token/profile generation.
+- Portal: the profile page lists the daemons serving each profile type so the
+  user can pick one (e.g. full-tunnel vs split-tunnel); QR payloads and share
+  links for a pinned profile resolve to that daemon. The admin links table
+  shows the daemon per link.
+
+### Share-link hardening
+- `profile_tokens.source` column (`V22` migration) with `TokenSource`
+  (`ADMIN`/`PORTAL`): portal QR payloads mark their token `PORTAL`,
+  admin-created links stay `ADMIN`. The admin table renders a "Portal QR" chip
+  for portal tokens.
+- Links table: status chips (`Active`, `Used up`, `Expired`, `Revoked`) derived
+  from remaining uses / expiry / revocation, expiry shown with date **and**
+  time, uses-left highlighted red at zero, Copy disabled (with a tooltip) for
+  dead links, plus Status and Source filters with a proper empty state.
+- `ShareController` error pages use specific titles: `Link not found`, `Link
+  revoked`, `Link used up`, `Link expired`.
+- `CreateTokenRequest` rejects `usesLeft < 1` (a link must allow at least one
+  use).
+
+### Verified
+- Backend suite green (**919 tests**); frontend **31 files / 175 tests** green.
+- Deployed to `65.21.108.250`: `V21` + `V22` migrations applied on the live DB,
+  the backend connects to all three daemons' management interfaces, and the
+  `/share` error titles confirmed live (`Link not found`, `Link revoked`,
+  `Link used up`, `Link expired`). Tag: `v0.1.0-beta.12`.
+
+---
+
 ## v0.1.0-beta.11 — 2026-08-16
 
 Eleventh **beta** milestone (SemVer pre-release): upgrades the VPN core from
