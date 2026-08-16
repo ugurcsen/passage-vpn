@@ -8,6 +8,40 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.11 — 2026-08-16
+
+Eleventh **beta** milestone (SemVer pre-release): upgrades the VPN core from
+OpenVPN 2.6.20 (Alpine 3.20, end-of-life since 2026-04) to OpenVPN **2.7.5** on
+**Alpine 3.24**. The new branch is out of EOL, carries the upstream
+CVE-2026-13117 / CVE-2026-13122 (external-auth `auth-gen-token` DoS) fixes, and
+the `openvpn` package is now pinned for deterministic rebuilds. Also migrates
+the build toolchains to Java 25 (backend) and Node 24 (frontend). Includes
+everything from `v0.1.0-beta.10` plus the changes below.
+
+### VPN core upgrade
+- `openvpn` image — `alpine:3.20` → `alpine:3.24` with `openvpn=2.7.5-r0`
+  pinned (bump to `2.7.6-r0` once it lands in the Alpine repos)
+  (`openvpn/Dockerfile`). The generated `daemon.conf` template is unchanged and
+  parses cleanly on 2.7 — no removed/deprecated directives; the management
+  interface contract (`status 3`, `kill`, `signal`) and all scripts are
+  unaffected.
+- Test fixtures now mirror 2.7.5 daemon titles (`MgmtStatusTest`,
+  `MgmtClientTest`); README, AGENTS and `docs/architecture.md` updated to
+  "OpenVPN 2.7".
+
+### Toolchain
+- Backend: Gradle build toolchain migrated to Java 25 (`026cf15`).
+- Frontend: Node 24 build/runtime (`94bfec3`).
+
+### Verified
+- Backend suite green (908 tests); frontend **31 files / 169 tests** green.
+- `docker compose build openvpn` → `openvpn --version` = **OpenVPN 2.7.5**
+  (OpenSSL 3.5.7, package `openvpn-2.7.5-r0`). Full `daemon.conf` template
+  smoke-parsed on 2.7.5 with zero `Options error` / deprecation messages.
+  Tag: `v0.1.0-beta.11`.
+
+---
+
 ## v0.1.0-beta.10 — 2026-08-16
 
 Tenth **beta** milestone (SemVer pre-release): fixes the CI `docker-build` job,
