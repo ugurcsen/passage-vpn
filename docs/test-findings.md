@@ -735,6 +735,16 @@ stolen profile could still authenticate against a cert-only (AUTO_LOGIN) daemon.
   `deleteCertificates` field are unaffected (unknown JSON fields are ignored and the
   behavior is now always-purge anyway).
 
+Live-verified on staging (`d984b7f`): create user → issue cert (serial
+`9A164E9D…`) → `DELETE /api/admin/users/{id}` with an empty body → the PKI index
+entry flips `V → R` (REVOKED), `issued/<cn>.crt` and `private/<cn>.key` are
+deleted from disk, the certificate row is removed, and a `CERT_PURGE` audit row
+(`{"count":1}`) is written. Recreating the same username then issues a **new**
+certificate (`B670411C…`, HTTP 200), proving no stale artifact is reused. UI:
+the delete dialog now shows only "Delete access rules" and "Clear static IP"
+checkboxes with the text "This cannot be undone. The user's certificate is
+revoked and removed."
+
 ---
 
 ## 4. Verification commands
