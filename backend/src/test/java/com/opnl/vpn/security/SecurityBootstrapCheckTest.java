@@ -26,7 +26,11 @@ class SecurityBootstrapCheckTest {
             "easyrsa",
             "/logs",
             mgmtPassword,
-            730);
+            730,
+            1194,
+            1194,
+            1195,
+            1195);
     return new OpnlProperties("./data", "OpenVPN Panel", token, jwt, auth, openvpn);
   }
 

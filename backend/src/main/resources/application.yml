@@ -91,6 +91,13 @@ opnl:
     cert-expire-days: ${OPNL_PKI_CERT_EXPIRE:730}
     log-dir: ${OPNL_LOG_DIR:./data/config/logs}
     internal-base-url: ${OPNL_INTERNAL_BASE_URL:http://backend:8080}
+    # Host-published daemon port ranges (must match docker-compose.yml). When
+    # *_END equals the base the range is a single port; additional daemons are
+    # auto-assigned the next free port within the range of their protocol.
+    udp-port-base: ${OPNL_OPENVPN_PORT:1194}
+    udp-port-end: ${OPNL_OPENVPN_PORT_END:1194}
+    tcp-port-base: ${OPNL_OPENVPN_TCP_PORT:1195}
+    tcp-port-end: ${OPNL_OPENVPN_TCP_PORT_END:1195}
   internal:
     mtls-port: ${OPNL_INTERNAL_MTLS_PORT:9443}
     tls-dir: ${OPNL_INTERNAL_TLS_DIR:./data/internal-tls}

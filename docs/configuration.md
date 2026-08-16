@@ -81,12 +81,26 @@ through `${VAR:-default}` substitutions for the rest.
 
 ## Frontend & compose ports
 
+Compose publishes a **range** of host ports for each protocol, and the backend
+auto-assigns new OpenVPN daemons from that range. A daemon's configured port is
+the container listen port *and* the port advertised in `.ovpn`, so the container
+port always equals the host-published port (identity mapping). Leave a daemon's
+**Port** empty in the UI to auto-assign the next free port of its protocol
+range; an explicit port must lie inside the published range
+(`daemon_port_not_published`). To run more than one daemon, widen the `*_END`
+variable of the protocol(s) you need and recreate the stack. Remote-node
+gateways publish their own independent ranges (`OPNL_NODE_OPENVPN_*`); their
+daemons must specify an explicit port. Full flow and error codes:
+`docs/architecture.md` §5.1.
+
 | Variable | Default | Description |
 |---|---|---|
 | `OPNL_FRONTEND_PORT` | `80` | Host port mapped to the frontend (nginx) container. |
 | `OPNL_VITE_PROXY_TARGET` | `http://localhost:8080` | Dev-only: backend target of the Vite dev-server proxy (`/api`, `/share`, `/ws`) in `frontend/vite.config.ts`. Not used by the production nginx image. |
-| `OPNL_OPENVPN_PORT` | `1194` | Host port mapped to the OpenVPN UDP listener. |
-| `OPNL_OPENVPN_TCP_PORT` | `1195` | Host port mapped to the OpenVPN TCP listener. |
+| `OPNL_OPENVPN_PORT` | `1194` | Start (base) of the host port range mapped to the OpenVPN UDP listeners. A daemon's configured port is both the container listen port and the externally advertised port, so daemons must use ports inside the published range. |
+| `OPNL_OPENVPN_PORT_END` | `1194` | End of the host UDP range. Defaults to the base (single port); widen it (e.g. `1199`) to publish more UDP daemon ports. The backend auto-assigns a new daemon the next free port of its protocol range and rejects explicit ports outside it (`daemon_port_not_published`). |
+| `OPNL_OPENVPN_TCP_PORT` | `1195` | Start (base) of the host port range mapped to the OpenVPN TCP listeners. |
+| `OPNL_OPENVPN_TCP_PORT_END` | `1195` | End of the host TCP range (see `OPNL_OPENVPN_PORT_END`). |
 
 ## Deployment images (release mode)
 
@@ -137,8 +151,10 @@ client CCD entries, etc.).
 | `OPNL_AGENT_TLS_KEY` | `/etc/opnl/agent/tls/client.key` | mTLS client private key. |
 | `OPNL_AGENT_TLS_DIR` | `./data/agent-tls` | **Host** directory holding the agent TLS files; mounted read-only into the agent container at `/etc/opnl/agent/tls`. |
 | `OPNL_NODE_INTERNAL_BASE_URL` | `http://backend:8080` | Base URL the remote gateway's OpenVPN scripts (`verify-user-pass`, `client-connect`, ...) use to call back into the **central** backend. The default only works when the gateway shares the central Docker network; a real remote gateway must point this at a reachable central address (e.g. `https://vpn.example.com:9443`). |
-| `OPNL_NODE_OPENVPN_PORT` | `1196` | Host port mapped to the remote gateway's UDP listener. |
-| `OPNL_NODE_OPENVPN_TCP_PORT` | `1197` | Host port mapped to the remote gateway's TCP listener. |
+| `OPNL_NODE_OPENVPN_PORT` | `1196` | Start (base) of the host port range mapped to the remote gateway's UDP listeners. |
+| `OPNL_NODE_OPENVPN_PORT_END` | `1196` | End of the remote gateway's UDP range (see `OPNL_OPENVPN_PORT_END`). |
+| `OPNL_NODE_OPENVPN_TCP_PORT` | `1197` | Start (base) of the host port range mapped to the remote gateway's TCP listeners. |
+| `OPNL_NODE_OPENVPN_TCP_PORT_END` | `1197` | End of the remote gateway's TCP range. |
 
 ## OpenVPN container firewall (runtime-injected)
 

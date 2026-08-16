@@ -14,7 +14,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class DaemonService {
 
   private static final String NETWORK_SETTING_KEY = "network";
+  private static final int DEFAULT_UDP_PORT = 1194;
+  private static final int DEFAULT_TCP_PORT = 1195;
 
   private final DaemonRepository repository;
   private final ServerSettingRepository settingRepository;
@@ -107,14 +111,15 @@ public class DaemonService {
 
   @Transactional
   public Daemon create(DaemonRequest request) {
-    validateUnique(request, null);
+    int port = resolvePort(request, null);
+    validateUnique(request, port, null);
     validateNode(request.nodeId());
     Daemon daemon =
         Daemon.builder()
             .id(UUID.randomUUID().toString())
             .daemonIndex(request.daemonIndex())
             .name(blankToNull(request.name()))
-            .port(request.port())
+            .port(port)
             .proto(request.proto())
             .subnet(request.subnet())
             .subnetMask(request.subnetMask())
@@ -146,11 +151,12 @@ public class DaemonService {
   @Transactional
   public Daemon update(String id, DaemonRequest request) {
     Daemon daemon = require(id);
-    validateUnique(request, id);
+    int port = resolvePort(request, id);
+    validateUnique(request, port, id);
     validateNode(request.nodeId());
     daemon.setDaemonIndex(request.daemonIndex());
     daemon.setName(blankToNull(request.name()));
-    daemon.setPort(request.port());
+    daemon.setPort(port);
     daemon.setProto(request.proto());
     daemon.setSubnet(request.subnet());
     daemon.setSubnetMask(request.subnetMask());
@@ -404,7 +410,7 @@ public class DaemonService {
         .orElseThrow(() -> ApiException.notFound("daemon_not_found", "Daemon not found"));
   }
 
-  private void validateUnique(DaemonRequest request, String excludedId) {
+  private void validateUnique(DaemonRequest request, int port, String excludedId) {
     repository
         .findByDaemonIndex(request.daemonIndex())
         .filter(d -> !d.getId().equals(excludedId))
@@ -416,12 +422,12 @@ public class DaemonService {
             });
     repository.findAll().stream()
         .filter(d -> !d.getId().equals(excludedId))
-        .filter(d -> d.getPort() == request.port())
+        .filter(d -> d.getPort() == port)
         .findAny()
         .ifPresent(
             d -> {
               throw ApiException.conflict(
-                  "daemon_port_taken", "Port " + request.port() + " is already in use");
+                  "daemon_port_taken", "Port " + port + " is already in use");
             });
     repository.findAll().stream()
         .filter(d -> !d.getId().equals(excludedId))
@@ -432,6 +438,66 @@ public class DaemonService {
               throw ApiException.conflict(
                   "daemon_subnet_taken", "Subnet " + request.subnet() + " is already in use");
             });
+  }
+
+  /**
+   * Resolves the daemon's listen port. An explicit port must fall inside the host-published range
+   * of its protocol family (local daemons only — anything else is unreachable from the host); an
+   * empty port is auto-assigned the lowest free port of that range. Remote-node daemons are
+   * provisioned by their own gateway and must always carry an explicit port.
+   */
+  private int resolvePort(DaemonRequest request, String excludedId) {
+    if (request.nodeId() != null && !request.nodeId().isBlank()) {
+      if (request.port() == null) {
+        throw ApiException.badRequest(
+            "daemon_port_required",
+            "A remote-node daemon must specify an explicit port (published by its gateway)");
+      }
+      return request.port();
+    }
+    OpnlProperties.OpenVpn openvpn = properties.openvpn();
+    int base;
+    int end;
+    if (isUdp(request.proto())) {
+      base = openvpn != null ? openvpn.udpRangeStart() : DEFAULT_UDP_PORT;
+      end = openvpn != null ? openvpn.udpRangeEnd() : DEFAULT_UDP_PORT;
+    } else {
+      base = openvpn != null ? openvpn.tcpRangeStart() : DEFAULT_TCP_PORT;
+      end = openvpn != null ? openvpn.tcpRangeEnd() : DEFAULT_TCP_PORT;
+    }
+    if (request.port() != null) {
+      if (request.port() < base || request.port() > end) {
+        throw ApiException.badRequest(
+            "daemon_port_not_published",
+            "Port "
+                + request.port()
+                + " is outside the published "
+                + request.proto()
+                + " range "
+                + base
+                + "-"
+                + end
+                + "; extend OPNL_OPENVPN_PORT_END / OPNL_OPENVPN_TCP_PORT_END to publish it");
+      }
+      return request.port();
+    }
+    Set<Integer> used =
+        repository.findAll().stream()
+            .filter(d -> !d.getId().equals(excludedId))
+            .map(Daemon::getPort)
+            .collect(Collectors.toSet());
+    for (int port = base; port <= end; port++) {
+      if (!used.contains(port)) {
+        return port;
+      }
+    }
+    throw ApiException.conflict(
+        "daemon_port_range_full",
+        "No free port left in the published " + request.proto() + " range " + base + "-" + end);
+  }
+
+  private static boolean isUdp(Protocol proto) {
+    return proto == Protocol.udp || proto == Protocol.udp6;
   }
 
   /** Rejects an unknown node id so daemons never point at a deleted node. */
@@ -494,11 +560,14 @@ public class DaemonService {
     return value == null || value.isBlank() ? null : value;
   }
 
-  /** Create/update payload for an OpenVPN daemon. */
+  /**
+   * Create/update payload for an OpenVPN daemon. Port is optional: null auto-assigns the next free
+   * port within the published range of the chosen protocol.
+   */
   public record DaemonRequest(
       @Min(0) @Max(31) int daemonIndex,
       String name,
-      @Min(1) @Max(65535) int port,
+      @Min(1) @Max(65535) Integer port,
       @NotNull Protocol proto,
       @NotBlank String subnet,
       @NotBlank String subnetMask,

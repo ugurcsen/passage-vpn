@@ -34,7 +34,11 @@ class ConfigWriterTest {
             "easyrsa",
             tempDir.resolve("logs").toString(),
             mgmtPassword,
-            730);
+            730,
+            1194,
+            1194,
+            1195,
+            1195);
     return new OpnlProperties(tempDir.toString(), "OpenVPN Panel", "token", jwt, auth, openvpn);
   }
 

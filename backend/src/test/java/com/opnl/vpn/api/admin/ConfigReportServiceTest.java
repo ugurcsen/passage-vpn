@@ -67,7 +67,11 @@ class ConfigReportServiceTest {
                     "easyrsa",
                     "./data/config/logs",
                     "mgmt-pass",
-                    730)),
+                    730,
+                    1194,
+                    1194,
+                    1195,
+                    1195)),
             environment);
   }
 

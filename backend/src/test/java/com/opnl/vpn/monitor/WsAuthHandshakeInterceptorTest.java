@@ -44,7 +44,11 @@ class WsAuthHandshakeInterceptorTest {
                 "easyrsa",
                 "logs",
                 "mgmt-pass",
-                730));
+                730,
+                1194,
+                1194,
+                1195,
+                1195));
     jwtService = new JwtService(properties);
     interceptor = new WsAuthHandshakeInterceptor(jwtService);
     handler = mock(WebSocketHandler.class);

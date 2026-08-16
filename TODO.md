@@ -284,6 +284,10 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] `ServerSettings` entity (port, proto, pool, DNS, routes, cipher, DCO, ...)
 - [x] `ServerConfigGenerator` — renders `server.conf` from settings
 - [x] Multi-daemon support (`daemons` entity) — per-daemon conf + management port
+- [x] Auto daemon port allocation: publish a configurable UDP/TCP host range
+      (`OPNL_OPENVPN_PORT[_END]`, `OPNL_OPENVPN_TCP_PORT[_END]`); daemons without
+      an explicit port get the next free port of their protocol range and out-of-range
+      ports are rejected, so added daemons are always reachable
 - [x] Apply flow: write conf → management `signal` reload / container restart
 - [x] DCO (Data Channel Offload) detection + display (status-based, UI on Status/Daemons)
 

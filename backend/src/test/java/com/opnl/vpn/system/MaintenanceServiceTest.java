@@ -91,7 +91,11 @@ class MaintenanceServiceTest {
                 "easyrsa",
                 tempDir.resolve("logs").toString(),
                 "mgmt-pass",
-                730));
+                730,
+                1194,
+                1194,
+                1195,
+                1195));
     this.properties = properties;
 
     Files.createDirectories(tempDir.resolve("pki"));

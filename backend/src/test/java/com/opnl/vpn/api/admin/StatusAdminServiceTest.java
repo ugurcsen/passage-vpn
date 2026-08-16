@@ -55,7 +55,11 @@ class StatusAdminServiceTest {
                 "easyrsa",
                 tempDir.resolve("logs").toString(),
                 "mgmt-pass",
-                730));
+                730,
+                1194,
+                1194,
+                1195,
+                1195));
     return new StatusAdminService(daemonService, connectionRegistry, clientManager, properties);
   }
 

@@ -114,7 +114,7 @@ export function DaemonsPage() {
       const payload = {
         name: form.name || null,
         daemonIndex: Number(form.daemonIndex),
-        port: Number(form.port),
+        port: form.port ? Number(form.port) : null,
         proto: form.proto,
         subnet: form.subnet,
         subnetMask: form.subnetMask,
@@ -372,8 +372,8 @@ export function DaemonsPage() {
                 label="Port"
                 value={form.port}
                 onChange={(e) => setForm({ ...form, port: e.target.value })}
-                required
                 sx={{ width: 140 }}
+                helperText="Empty = auto-assign from published range"
               />
               <TextField
                 select
@@ -514,7 +514,7 @@ export function DaemonsPage() {
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
           <Button
             variant="contained"
-            disabled={!form.daemonIndex || !form.port || !form.subnet || !form.subnetMask}
+            disabled={!form.daemonIndex || !form.subnet || !form.subnetMask}
             onClick={() => save.mutate()}
           >
             {editing ? "Save" : "Create"}

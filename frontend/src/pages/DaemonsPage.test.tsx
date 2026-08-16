@@ -142,6 +142,37 @@ describe("DaemonsPage", () => {
     });
   });
 
+  it("submits a null port when the field is left empty (auto-assign)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findAllByText("Primary");
+
+    await user.click(screen.getByRole("button", { name: /new daemon/i }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/^name$/i), {
+      target: { value: "Auto port" },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/^subnet\s*\*?$/i), {
+      target: { value: "10.10.0.0" },
+    });
+    await user.click(within(dialog).getByRole("button", { name: /^create$/i }));
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, opts]) => url === "/api/admin/daemons" && opts?.method === "POST",
+      );
+      expect(post).toBeDefined();
+    });
+    const [, opts] = fetchMock.mock.calls.find(
+      ([url, o]) => url === "/api/admin/daemons" && o?.method === "POST",
+    )!;
+    expect(JSON.parse(String(opts!.body))).toMatchObject({
+      name: "Auto port",
+      port: null,
+    });
+  });
+
   it("toggles a daemon enabled state", async () => {
     const user = userEvent.setup();
     renderPage();

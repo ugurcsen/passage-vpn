@@ -44,9 +44,31 @@ public record OpnlProperties(
       String easyrsaBin,
       String logDir,
       String mgmtPassword,
-      int certExpireDays) {
+      int certExpireDays,
+      int udpPortBase,
+      int udpPortEnd,
+      int tcpPortBase,
+      int tcpPortEnd) {
     public String mgmtEndpoint() {
       return mgmtHost + ":" + mgmtPort;
+    }
+
+    /** The inclusive UDP host-published port range; defaults to a single port. */
+    public int udpRangeStart() {
+      return udpPortBase;
+    }
+
+    public int udpRangeEnd() {
+      return Math.max(udpPortBase, udpPortEnd);
+    }
+
+    /** The inclusive TCP host-published port range; defaults to a single port. */
+    public int tcpRangeStart() {
+      return tcpPortBase;
+    }
+
+    public int tcpRangeEnd() {
+      return Math.max(tcpPortBase, tcpPortEnd);
     }
   }
 }

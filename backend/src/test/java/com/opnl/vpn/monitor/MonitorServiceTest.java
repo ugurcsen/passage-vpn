@@ -61,7 +61,11 @@ class MonitorServiceTest {
                 "easyrsa",
                 tempDir.resolve("logs").toString(),
                 "mgmt-pass",
-                730));
+                730,
+                1194,
+                1194,
+                1195,
+                1195));
     registry = new ConnectionRegistry();
     daemonService = mock(DaemonService.class);
     when(daemonService.list()).thenReturn(List.of(daemon(0), daemon(1)));

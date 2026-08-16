@@ -29,8 +29,11 @@ services:
     networks:
       - opnl-net
     ports:
-      - "${OPNL_OPENVPN_PORT:-1194}:1194/udp"
-      - "${OPNL_OPENVPN_TCP_PORT:-1195}:1195/tcp"
+      # Published daemon port ranges (base..end per protocol). *_END defaults to the base, i.e. a
+      # single published port; widen it (e.g. OPNL_OPENVPN_PORT_END=1199) so additional daemons
+      # are reachable. Container side equals the host side: a daemon's configured port is both.
+      - "${OPNL_OPENVPN_PORT:-1194}-${OPNL_OPENVPN_PORT_END:-1194}:${OPNL_OPENVPN_PORT:-1194}-${OPNL_OPENVPN_PORT_END:-1194}/udp"
+      - "${OPNL_OPENVPN_TCP_PORT:-1195}-${OPNL_OPENVPN_TCP_PORT_END:-1195}:${OPNL_OPENVPN_TCP_PORT:-1195}-${OPNL_OPENVPN_TCP_PORT_END:-1195}/tcp"
     expose:
       - "7505-7510"        # management interface per daemon (daemon 0 = 7505)
 
@@ -135,8 +138,8 @@ services:
     networks:
       - opnl-net
     ports:
-      - "${OPNL_NODE_OPENVPN_PORT:-1196}:1194/udp"
-      - "${OPNL_NODE_OPENVPN_TCP_PORT:-1197}:1195/tcp"
+      - "${OPNL_NODE_OPENVPN_PORT:-1196}-${OPNL_NODE_OPENVPN_PORT_END:-1196}:${OPNL_NODE_OPENVPN_PORT:-1196}-${OPNL_NODE_OPENVPN_PORT_END:-1196}/udp"
+      - "${OPNL_NODE_OPENVPN_TCP_PORT:-1197}-${OPNL_NODE_OPENVPN_TCP_PORT_END:-1197}:${OPNL_NODE_OPENVPN_TCP_PORT:-1197}-${OPNL_NODE_OPENVPN_TCP_PORT_END:-1197}/tcp"
     expose:
       - "7505-7510"        # management interface per daemon (daemon 0 = 7505)
 

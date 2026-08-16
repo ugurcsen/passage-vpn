@@ -241,7 +241,7 @@ class DaemonServiceTest {
                     new DaemonService.DaemonRequest(
                         0,
                         "dup",
-                        9999,
+                        1194,
                         Protocol.udp,
                         "10.9.0.0",
                         "255.255.255.0",
@@ -303,7 +303,7 @@ class DaemonServiceTest {
             1,
             "Generic",
             1195,
-            Protocol.udp,
+            Protocol.tcp,
             "10.9.0.0",
             "255.255.255.0",
             List.of(),
@@ -319,6 +319,201 @@ class DaemonServiceTest {
             true));
 
     verify(configWriter).writeDaemon(any(), any(), any(), any());
+  }
+
+  @Test
+  void createAutoAssignsLowestFreeUdpPortFromPublishedRange() {
+    OpnlProperties.OpenVpn openvpn = mock(OpnlProperties.OpenVpn.class);
+    when(properties.openvpn()).thenReturn(openvpn);
+    when(openvpn.udpRangeStart()).thenReturn(1194);
+    when(openvpn.udpRangeEnd()).thenReturn(1196);
+    when(repository.findByDaemonIndex(0)).thenReturn(Optional.of(primary()));
+    when(repository.findByDaemonIndex(1)).thenReturn(Optional.empty());
+    when(repository.findAll()).thenReturn(List.of(primary()));
+    when(repository.save(any(Daemon.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.findAllByOrderByDaemonIndexAsc()).thenReturn(List.of(primary()));
+    when(settingRepository.findById(SettingKeys.NETWORK_MODE)).thenReturn(Optional.empty());
+
+    Daemon saved =
+        service.create(
+            new DaemonService.DaemonRequest(
+                1,
+                "Auto",
+                null,
+                Protocol.udp,
+                "10.9.0.0",
+                "255.255.255.0",
+                List.of(),
+                null,
+                List.of(),
+                true,
+                false,
+                true,
+                null,
+                null,
+                false,
+                null,
+                true));
+
+    assertThat(saved.getPort()).isEqualTo(1195);
+  }
+
+  @Test
+  void createAutoAssignsFromTcpRangeForTcpDaemon() {
+    OpnlProperties.OpenVpn openvpn = mock(OpnlProperties.OpenVpn.class);
+    when(properties.openvpn()).thenReturn(openvpn);
+    when(openvpn.tcpRangeStart()).thenReturn(1195);
+    when(openvpn.tcpRangeEnd()).thenReturn(1197);
+    when(repository.findByDaemonIndex(0)).thenReturn(Optional.of(primary()));
+    when(repository.findByDaemonIndex(1)).thenReturn(Optional.empty());
+    when(repository.findAll()).thenReturn(List.of(primary()));
+    when(repository.save(any(Daemon.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.findAllByOrderByDaemonIndexAsc()).thenReturn(List.of(primary()));
+    when(settingRepository.findById(SettingKeys.NETWORK_MODE)).thenReturn(Optional.empty());
+
+    Daemon saved =
+        service.create(
+            new DaemonService.DaemonRequest(
+                1,
+                "Auto",
+                null,
+                Protocol.tcp,
+                "10.9.0.0",
+                "255.255.255.0",
+                List.of(),
+                null,
+                List.of(),
+                true,
+                false,
+                true,
+                null,
+                null,
+                false,
+                null,
+                true));
+
+    assertThat(saved.getPort()).isEqualTo(1195);
+  }
+
+  @Test
+  void createRejectsExplicitPortOutsidePublishedRange() {
+    OpnlProperties.OpenVpn openvpn = mock(OpnlProperties.OpenVpn.class);
+    when(properties.openvpn()).thenReturn(openvpn);
+    when(openvpn.udpRangeStart()).thenReturn(1194);
+    when(openvpn.udpRangeEnd()).thenReturn(1196);
+
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new DaemonService.DaemonRequest(
+                        1,
+                        "OutOfRange",
+                        1197,
+                        Protocol.udp,
+                        "10.9.0.0",
+                        "255.255.255.0",
+                        List.of(),
+                        null,
+                        List.of(),
+                        true,
+                        false,
+                        true,
+                        null,
+                        null,
+                        false,
+                        null,
+                        true)))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "daemon_port_not_published");
+  }
+
+  @Test
+  void createRejectsWhenPublishedRangeIsFull() {
+    when(repository.findByDaemonIndex(0)).thenReturn(Optional.of(primary()));
+    when(repository.findAll()).thenReturn(List.of(primary()));
+
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new DaemonService.DaemonRequest(
+                        1,
+                        "Full",
+                        null,
+                        Protocol.udp,
+                        "10.9.0.0",
+                        "255.255.255.0",
+                        List.of(),
+                        null,
+                        List.of(),
+                        true,
+                        false,
+                        true,
+                        null,
+                        null,
+                        false,
+                        null,
+                        true)))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "daemon_port_range_full");
+  }
+
+  @Test
+  void createRemoteNodeDaemonRequiresExplicitPort() {
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new DaemonService.DaemonRequest(
+                        1,
+                        "Remote",
+                        null,
+                        Protocol.udp,
+                        "10.9.0.0",
+                        "255.255.255.0",
+                        List.of(),
+                        null,
+                        List.of(),
+                        true,
+                        false,
+                        true,
+                        null,
+                        "n1",
+                        false,
+                        null,
+                        true)))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "daemon_port_required");
+  }
+
+  @Test
+  void createRemoteNodeDaemonAcceptsPortOutsideCentralRange() {
+    when(repository.findByDaemonIndex(1)).thenReturn(Optional.empty());
+    when(repository.findAll()).thenReturn(List.of());
+    when(repository.save(any(Daemon.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.findAllByOrderByDaemonIndexAsc()).thenReturn(List.of());
+    when(settingRepository.findById(SettingKeys.NETWORK_MODE)).thenReturn(Optional.empty());
+
+    Daemon saved =
+        service.create(
+            new DaemonService.DaemonRequest(
+                1,
+                "Remote",
+                9999,
+                Protocol.udp,
+                "10.9.0.0",
+                "255.255.255.0",
+                List.of(),
+                null,
+                List.of(),
+                true,
+                false,
+                true,
+                null,
+                "n1",
+                false,
+                null,
+                true));
+
+    assertThat(saved.getPort()).isEqualTo(9999);
   }
 
   @Test

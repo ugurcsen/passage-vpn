@@ -56,7 +56,11 @@ class DashboardAdminServiceTest {
                 "easyrsa",
                 tempDir.resolve("logs").toString(),
                 "mgmt-pass",
-                730));
+                730,
+                1194,
+                1194,
+                1195,
+                1195));
     registry = new ConnectionRegistry();
     aggregator = new TrafficAggregator();
     daemonService = mock(DaemonService.class);

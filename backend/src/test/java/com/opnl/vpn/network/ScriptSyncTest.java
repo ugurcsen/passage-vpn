@@ -33,7 +33,11 @@ class ScriptSyncTest {
             "easyrsa",
             "/logs",
             "mgmt-secret",
-            730);
+            730,
+            1194,
+            1194,
+            1195,
+            1195);
     OpnlProperties properties =
         new OpnlProperties("./data", "OpenVPN Panel", token, jwt, auth, openvpn);
     return new ScriptSync(properties);
