@@ -8,6 +8,57 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.8 — 2026-08-16
+
+Eighth **beta** milestone (SemVer pre-release): PKI lifecycle hardening round —
+certificate restore/re-revoke artifact bugs, a login-lockout persistence bug,
+and the orphan-certificate deletion leak — plus the UX simplification that
+**deleting a user always revokes and purges their certificate** (the cleanup
+checkbox is gone). All changes were live-verified on the staging host.
+Includes everything from `v0.1.0-beta.7` plus the changes below.
+
+### PKI lifecycle fixes
+- **F15 — restore artifacts / re-revoke** — `CertService.restore` now restores
+  the on-disk artifacts (`issued/`, `private/`) *before* touching `index.txt`
+  (`9005aa2`), and clears the Easy-RSA 3.2.x revoked archive so a second
+  revoke after a restore no longer fails with `pki_command` "conflicting file
+  exists" (`eec3949`). Live: issue → revoke → restore → rotate (200, new
+  serial) → revoke again (200).
+- **M9 — orphan certificate rows** — `UserAdminService.deleteUser` now always
+  removes the user's certificate bookkeeping rows (`CertService.deleteRowsForUser`,
+  bulk `deleteByUserId`), and `CertService.ensureUserCert` purges a stale
+  same-`common_name` row with an **immediate bulk delete** instead of a deferred
+  entity delete that Hibernate flushed *after* the new INSERT — fixing the
+  `UNIQUE constraint (common_name)` 500 when a username was re-created after a
+  delete (`4df2588`). Live: no-body DELETE → re-create → issue 200.
+- **M10 — user delete always purges the PKI** — deleting a user now always
+  revokes + purges their certificate; the `deleteCertificates` option and its
+  UI checkbox are removed, leaving `DeleteOptions` with `deleteAccessRules` +
+  `clearCcd` only (`d984b7f`). Without the checkbox the deleted user's
+  certificate stayed **VALID** in the PKI index with its on-disk artifacts
+  intact, so a stolen profile could still authenticate against a cert-only
+  (AUTO_LOGIN) daemon. "Deactivate but keep the certificate" remains available
+  via the separate ban/disable action. Live: no-body DELETE → index entry
+  `V → R` (REVOKED), `issued/`+`private/` artifacts removed, `CERT_PURGE`
+  audit written, re-create → new serial (200); the delete dialog now shows only
+  "Delete access rules" and "Clear static IP".
+
+### Auth fix
+- **F16 — persisted login lockout** — the failed-login lockout counters were
+  updated inside the same `@Transactional` login method that then threw, so the
+  exception rolled the updates back and the lockout never persisted. The
+  accounting now commits outside the rollback (`66d97c0`). Live: 5× wrong
+  password → `users.failed_attempts` reset + `users.locked_until` set, exactly
+  5 `LOGIN_FAILED` audit rows committed, and a correct-password 6th attempt →
+  `account_locked`.
+
+### Verified
+- Backend suite green: **908 tests**; frontend **31 files / 169 tests**, lint
+  clean. All three fixes live-verified on staging (see `docs/test-findings.md`
+  §M8, §M9, §M10). Tag: `v0.1.0-beta.8`.
+
+---
+
 ## v0.1.0-beta.7 — 2026-08-15
 
 Seventh **beta** milestone (SemVer pre-release): scoped `GROUP_ADMIN` RBAC
