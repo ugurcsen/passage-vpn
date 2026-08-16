@@ -44,6 +44,14 @@ services:
     restart: unless-stopped
     mem_limit: 1g
     cpus: 2.0
+    healthcheck:
+      # curl is present in the runtime image; OPNL_SERVER_PORT is expanded inside the
+      # container ($$ escapes compose interpolation so it can vary per deployment).
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$${OPNL_SERVER_PORT:-8080}/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
     env_file:
       - .env
     environment:
@@ -211,10 +219,10 @@ networks:
   opnl-net:
     driver: bridge
     enable_ipv6: true
-    ipam:
-      config:
-        - subnet: 172.18.0.0/16
-        - subnet: fd00:2::/112
+    # No explicit ipam subnets: Docker auto-allocates IPv4 from its default address
+    # pools and a unique random IPv6 ULA (/64). Pinning fixed subnets (e.g.
+    # 172.18.0.0/16, fd00:2::/112) collides with other stacks sharing the same host
+    # ("invalid pool request: Pool overlaps with other one on this address space").
 
 volumes:
   opnl-data:

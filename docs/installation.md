@@ -43,9 +43,17 @@ Two deployment paths are supported:
    ./install.sh --mode=release --tag=<tag> [--profile=postgres]
    ```
 
-   `--tag` defaults to `latest`; pin it to the released version for reproducibility.
-   The installer creates `.env` from `.env.example` on first run and generates a
-   JWT secret and admin password.
+   Because the tarball contains no source directories, plain `./install.sh`
+   (no flags) automatically detects the deploy-only tarball and falls back to
+   release mode, prompting for the tag interactively when run on a terminal.
+   `-y` skips all prompts and uses the defaults (`latest`). `--tag` defaults to
+   `latest`; pin it to the released version for reproducibility.
+
+   The installer creates `.env` from `.env.example` on first run and generates
+   all secrets the backend requires: the JWT signing secret, the admin password,
+   the internal token and the OpenVPN management-interface password. The admin
+   password is printed at the end of the install (also in `.env` as
+   `OPNL_ADMIN_PASSWORD`).
 
 4. Complete the setup wizard at `http://<server>:` and log in with
    username `admin` and the password in `.env` (`OPNL_ADMIN_PASSWORD`).
@@ -61,11 +69,14 @@ logs) lives in Docker named volumes and is preserved.
 ```bash
 git clone <repo> && cd opnl-vpn
 cp .env.example .env        # then adjust (see docs/configuration.md)
-./install.sh                # == docker compose up -d --build
+./install.sh                # interactive; ./install.sh -y for defaults
 ```
 
-All source is required for this path. `make up` / `make down` / `make logs` are
-the day-to-day helpers; `make test` runs the full backend + frontend test suite.
+All source is required for this path. On a terminal the installer asks for the
+install mode (build vs release), the database profile and whether to reset any
+existing data; `./install.sh --mode=release --tag=<tag>` works here too.
+`make up` / `make down` / `make logs` are the day-to-day helpers; `make test`
+runs the full backend + frontend test suite.
 
 ## PostgreSQL (optional)
 
@@ -81,7 +92,11 @@ the day-to-day helpers; `make test` runs the full backend + frontend test suite.
   production. Enable it only for development.
 - The backend refuses to start without `OPNL_INTERNAL_TOKEN` and
   `OPNL_OPENVPN_MGMT_PASSWORD` — replace the placeholders in `.env`.
-- Backups: `make backup` archives the `data/` directory (config + PKI + DB dump).
+- Backups: in a full checkout `make backup` archives the `data/` directory (agent TLS
+  + DB dump). Release-tarball deployments have no Makefile — back up the Docker named
+  volumes directly instead, e.g.
+  `docker run --rm -v opnl_data:/data -v "$PWD":/backup alpine tar czf /backup/opnl-data.tar.gz -C /data .`
+  and repeat for `opnl-pki`, `opnl-ccd`, `opnl-config`, `opnl-logs`.
 - The release images are tagged `ghcr.io/ugurcsen/opnl-vpn/{backend,frontend,openvpn}:<tag>`
   — override with `OPNL_IMAGE_REGISTRY` / `OPNL_IMAGE_NAMESPACE` / `OPNL_IMAGE_TAG`
   if you host them elsewhere.

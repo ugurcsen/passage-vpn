@@ -133,10 +133,10 @@ install: ## Single-command install (see install.sh)
 	./install.sh
 
 release: ## Build deploy-only tarball release/opnl-vpn-<git-tag>.tar.gz (requires a tag on HEAD)
-	@tag="$$(git describe --tags --exact-match 2>/dev/null)" || { echo "error: no git tag on HEAD — tag the commit first"; exit 1; }
-	@rm -rf release
-	@mkdir -p "release/opnl-vpn-$$tag"
-	@cp docker-compose.yml docker-compose.postgres.yml .env.example install.sh "release/opnl-vpn-$$tag/"
-	@cp docs/installation.md "release/opnl-vpn-$$tag/README.md"
-	@cd release && tar -czf "opnl-vpn-$$tag.tar.gz" "opnl-vpn-$$tag"
-	@echo "Wrote release/opnl-vpn-$$tag.tar.gz (deploy-only files, no source)"
+	@tag="$$(git describe --tags --exact-match 2>/dev/null)" || { echo "error: no git tag on HEAD — tag the commit first"; exit 1; }; \
+	rm -rf release; \
+	mkdir -p "release/opnl-vpn-$$tag"; \
+	cp docker-compose.yml docker-compose.postgres.yml .env.example install.sh "release/opnl-vpn-$$tag/"; \
+	cp docs/installation.md "release/opnl-vpn-$$tag/README.md"; \
+	cd release && tar -czf "opnl-vpn-$$tag.tar.gz" "opnl-vpn-$$tag"; \
+	echo "Wrote release/opnl-vpn-$$tag.tar.gz (deploy-only files, no source)"
