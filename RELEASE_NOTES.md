@@ -8,6 +8,27 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.9 — 2026-08-16
+
+Ninth **beta** milestone (SemVer pre-release): fixes the frontend test suite,
+which was red after the jsdom copyToClipboard fallback tests referenced the
+`HTMLDocument` global and the `document.execCommand` method — neither of which
+exists in the jsdom test environment (`ReferenceError: HTMLDocument is not
+defined`). The tests now stub `execCommand` directly on `document`. Includes
+everything from `v0.1.0-beta.8` plus the changes below.
+
+### Test fix
+- `copyToClipboard` fallback tests — define `document.execCommand` via
+  `Object.defineProperty` instead of poking `HTMLDocument.prototype`; the
+  property is stubbed per test so the async-Clipboard and rejection paths both
+  exercise the legacy fallback (`45b6710`).
+
+### Verified
+- Backend suite green (unchanged); frontend **31 files / 169 tests** green
+  (was 2 failed / 167 passed). Tag: `v0.1.0-beta.9`.
+
+---
+
 ## v0.1.0-beta.8 — 2026-08-16
 
 Eighth **beta** milestone (SemVer pre-release): PKI lifecycle hardening round —
