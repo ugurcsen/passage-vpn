@@ -249,18 +249,9 @@ class UserAdminServiceTest {
   }
 
   @Test
-  void deleteUserWithCertificateCleanupPurgesCertificates() {
-    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
-    service.deleteUser(admin(), "u2", new UserAdminService.DeleteOptions(true, false, false));
-    verify(certService).purgeForUser("u2");
-    verify(certService, never()).deleteRowsForUser(any());
-    verify(userRepository).delete(any());
-  }
-
-  @Test
   void deleteUserWithAccessRuleCleanupDeletesRules() {
     when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
-    service.deleteUser(admin(), "u2", new UserAdminService.DeleteOptions(false, true, false));
+    service.deleteUser(admin(), "u2", new UserAdminService.DeleteOptions(true, false));
     verify(accessRuleService).deleteForUser("u2");
     verify(userRepository).delete(any());
   }
@@ -268,18 +259,17 @@ class UserAdminServiceTest {
   @Test
   void deleteUserWithCcdCleanupClearsStaticIp() {
     when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
-    service.deleteUser(admin(), "u2", new UserAdminService.DeleteOptions(false, false, true));
+    service.deleteUser(admin(), "u2", new UserAdminService.DeleteOptions(false, true));
     verify(ccdService).clearStaticIp("u2");
     verify(ccdService).clearStaticIpv6("u2");
     verify(userRepository).delete(any());
   }
 
   @Test
-  void deleteUserWithoutOptionsStillRemovesCertificateRows() {
+  void deleteUserAlwaysPurgesCertificates() {
     when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
     service.deleteUser(admin(), "u2");
-    verify(certService).deleteRowsForUser("u2");
-    verify(certService, never()).purgeForUser(any());
+    verify(certService).purgeForUser("u2");
     verify(accessRuleService, never()).deleteForUser(any());
     verify(ccdService, never()).clearStaticIp(any());
     verify(ccdService, never()).clearStaticIpv6(any());
@@ -308,7 +298,7 @@ class UserAdminServiceTest {
         admin(),
         UserAdminService.BulkAction.DELETE,
         List.of("u2"),
-        new UserAdminService.DeleteOptions(true, true, true));
+        new UserAdminService.DeleteOptions(true, true));
     verify(certService).purgeForUser("u2");
     verify(accessRuleService).deleteForUser("u2");
     verify(ccdService).clearStaticIp("u2");

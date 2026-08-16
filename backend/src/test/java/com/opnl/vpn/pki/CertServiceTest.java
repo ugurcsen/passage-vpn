@@ -193,15 +193,6 @@ class CertServiceTest {
   }
 
   @Test
-  void deleteRowsForUserRemovesBookkeepingWithoutPkiPurge() {
-    service.deleteRowsForUser("u2");
-
-    verify(certificateRepository).deleteByUserId("u2");
-    verify(easyRsa, never()).revokeCert(any());
-    verify(easyRsa, never()).deleteClientCert(any());
-  }
-
-  @Test
   void restoreReactivatesRevokedCertificate() {
     Certificate cert =
         Certificate.builder()

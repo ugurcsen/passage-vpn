@@ -717,6 +717,24 @@ Unit tests: `UserAdminServiceTest.deleteUserWithoutOptionsStillRemovesCertificat
 `CertServiceTest.ensureUserCertPurgesStaleCertFromDeletedAccountWithSameName` (now
 verifies the bulk delete) and `CertServiceTest.deleteRowsForUserRemovesBookkeepingWithoutPkiPurge`.
 
+### M10 UX simplification: user delete always purges the PKI (2026-08-16)
+
+The leftover two-level behavior (DB rows always removed, PKI purge opt-in via the
+`deleteCertificates` checkbox) was confusing: with the checkbox off, a deleted user's
+certificate stayed **VALID** in the PKI index with its on-disk artifacts intact, so a
+stolen profile could still authenticate against a cert-only (AUTO_LOGIN) daemon. Decision:
+**deleting a user always revokes + purges the certificate**; the checkbox is removed.
+
+- `UserAdminService.DeleteOptions` now has only `deleteAccessRules` + `clearCcd`;
+  `deleteUser` always calls `certService.purgeForUser(id)`.
+- `CertService.deleteRowsForUser` / `CertificateRepository.deleteByUserId` removed.
+- Frontend delete dialog no longer offers a certificates checkbox and states the
+  certificate is revoked and removed. "Deactivate but keep the cert" remains available
+  via the separate ban/disable action (which does not purge).
+- `docs/api.md` DeleteOptions updated; existing clients sending the removed
+  `deleteCertificates` field are unaffected (unknown JSON fields are ignored and the
+  behavior is now always-purge anyway).
+
 ---
 
 ## 4. Verification commands

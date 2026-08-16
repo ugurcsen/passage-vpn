@@ -70,13 +70,11 @@ interface GroupRow {
 }
 
 interface DeleteOptions {
-  deleteCertificates: boolean;
   deleteAccessRules: boolean;
   clearCcd: boolean;
 }
 
 const EMPTY_DELETE_OPTIONS: DeleteOptions = {
-  deleteCertificates: false,
   deleteAccessRules: false,
   clearCcd: false,
 };
@@ -1129,20 +1127,10 @@ export function UsersPage() {
         <DialogTitle>Delete {deleteTarget?.usernames}</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 1 }}>
-            This cannot be undone. Optionally clean up related resources:
+            This cannot be undone. The user's certificate is revoked and removed. Optionally clean
+            up related resources:
           </DialogContentText>
           <FormGroup>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={deleteOptions.deleteCertificates}
-                  onChange={(e) =>
-                    setDeleteOptions((o) => ({ ...o, deleteCertificates: e.target.checked }))
-                  }
-                />
-              }
-              label="Revoke and delete certificates"
-            />
             <FormControlLabel
               control={
                 <Checkbox

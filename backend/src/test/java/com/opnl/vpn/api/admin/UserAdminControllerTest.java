@@ -159,7 +159,7 @@ class UserAdminControllerTest {
 
   @Test
   void deleteDelegatesToServiceWithOptions() {
-    UserAdminService.DeleteOptions options = new UserAdminService.DeleteOptions(true, false, true);
+    UserAdminService.DeleteOptions options = new UserAdminService.DeleteOptions(false, true);
 
     controller.delete(authentication, "u1", options);
 
@@ -373,7 +373,7 @@ class UserAdminControllerTest {
 
   @Test
   void bulkDelegatesToServiceWithOptions() {
-    UserAdminService.DeleteOptions options = new UserAdminService.DeleteOptions(true, true, true);
+    UserAdminService.DeleteOptions options = new UserAdminService.DeleteOptions(true, true);
     when(userAdminService.bulk(any(), any(), any(), any())).thenReturn(1);
 
     int count =

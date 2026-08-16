@@ -15,9 +15,6 @@ public interface CertificateRepository extends JpaRepository<Certificate, String
   /** Removes stale rows whose common name is being reused by another (new) account. */
   void deleteByCommonNameAndUserIdNot(String commonName, String userId);
 
-  /** Removes all bookkeeping rows of a deleted account. */
-  void deleteByUserId(String userId);
-
   List<Certificate> findByUserIdAndStatus(String userId, Certificate.Status status);
 
   boolean existsByCommonName(String commonName);

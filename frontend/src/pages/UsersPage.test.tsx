@@ -358,7 +358,7 @@ describe("UsersPage", () => {
     expect(screen.queryByTestId("edit-ccd-dave")).not.toBeInTheDocument();
   });
 
-  it("deletes a single user with cleanup options", async () => {
+  it("deletes a single user", async () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText("alice");
@@ -368,12 +368,9 @@ describe("UsersPage", () => {
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText(/This cannot be undone/)).toBeInTheDocument();
     expect(
-      within(dialog).getByRole("checkbox", { name: "Revoke and delete certificates" }),
-    ).toBeInTheDocument();
+      within(dialog).queryByRole("checkbox", { name: /certificates/i }),
+    ).not.toBeInTheDocument();
 
-    await user.click(
-      within(dialog).getByRole("checkbox", { name: "Revoke and delete certificates" }),
-    );
     await user.click(within(dialog).getByRole("button", { name: /^delete$/i }));
 
     const fetchMock = vi.mocked(fetch);
@@ -387,7 +384,6 @@ describe("UsersPage", () => {
       ([url, o]) => url === "/api/admin/users/u1" && o?.method === "DELETE",
     )!;
     expect(JSON.parse(String(opts!.body))).toEqual({
-      deleteCertificates: true,
       deleteAccessRules: false,
       clearCcd: false,
     });
@@ -423,7 +419,7 @@ describe("UsersPage", () => {
     expect(JSON.parse(String(opts!.body))).toMatchObject({
       action: "DELETE",
       ids: ["u1", "u2"],
-      options: { deleteCertificates: false, deleteAccessRules: true, clearCcd: false },
+      options: { deleteAccessRules: true, clearCcd: false },
     });
   });
 });

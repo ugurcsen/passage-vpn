@@ -239,11 +239,11 @@ public class UserAdminService {
   }
 
   /**
-   * Deletes a user. Certificate bookkeeping rows are always removed (otherwise re-creating the
-   * username would trip the UNIQUE common_name constraint). When {@link DeleteOptions} flags are
-   * set, related resources are cleaned up as well: certificates are also revoked and purged from
-   * the PKI, user-targeted access rules are removed (with the dnsmasq config refreshed) and the
-   * user's static IP/CCD file is cleared.
+   * Deletes a user. The user's certificates are always revoked and purged from the PKI (index entry
+   * flipped to REVOKED so the CRL rejects it, on-disk artifacts deleted best-effort, bookkeeping
+   * rows removed). When the remaining {@link DeleteOptions} flags are set, related resources are
+   * cleaned up as well: user-targeted access rules are removed (with the dnsmasq config refreshed)
+   * and the user's static IP/CCD file is cleared.
    */
   @Transactional
   public void deleteUser(User actor, String id, DeleteOptions options) {
@@ -255,11 +255,7 @@ public class UserAdminService {
     if (user.getRole() == User.Role.ADMIN && countAdmins() <= 1) {
       throw ApiException.badRequest("last_admin", "Cannot delete the last admin");
     }
-    if (options.deleteCertificates()) {
-      certService.purgeForUser(id);
-    } else {
-      certService.deleteRowsForUser(id);
-    }
+    certService.purgeForUser(id);
     if (options.deleteAccessRules()) {
       accessRuleService.deleteForUser(id);
     }
@@ -276,17 +272,15 @@ public class UserAdminService {
     userRepository.delete(user);
     Map<String, Object> detail = new java.util.HashMap<>();
     detail.put("username", user.getUsername());
-    if (options.deleteCertificates()) detail.put("certificates", true);
     if (options.deleteAccessRules()) detail.put("accessRules", true);
     if (options.clearCcd()) detail.put("ccd", true);
     auditLogService.record("USER_DELETE", AuditLogService.CAT_USER, id, "user", detail);
   }
 
   /** Cleanup choices offered when deleting a user; all flags default to off. */
-  public record DeleteOptions(
-      boolean deleteCertificates, boolean deleteAccessRules, boolean clearCcd) {
+  public record DeleteOptions(boolean deleteAccessRules, boolean clearCcd) {
     public static DeleteOptions none() {
-      return new DeleteOptions(false, false, false);
+      return new DeleteOptions(false, false);
     }
   }
 

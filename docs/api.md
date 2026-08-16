@@ -1716,7 +1716,9 @@ Downloads the profile a token resolves to; serves the .ovpn file as an attachmen
 |---|---|---|
 | `clearCcd` | boolean | no |
 | `deleteAccessRules` | boolean | no |
-| `deleteCertificates` | boolean | no |
+
+Note: deleting a user always revokes and purges their certificates from the PKI; the
+`DeleteOptions` flags only control additional cleanup.
 
 ---
 
