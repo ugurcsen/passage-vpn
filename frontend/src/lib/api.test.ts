@@ -271,8 +271,8 @@ describe("download helpers", () => {
 
   it("copyToClipboard falls back to execCommand without the async API", async () => {
     Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
-    (HTMLDocument.prototype as unknown as { execCommand: () => boolean }).execCommand = () => true;
-    const exec = vi.spyOn(document, "execCommand").mockReturnValue(true);
+    const exec = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, "execCommand", { value: exec, configurable: true });
 
     const ok = await copyToClipboard("hello");
 
@@ -288,8 +288,8 @@ describe("download helpers", () => {
       },
       configurable: true,
     });
-    (HTMLDocument.prototype as unknown as { execCommand: () => boolean }).execCommand = () => true;
-    const exec = vi.spyOn(document, "execCommand").mockReturnValue(true);
+    const exec = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, "execCommand", { value: exec, configurable: true });
 
     const ok = await copyToClipboard("hello");
 
