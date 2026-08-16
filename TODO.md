@@ -3,7 +3,7 @@
 Development roadmap for the OpenVPN Access Server–like management panel built on
 OpenVPN Community Edition + Easy-RSA + OpenVPN Management Interface.
 
-All code and UI text are in **English**. Backend is **Java 21 + Spring Boot** (Gradle
+All code and UI text are in **English**. Backend is **Java 25 + Spring Boot** (Gradle
 Kotlin DSL), frontend is **React + TypeScript + MUI**. Database is **SQLite** first,
 with a portable-to-PostgreSQL path.
 
@@ -256,7 +256,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 - [x] `TODO.md` and `AGENTS.md` (this file + agent guide)
 - [x] Repo layout, `.gitignore`, `.env.example`
-- [x] Gradle wrapper + `settings.gradle.kts` + `build.gradle.kts` (Java 21, Spring Boot 3.5)
+- [x] Gradle wrapper + `settings.gradle.kts` + `build.gradle.kts` (Java 25, Spring Boot 3.5)
 - [x] `docker-compose.yml` (openvpn / backend / frontend / db)
 - [x] `Makefile` skeleton (`up/down/build/logs/test/...`)
 - [x] `install.sh` single-command installer skeleton

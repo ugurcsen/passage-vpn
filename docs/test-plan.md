@@ -1,6 +1,6 @@
 # Test Plan — OpenVPN Management Panel
 
-Living test strategy for the management panel (backend Java 21 + Spring Boot, frontend
+Living test strategy for the management panel (backend Java 25 + Spring Boot, frontend
 React + TypeScript + MUI, OpenVPN Community 2.6). Companion to `TODO.md` and
 `RELEASE_NOTES.md`. Update this file whenever the suite or the feature set changes.
 

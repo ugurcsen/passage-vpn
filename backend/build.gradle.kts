@@ -2,9 +2,9 @@ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     java
-    id("org.springframework.boot") version "3.5.4"
+    id("org.springframework.boot") version "3.5.16"
     id("io.spring.dependency-management") version "1.1.7"
-    id("com.diffplug.spotless") version "6.25.0"
+    id("com.diffplug.spotless") version "8.9.0"
     id("jacoco")
 }
 
@@ -13,8 +13,12 @@ version = "0.1.0-SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
+}
+
+jacoco {
+    toolVersion = "0.8.15"
 }
 
 configurations {
@@ -29,7 +33,7 @@ repositories {
 
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.boot:spring-boot-dependencies:3.5.4")
+        mavenBom("org.springframework.boot:spring-boot-dependencies:3.5.16")
     }
 }
 
@@ -113,7 +117,7 @@ tasks.jacocoTestCoverageVerification {
 spotless {
     java {
         target("src/**/*.java")
-        googleJavaFormat("1.22.0")
+        googleJavaFormat("1.28.0")
         removeUnusedImports()
     }
 }

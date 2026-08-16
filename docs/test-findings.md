@@ -6,7 +6,7 @@ this file whenever a new issue is confirmed or one is fixed (mark it `[FIXED]` w
 to the commit).
 
 Environment tested: staging host `65.21.108.250`, `docker compose up` deployment, OpenVPN
-Community **2.6.20** (`x86_64-alpine-linux-musl`), backend Java 21 + Spring Boot 3.5.
+Community **2.6.20** (`x86_64-alpine-linux-musl`), backend Java 25 + Spring Boot 3.5.
 Tests executed as live HTTP/UI probes against the running stack.
 
 Legend: `[CRIT]` breaks core functionality, `[HIGH]` degrades a feature, `[MED]` edge

@@ -1,6 +1,6 @@
 # ---- Build stage: compile backend jar ----
 # Context is the repository root (see docker-compose.yml).
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 
 COPY backend/gradle/ gradle/
@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/root/.gradle/caches \
     ./gradlew --no-daemon bootJar
 
 # ---- Runtime stage: JRE + easy-rsa + openvpn (PKI authority) ----
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 RUN apt-get update && apt-get install -y --no-install-recommends \
         easy-rsa \
         openvpn \

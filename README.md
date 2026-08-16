@@ -7,7 +7,7 @@
 A production-ready OpenVPN management panel replicating OpenVPN Access Server
 features on top of open source components. Source: **github.com/ugurcsen/opnl-vpn**.
 
-- **Backend**: Java 21, Spring Boot 3.5, Gradle (Kotlin DSL), SQLite (validated against a PostgreSQL profile)
+- **Backend**: Java 25, Spring Boot 3.5, Gradle (Kotlin DSL), SQLite (validated against a PostgreSQL profile)
 - **Frontend**: React 18 + TypeScript, Vite, MUI v6, TanStack Query
 - **VPN core**: OpenVPN Community Edition 2.6, Easy-RSA 3.1, OpenVPN Management Interface
 - **Deploy**: Docker Compose, Makefile, `install.sh`

@@ -1115,7 +1115,7 @@ Second tagged milestone (SemVer pre-release). Includes everything from
 
 ### Phase 0 — Project scaffolding
 - [x] Repo layout, `TODO.md`, `AGENTS.md`, `.gitignore`, `.env.example`
-- [x] Gradle wrapper + build scripts (Java 21, Spring Boot 3.5, Kotlin DSL)
+- [x] Gradle wrapper + build scripts (Java 25, Spring Boot 3.5, Kotlin DSL)
 - [x] `docker-compose.yml` (openvpn / backend / frontend / db) + PostgreSQL profile
 - [x] `Makefile` and `install.sh`
 - [x] OpenVPN container image (`openvpn/Dockerfile`) with helper scripts

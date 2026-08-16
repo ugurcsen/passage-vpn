@@ -7,7 +7,7 @@ Guidance for AI agents and human developers working on this repository.
 A production-ready OpenVPN management panel replicating OpenVPN Access Server
 features, built on open source components:
 
-- **Backend**: Java 21, Spring Boot 3.5, Gradle (Kotlin DSL), JPA + Hibernate, SQLite (WAL) with a portable-to-PostgreSQL path
+- **Backend**: Java 25, Spring Boot 3.5, Gradle (Kotlin DSL), JPA + Hibernate, SQLite (WAL) with a portable-to-PostgreSQL path
 - **Frontend**: React 18 + TypeScript, Vite, MUI v6 (Material), TanStack Query, React Hook Form + Zod
 - **VPN core**: OpenVPN Community Edition 2.6 + Easy-RSA 3.1 + OpenVPN Management Interface
 - **Deploy**: Docker Compose, Makefile, `install.sh`
