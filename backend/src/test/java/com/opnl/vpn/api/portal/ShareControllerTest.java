@@ -70,6 +70,20 @@ class ShareControllerTest {
   }
 
   @Test
+  void usedUpTokenReturnsHtmlUsedUpPage() throws Exception {
+    when(profileService.downloadFromToken("used"))
+        .thenThrow(ApiException.conflict("token_exhausted", "Profile token has no uses left"));
+
+    mvc.perform(get("/share/used"))
+        .andExpect(status().isConflict())
+        .andExpect(content().contentType("text/html;charset=UTF-8"))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("Link used up")))
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.containsString("Profile token has no uses left")));
+  }
+
+  @Test
   void htmlEscapesErrorMessage() throws Exception {
     when(profileService.downloadFromToken("x"))
         .thenThrow(

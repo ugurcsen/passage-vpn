@@ -289,6 +289,77 @@ class ProfileServiceTest {
   }
 
   @Test
+  void pinnedDaemonProfileEmbedsOnlyThatDaemonEvenWhenMultiRemoteEnabled() {
+    ServerConfig split =
+        new ServerConfig(
+            1,
+            1195,
+            ServerConfig.Protocol.udp,
+            "10.9.0.0",
+            "255.255.255.0",
+            List.of("1.1.1.1"),
+            null,
+            List.of("192.168.50.0/24"),
+            false,
+            false,
+            true,
+            "vpn.example.com",
+            false,
+            null);
+    when(settingsService.serverSettings())
+        .thenReturn(java.util.Map.of(SettingKeys.PROFILE_MULTI_REMOTE, true));
+    when(daemonService.resolvePinnedForProfile(ProfileType.USER_LOCKED, 1))
+        .thenReturn(new DaemonService.ProfileEndpoint(split, "vpn.example.com", "Split tunnel"));
+
+    OvpnFile file = service.downloadForUser("u1", ProfileType.USER_LOCKED, 1);
+
+    assertThat(file.filename()).isEqualTo("user-locked-Split_tunnel-alice.ovpn");
+    assertThat(file.content())
+        .contains("remote vpn.example.com 1195")
+        .doesNotContain("remote-random");
+  }
+
+  @Test
+  void tokenDownloadUsesPinnedDaemon() {
+    ServerConfig split =
+        new ServerConfig(
+            1,
+            1195,
+            ServerConfig.Protocol.udp,
+            "10.9.0.0",
+            "255.255.255.0",
+            List.of("1.1.1.1"),
+            null,
+            List.of("192.168.50.0/24"),
+            false,
+            false,
+            true,
+            "vpn.example.com",
+            false,
+            null);
+    ProfileToken token =
+        ProfileToken.builder()
+            .id("t1")
+            .token("tok-abc")
+            .userId("u1")
+            .profileType(ProfileType.USER_LOCKED)
+            .daemonIndex(1)
+            .usesLeft(3)
+            .createdAt(Instant.now())
+            .build();
+    when(tokenRepository.findByToken("tok-abc")).thenReturn(Optional.of(token));
+    when(tokenRepository.save(token)).thenReturn(token);
+    when(daemonService.resolvePinnedForProfile(ProfileType.USER_LOCKED, 1))
+        .thenReturn(new DaemonService.ProfileEndpoint(split, "vpn.example.com", "Split tunnel"));
+
+    OvpnFile file = service.downloadFromToken("tok-abc");
+
+    assertThat(file.content())
+        .contains("remote vpn.example.com 1195")
+        .doesNotContain("remote-random");
+  }
+
+  @Test
   void qrPayloadCreatesSingleUseToken() {
     ProfileToken token =
         ProfileToken.builder()
@@ -310,10 +381,31 @@ class ProfileServiceTest {
     ArgumentCaptor<ProfileToken> saved = ArgumentCaptor.forClass(ProfileToken.class);
     verify(tokenRepository).save(saved.capture());
     assertThat(saved.getValue().getUsesLeft()).isEqualTo(1);
+    assertThat(saved.getValue().getSource()).isEqualTo(TokenSource.PORTAL);
     assertThat(saved.getValue().getExpiresAt())
         .isBetween(
             Instant.now().minusSeconds(2),
             Instant.now().plus(ProfileService.QR_TOKEN_TTL).plusSeconds(2));
+  }
+
+  @Test
+  void adminCreateTokenDefaultsToAdminSource() {
+    ProfileToken token =
+        ProfileToken.builder()
+            .id("t1")
+            .token("tok")
+            .userId("u1")
+            .profileType(ProfileType.USER_LOCKED)
+            .createdAt(Instant.now())
+            .build();
+    when(tokenRepository.save(org.mockito.ArgumentMatchers.any(ProfileToken.class)))
+        .thenReturn(token);
+
+    service.createToken("u1", ProfileType.USER_LOCKED, null, 3);
+
+    ArgumentCaptor<ProfileToken> saved = ArgumentCaptor.forClass(ProfileToken.class);
+    verify(tokenRepository).save(saved.capture());
+    assertThat(saved.getValue().getSource()).isEqualTo(TokenSource.ADMIN);
   }
 
   @Test

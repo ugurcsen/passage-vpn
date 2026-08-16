@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Admin profile management: download any user's profile and manage sharing tokens. */
@@ -43,15 +44,22 @@ public class ProfileAdminController {
   }
 
   @GetMapping("/users/{userId}/profiles/{type}/download")
-  public OvpnFile download(@PathVariable String userId, @PathVariable ProfileType type) {
-    return profileService.downloadForUser(userId, type);
+  public OvpnFile download(
+      @PathVariable String userId,
+      @PathVariable ProfileType type,
+      @RequestParam(required = false) Integer daemonIndex) {
+    return profileService.downloadForUser(userId, type, daemonIndex);
   }
 
   @PostMapping("/profile-tokens")
   public ProfileTokenDto create(@Valid @RequestBody CreateTokenRequest request) {
     ProfileToken token =
         profileService.createToken(
-            request.userId(), request.profileType(), request.expiresAt(), request.usesLeft());
+            request.userId(),
+            request.profileType(),
+            request.expiresAt(),
+            request.usesLeft(),
+            request.daemonIndex());
     return ProfileTokenDto.from(token, usernameFor(token.getUserId()));
   }
 
@@ -78,7 +86,11 @@ public class ProfileAdminController {
   }
 
   public record CreateTokenRequest(
-      String userId, @NotNull ProfileType profileType, Instant expiresAt, Integer usesLeft) {
+      String userId,
+      @NotNull ProfileType profileType,
+      Integer daemonIndex,
+      Instant expiresAt,
+      Integer usesLeft) {
 
     /** GENERIC tokens are user-less; every other profile type needs a concrete user. */
     @AssertTrue(message = "userId is required for non-generic profile tokens")
@@ -86,6 +98,12 @@ public class ProfileAdminController {
       return profileType == null
           || profileType == ProfileType.GENERIC
           || (userId != null && !userId.isBlank());
+    }
+
+    /** 0 uses would create an immediately-dead link; treat it as invalid input. */
+    @AssertTrue(message = "usesLeft must be 1 or more when set")
+    public boolean isUsesLeftPositive() {
+      return usesLeft == null || usesLeft >= 1;
     }
   }
 }

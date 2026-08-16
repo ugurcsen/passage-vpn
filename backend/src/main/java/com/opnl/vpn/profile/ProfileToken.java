@@ -40,6 +40,16 @@ public class ProfileToken {
   @Enumerated(EnumType.STRING)
   private ProfileType profileType;
 
+  /** The specific daemon the profile is pinned to; null = legacy multi-remote behavior. */
+  @Column(name = "daemon_index")
+  private Integer daemonIndex;
+
+  /** Where the token was created: admin panel or user portal (QR). */
+  @Column(name = "source", nullable = false, length = 32)
+  @Enumerated(EnumType.STRING)
+  @Builder.Default
+  private TokenSource source = TokenSource.ADMIN;
+
   @Column(name = "expires_at")
   private Instant expiresAt;
 

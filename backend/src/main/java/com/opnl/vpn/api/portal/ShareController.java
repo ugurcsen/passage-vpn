@@ -53,14 +53,13 @@ public class ShareController {
     } catch (ApiException ex) {
       return ResponseEntity.status(ex.getStatus())
           .contentType(MediaType.parseMediaType("text/html;charset=UTF-8"))
-          .body(errorPage(ex.getStatus(), ex.getMessage()));
+          .body(errorPage(ex.getStatus(), ex.getCode(), ex.getMessage()));
     }
   }
 
-  private byte[] errorPage(HttpStatus status, String message) {
+  private byte[] errorPage(HttpStatus status, String code, String message) {
     String safe = message == null ? "" : escapeHtml(message);
-    String title =
-        status.value() == HttpStatus.NOT_FOUND.value() ? "Link not found" : "Link expired";
+    String title = titleFor(status, code);
     String html =
         """
         <!DOCTYPE html>
@@ -83,6 +82,19 @@ public class ShareController {
         """
             .formatted(title, title, safe);
     return html.getBytes(StandardCharsets.UTF_8);
+  }
+
+  private String titleFor(HttpStatus status, String code) {
+    if (code == null) {
+      return status.value() == HttpStatus.NOT_FOUND.value() ? "Link not found" : "Link expired";
+    }
+    return switch (code) {
+      case "token_not_found" -> "Link not found";
+      case "token_revoked" -> "Link revoked";
+      case "token_exhausted" -> "Link used up";
+      case "token_expired" -> "Link expired";
+      default -> status.value() == HttpStatus.NOT_FOUND.value() ? "Link not found" : "Link expired";
+    };
   }
 
   private String escapeHtml(String text) {

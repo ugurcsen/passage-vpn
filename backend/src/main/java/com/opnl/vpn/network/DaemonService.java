@@ -219,6 +219,33 @@ public class DaemonService {
   }
 
   /**
+   * Resolves the endpoint of a single pinned daemon for the given profile type, validating that the
+   * daemon exists, is enabled, serves the type and runs on a serving node. Used by per-daemon
+   * profile downloads (full-tunnel vs split-tunnel daemons) so clients connect to exactly the
+   * chosen instance instead of load-balancing across all matching daemons.
+   */
+  @Transactional(readOnly = true)
+  public ProfileEndpoint resolvePinnedForProfile(ProfileType type, int daemonIndex) {
+    Daemon daemon =
+        repository
+            .findByDaemonIndex(daemonIndex)
+            .orElseThrow(
+                () ->
+                    ApiException.notFound(
+                        "daemon_not_found", "Daemon " + daemonIndex + " not found"));
+    if (!servesProfile(daemon, type)) {
+      throw ApiException.badRequest(
+          "daemon_mismatch", "Daemon " + daemonIndex + " does not serve profile type " + type);
+    }
+    if (!nodeServing(daemon)) {
+      throw ApiException.badRequest(
+          "daemon_mismatch", "Daemon " + daemonIndex + " is not currently reachable");
+    }
+    return new ProfileEndpoint(
+        toServerConfig(daemon), effectiveAdminHost(daemon), daemon.getName());
+  }
+
+  /**
    * Every daemon that serves the given profile type, local and remote, in daemon-index order. Used
    * to embed multiple {@code remote} endpoints in a connection profile; falls back to the primary
    * daemon when nothing matches so single-daemon installs keep working.
@@ -324,16 +351,26 @@ public class DaemonService {
   }
 
   private java.util.function.Predicate<Daemon> matchesProfile(ProfileType type) {
+    return d -> servesProfile(d, type);
+  }
+
+  /** Whether the daemon's flag combination serves the given profile type (see class javadoc). */
+  private boolean servesProfile(Daemon daemon, ProfileType type) {
     return switch (type) {
-      case GENERIC -> d -> d.isEnabled() && d.isClientCertNotRequired();
-      case AUTO_LOGIN -> d -> d.isEnabled() && !d.isClientCertNotRequired() && !d.isAuthUserPass();
+      case GENERIC -> daemon.isEnabled() && daemon.isClientCertNotRequired();
+      case AUTO_LOGIN ->
+          daemon.isEnabled() && !daemon.isClientCertNotRequired() && !daemon.isAuthUserPass();
       case USER_LOCKED, SERVER_LOCKED ->
-          d -> d.isEnabled() && !d.isClientCertNotRequired() && d.isAuthUserPass();
+          daemon.isEnabled() && !daemon.isClientCertNotRequired() && daemon.isAuthUserPass();
     };
   }
 
   /** A single profile-serving endpoint with the effective public host clients should connect to. */
-  public record ProfileEndpoint(ServerConfig config, String host) {}
+  public record ProfileEndpoint(ServerConfig config, String host, String name) {
+    public ProfileEndpoint(ServerConfig config, String host) {
+      this(config, host, null);
+    }
+  }
 
   /** Maps an entity to the shared config shape used by generators and writers. */
   public ServerConfig toServerConfig(Daemon daemon) {

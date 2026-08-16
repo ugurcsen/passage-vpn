@@ -7,14 +7,16 @@ import {
   CardContent,
   Collapse,
   CircularProgress,
+  MenuItem,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { QRCodeSVG } from "qrcode.react";
-import { downloadOvpn, type OvpnFile } from "@/lib/api";
+import { downloadOvpn, type OvpnFile, type ProfileDaemon } from "@/lib/api";
 
 export interface QrData {
   /** Text encoded in the QR code (the share URL). */
@@ -31,6 +33,17 @@ interface ProfileCardProps {
   /** When provided, the QR encodes this short-lived share link instead of the full profile
    *  content (which exceeds QR capacity). The card then shows a live expiry countdown. */
   qrFetch?: () => Promise<QrData>;
+  /** Optional daemon picker shown when a profile type is served by more than one daemon
+   *  (e.g. full-tunnel vs split-tunnel instances). */
+  daemonOptions?: ProfileDaemon[];
+  daemon?: number | null;
+  onDaemonChange?: (daemonIndex: number | null) => void;
+}
+
+function daemonLabel(d: ProfileDaemon): string {
+  const name = d.name ?? `Daemon ${d.daemonIndex}`;
+  const routing = d.fullTunnel ? "full tunnel" : "split tunnel";
+  return `${name} · ${routing} (${d.proto}:${d.port})`;
 }
 
 function formatRemaining(ms: number): string {
@@ -41,7 +54,16 @@ function formatRemaining(ms: number): string {
 }
 
 /** A profile tile with download and QR-code share actions. */
-export function ProfileCard({ title, subtitle, disabled, fetch, qrFetch }: ProfileCardProps) {
+export function ProfileCard({
+  title,
+  subtitle,
+  disabled,
+  fetch,
+  qrFetch,
+  daemonOptions,
+  daemon,
+  onDaemonChange,
+}: ProfileCardProps) {
   const [qrOpen, setQrOpen] = useState(false);
   const [content, setContent] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
@@ -104,6 +126,26 @@ export function ProfileCard({ title, subtitle, disabled, fetch, qrFetch }: Profi
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           {subtitle}
         </Typography>
+        {daemonOptions && daemonOptions.length > 1 && (
+          <TextField
+            select
+            size="small"
+            fullWidth
+            label="Server"
+            value={daemon ?? ""}
+            disabled={disabled}
+            onChange={(e) => onDaemonChange?.(e.target.value === "" ? null : Number(e.target.value))}
+            helperText="Choose which VPN server this profile connects to."
+            sx={{ mt: 1 }}
+          >
+            <MenuItem value="">All servers (auto)</MenuItem>
+            {daemonOptions.map((d) => (
+              <MenuItem key={d.daemonIndex} value={d.daemonIndex}>
+                {daemonLabel(d)}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
       </CardContent>
       <CardActions>
         <Stack direction="row" spacing={1} sx={{ px: 1, pb: 1, width: "100%" }}>

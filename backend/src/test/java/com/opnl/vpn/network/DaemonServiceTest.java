@@ -172,6 +172,66 @@ class DaemonServiceTest {
   }
 
   @Test
+  void resolvePinnedForProfileReturnsMatchingDaemonWithName() {
+    Daemon split = daemon("d1", 1, "Split tunnel", 1195, "10.9.0.0", false, true);
+    split.setFullTunnel(false);
+    split.setExtraRoutes(List.of("192.168.50.0/24"));
+    when(repository.findByDaemonIndex(1)).thenReturn(Optional.of(split));
+
+    DaemonService.ProfileEndpoint endpoint =
+        service.resolvePinnedForProfile(ProfileType.USER_LOCKED, 1);
+
+    assertThat(endpoint.config().port()).isEqualTo(1195);
+    assertThat(endpoint.config().fullTunnel()).isFalse();
+    assertThat(endpoint.name()).isEqualTo("Split tunnel");
+    assertThat(endpoint.host()).isEqualTo("vpn.example.com");
+  }
+
+  @Test
+  void resolvePinnedForProfileRejectsDaemonServingAnotherType() {
+    Daemon generic = daemon("g1", 1, "Generic", 1195, "10.9.0.0", true, true);
+    when(repository.findByDaemonIndex(1)).thenReturn(Optional.of(generic));
+
+    assertThatThrownBy(() -> service.resolvePinnedForProfile(ProfileType.USER_LOCKED, 1))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "daemon_mismatch");
+  }
+
+  @Test
+  void resolvePinnedForProfileRejectsDisabledDaemon() {
+    Daemon disabled = daemon("d1", 1, "Off", 1195, "10.9.0.0", false, true);
+    disabled.setEnabled(false);
+    when(repository.findByDaemonIndex(1)).thenReturn(Optional.of(disabled));
+
+    assertThatThrownBy(() -> service.resolvePinnedForProfile(ProfileType.USER_LOCKED, 1))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "daemon_mismatch");
+  }
+
+  @Test
+  void resolvePinnedForProfileRejectsUnknownDaemon() {
+    when(repository.findByDaemonIndex(9)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.resolvePinnedForProfile(ProfileType.USER_LOCKED, 9))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "daemon_not_found");
+  }
+
+  @Test
+  void resolvePinnedForProfileRejectsDaemonOnDisabledNode() {
+    Daemon remote = daemon("r1", 1, "Remote", 1195, "10.9.0.0", false, true);
+    remote.setNodeId("n1");
+    OpenVpnNode node = new OpenVpnNode();
+    node.setEnabled(false);
+    when(repository.findByDaemonIndex(1)).thenReturn(Optional.of(remote));
+    when(nodeRegistryService.findNode("n1")).thenReturn(Optional.of(node));
+
+    assertThatThrownBy(() -> service.resolvePinnedForProfile(ProfileType.USER_LOCKED, 1))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "daemon_mismatch");
+  }
+
+  @Test
   void createRejectsDuplicateDaemonIndex() {
     when(repository.findByDaemonIndex(0)).thenReturn(Optional.of(primary()));
 

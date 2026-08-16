@@ -252,6 +252,32 @@ export interface OvpnFile {
   content: string;
 }
 
+/** A single daemon the portal user can choose for a profile download. */
+export interface ProfileDaemon {
+  daemonIndex: number;
+  name: string | null;
+  port: number;
+  proto: string;
+  fullTunnel: boolean;
+  extraRoutes: string[];
+  host: string | null;
+}
+
+/** Availability + serving daemons of one profile type in the client portal. */
+export interface PortalProfileType {
+  type: ProfileType;
+  label: string;
+  locked: boolean;
+  allowed: boolean;
+  available: boolean;
+  daemons: ProfileDaemon[];
+}
+
+/** Appends the daemon pin to a profile URL when one is selected. */
+export function withDaemon(path: string, daemonIndex: number | null | undefined): string {
+  return daemonIndex == null ? path : `${path}?daemonIndex=${daemonIndex}`;
+}
+
 export interface Daemon {
   id: string;
   daemonIndex: number;

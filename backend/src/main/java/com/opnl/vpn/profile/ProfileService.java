@@ -58,8 +58,19 @@ public class ProfileService {
   /** Downloads a profile for a user; locked types ensure a client certificate exists. */
   @Transactional
   public OvpnFile downloadForUser(String userId, ProfileType type) {
+    return downloadForUser(userId, type, null);
+  }
+
+  /**
+   * Downloads a profile for a user, optionally pinned to a specific daemon. When {@code
+   * daemonIndex} is set the profile contains only that daemon's endpoint (ignoring {@code
+   * profile_multi_remote}), so e.g. a full-tunnel and a split-tunnel daemon of the same profile
+   * type can each have their own downloadable profile.
+   */
+  @Transactional
+  public OvpnFile downloadForUser(String userId, ProfileType type, Integer daemonIndex) {
     User user = requireUser(userId);
-    return build(user, type, certMaterial(user, type));
+    return build(user, type, certMaterial(user, type), daemonIndex);
   }
 
   /** Resolves and consumes a sharing token; returns the profile it points to. */
@@ -86,22 +97,51 @@ public class ProfileService {
 
     if (token.getUserId() != null) {
       User user = requireUser(token.getUserId());
-      return build(user, token.getProfileType(), certMaterial(user, token.getProfileType()));
+      return build(
+          user,
+          token.getProfileType(),
+          certMaterial(user, token.getProfileType()),
+          token.getDaemonIndex());
     }
     User generic = requireUserForGeneric();
-    return build(generic, token.getProfileType(), null);
+    return build(generic, token.getProfileType(), null, token.getDaemonIndex());
   }
 
   /** Creates a short-lived single-use token for QR-code sharing of the user's own profile. */
   @Transactional
   public QrPayload createQrPayload(String userId, ProfileType type) {
-    ProfileToken token = createToken(userId, type, Instant.now().plus(QR_TOKEN_TTL), 1);
+    return createQrPayload(userId, type, null);
+  }
+
+  /** Creates a short-lived single-use QR token pinned to a specific daemon. */
+  @Transactional
+  public QrPayload createQrPayload(String userId, ProfileType type, Integer daemonIndex) {
+    ProfileToken token =
+        createToken(
+            userId, type, Instant.now().plus(QR_TOKEN_TTL), 1, daemonIndex, TokenSource.PORTAL);
     return new QrPayload(token.getToken(), token.getExpiresAt());
   }
 
   @Transactional
   public ProfileToken createToken(
       String userId, ProfileType type, Instant expiresAt, Integer usesLeft) {
+    return createToken(userId, type, expiresAt, usesLeft, null);
+  }
+
+  @Transactional
+  public ProfileToken createToken(
+      String userId, ProfileType type, Instant expiresAt, Integer usesLeft, Integer daemonIndex) {
+    return createToken(userId, type, expiresAt, usesLeft, daemonIndex, TokenSource.ADMIN);
+  }
+
+  @Transactional
+  public ProfileToken createToken(
+      String userId,
+      ProfileType type,
+      Instant expiresAt,
+      Integer usesLeft,
+      Integer daemonIndex,
+      TokenSource source) {
     if (type == ProfileType.GENERIC) {
       requireUserForGeneric();
     } else {
@@ -113,6 +153,8 @@ public class ProfileService {
             .token(UUID.randomUUID().toString().replace("-", ""))
             .userId(type == ProfileType.GENERIC ? null : userId)
             .profileType(type)
+            .daemonIndex(daemonIndex)
+            .source(source)
             .expiresAt(expiresAt)
             .usesLeft(usesLeft)
             .createdAt(Instant.now())
@@ -231,8 +273,13 @@ public class ProfileService {
     };
   }
 
-  private OvpnFile build(User user, ProfileType type, String[] certMaterial) {
-    List<DaemonService.ProfileEndpoint> endpoints = daemonService.resolveAllForProfile(type);
+  private OvpnFile build(User user, ProfileType type, String[] certMaterial, Integer daemonIndex) {
+    List<DaemonService.ProfileEndpoint> endpoints;
+    if (daemonIndex != null) {
+      endpoints = List.of(daemonService.resolvePinnedForProfile(type, daemonIndex));
+    } else {
+      endpoints = daemonService.resolveAllForProfile(type);
+    }
     if (endpoints.isEmpty()) {
       throw ApiException.badRequest("no_daemon", "No daemon serves this profile type");
     }
@@ -243,9 +290,12 @@ public class ProfileService {
                     new OvpnGenerator.Endpoint(
                         e.host(), e.config().port(), e.config().proto(), e.config().ipv6Enabled()))
             .toList();
+    // A pinned daemon always yields a single-endpoint profile; the multi-remote
+    // setting only applies to the unpinned (load-balancing) path.
     boolean multiRemote =
-        !Boolean.FALSE.equals(
-            settingsService.serverSettings().get(SettingKeys.PROFILE_MULTI_REMOTE));
+        daemonIndex == null
+            && !Boolean.FALSE.equals(
+                settingsService.serverSettings().get(SettingKeys.PROFILE_MULTI_REMOTE));
     String content =
         generator.render(
             type,
@@ -256,10 +306,18 @@ public class ProfileService {
             certMaterial == null ? null : certMaterial[1],
             requiresMfaChallenge(user, type),
             multiRemote);
-    String daemonSuffix = type == ProfileType.GENERIC ? "-generic" : "";
+    String typePrefix = type.name().toLowerCase().replace('_', '-');
+    String daemonTag;
+    if (daemonIndex != null) {
+      String raw = endpoints.get(0).name();
+      String safe = raw == null || raw.isBlank() ? null : raw.replaceAll("[^A-Za-z0-9_.-]", "_");
+      daemonTag = "-" + (safe == null ? "daemon" + endpoints.get(0).config().daemonIndex() : safe);
+    } else {
+      daemonTag = type == ProfileType.GENERIC ? "-generic" : "";
+    }
     String filename =
-        type.name().toLowerCase().replace('_', '-')
-            + daemonSuffix
+        typePrefix
+            + daemonTag
             + "-"
             + user.getUsername().replaceAll("[^A-Za-z0-9_.-]", "_")
             + ".ovpn";

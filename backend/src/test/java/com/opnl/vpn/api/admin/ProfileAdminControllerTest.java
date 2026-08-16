@@ -56,13 +56,13 @@ class ProfileAdminControllerTest {
                 .content(objectMapper.writeValueAsString(Map.of("profileType", "USER_LOCKED"))))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("validation_failed"));
-    verify(profileService, never()).createToken(any(), any(), any(), any());
+    verify(profileService, never()).createToken(any(), any(), any(), any(), any());
   }
 
   @Test
   void createAcceptsGenericWithoutUserId() throws Exception {
     ProfileToken token = token(ProfileType.GENERIC, null);
-    when(profileService.createToken(eq(null), eq(ProfileType.GENERIC), any(), any()))
+    when(profileService.createToken(eq(null), eq(ProfileType.GENERIC), any(), any(), any()))
         .thenReturn(token);
     mvc.perform(
             post("/api/admin/profile-tokens")
@@ -74,7 +74,8 @@ class ProfileAdminControllerTest {
 
   @Test
   void createWithUnknownUserIdReturns404() throws Exception {
-    when(profileService.createToken(eq("unknown-id"), eq(ProfileType.USER_LOCKED), any(), any()))
+    when(profileService.createToken(
+            eq("unknown-id"), eq(ProfileType.USER_LOCKED), any(), any(), any()))
         .thenThrow(ApiException.notFound("user_not_found", "User not found"));
     mvc.perform(
             post("/api/admin/profile-tokens")
@@ -86,6 +87,40 @@ class ProfileAdminControllerTest {
                             "profileType", "USER_LOCKED"))))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("user_not_found"));
+  }
+
+  @Test
+  void createPinsTokenToDaemonWhenRequested() throws Exception {
+    ProfileToken token = token(ProfileType.USER_LOCKED, "u1");
+    when(profileService.createToken(eq("u1"), eq(ProfileType.USER_LOCKED), any(), any(), eq(1)))
+        .thenReturn(token);
+    mvc.perform(
+            post("/api/admin/profile-tokens")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        Map.of(
+                            "userId", "u1",
+                            "profileType", "USER_LOCKED",
+                            "daemonIndex", 1))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.profileType").value("USER_LOCKED"));
+  }
+
+  @Test
+  void createRejectsZeroUses() throws Exception {
+    mvc.perform(
+            post("/api/admin/profile-tokens")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        Map.of(
+                            "userId", "u1",
+                            "profileType", "USER_LOCKED",
+                            "usesLeft", 0))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validation_failed"));
+    verify(profileService, never()).createToken(any(), any(), any(), any(), any());
   }
 
   private ProfileToken token(ProfileType type, String userId) {

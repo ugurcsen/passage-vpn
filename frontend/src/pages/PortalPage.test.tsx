@@ -10,8 +10,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { PortalPage } from "@/pages/PortalPage";
 
 const profileTypes = [
-  { type: "USER_LOCKED", label: "User locked", locked: false, allowed: true, available: true },
-  { type: "AUTO_LOGIN", label: "Auto login", locked: false, allowed: true, available: true },
+  { type: "USER_LOCKED", label: "User locked", locked: false, allowed: true, available: true, daemons: [] },
+  { type: "AUTO_LOGIN", label: "Auto login", locked: false, allowed: true, available: true, daemons: [] },
 ];
 
 const meBody = {
@@ -67,7 +67,7 @@ describe("PortalPage", () => {
             json({ token: "qr-tok", expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() }),
           );
         }
-        if (url.startsWith("/api/portal/profiles/"))
+      if (String(url).startsWith("/api/portal/profiles/"))
           return Promise.resolve(
             json({ filename: "user-locked-alice.ovpn", content: "client\nremote vpn.example.com" }),
           );
@@ -135,10 +135,10 @@ describe("PortalPage", () => {
       if (url === "/api/portal/profiles")
         return Promise.resolve(
           json([
-            { type: "USER_LOCKED", label: "User locked", locked: false, allowed: true, available: true },
-            { type: "AUTO_LOGIN", label: "Auto login", locked: false, allowed: true, available: false },
-            { type: "SERVER_LOCKED", label: "Server locked", locked: false, allowed: true, available: true },
-            { type: "GENERIC", label: "Generic", locked: false, allowed: false, available: true },
+            { type: "USER_LOCKED", label: "User locked", locked: false, allowed: true, available: true, daemons: [] },
+            { type: "AUTO_LOGIN", label: "Auto login", locked: false, allowed: true, available: false, daemons: [] },
+            { type: "SERVER_LOCKED", label: "Server locked", locked: false, allowed: true, available: true, daemons: [] },
+            { type: "GENERIC", label: "Generic", locked: false, allowed: false, available: true, daemons: [] },
           ]),
         );
       return Promise.resolve(new Response("{}", { status: 200 }));
@@ -150,5 +150,51 @@ describe("PortalPage", () => {
     expect(screen.queryByText("AUTO LOGIN")).not.toBeInTheDocument();
     expect(screen.queryByText("GENERIC")).not.toBeInTheDocument();
     expect(screen.getByText(/some profile types are hidden/i)).toBeInTheDocument();
+  });
+
+  it("lets the user pick a specific daemon and pins the download to it", async () => {
+    vi.mocked(fetch).mockImplementation((url: RequestInfo | URL) => {
+      if (url === "/api/auth/me") return Promise.resolve(json(meBody));
+      if (url === "/api/portal/profiles")
+        return Promise.resolve(
+          json([
+            {
+              type: "USER_LOCKED",
+              label: "User locked",
+              locked: false,
+              allowed: true,
+              available: true,
+              daemons: [
+                { daemonIndex: 0, name: "Full tunnel", port: 1194, proto: "UDP", fullTunnel: true, extraRoutes: [], host: "vpn.example.com" },
+                { daemonIndex: 1, name: "Split tunnel", port: 1195, proto: "UDP", fullTunnel: false, extraRoutes: ["192.168.50.0/24"], host: "vpn.example.com" },
+              ],
+            },
+          ]),
+        );
+      if (String(url).startsWith("/api/portal/profiles/"))
+        return Promise.resolve(
+          json({ filename: "user-locked-alice.ovpn", content: "client\nremote vpn.example.com" }),
+        );
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("USER LOCKED");
+
+    const serverSelect = screen.getByRole("combobox", { name: /server/i });
+    await user.click(serverSelect);
+    await user.click(await screen.findByRole("option", { name: /split tunnel/i }));
+
+    const downloadButtons = screen.getAllByRole("button", { name: /download/i });
+    await user.click(downloadButtons[0]);
+
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([url]) => url === "/api/portal/profiles/USER_LOCKED/download?daemonIndex=1",
+        ),
+      ).toBe(true);
+    });
   });
 });
