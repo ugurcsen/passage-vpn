@@ -15,6 +15,29 @@ Two deployment paths are supported:
 - Linux host; the OpenVPN container needs `/dev/net/tun` and `NET_ADMIN`
   (iptables-based access control)
 
+### Host Kernel Requirements
+
+The OpenVPN container uses a TUN device and iptables-based NAT for VPN
+client traffic routing. The host kernel **must** have IP forwarding enabled,
+otherwise VPN clients can connect but cannot route traffic through the
+server (the most common "connected but no internet" symptom).
+
+Verify current state:
+
+```bash
+sysctl net.ipv4.ip_forward net.ipv6.conf.all.forwarding
+```
+
+Enable permanently:
+
+```bash
+sudo tee -a /etc/sysctl.conf <<'EOF'
+net.ipv4.ip_forward=1
+net.ipv6.conf.all.forwarding=1
+EOF
+sudo sysctl -p
+```
+
 ## Production: install from the release tarball
 
 1. **Create a release.** Tag a commit and push; the `release.yml` workflow builds

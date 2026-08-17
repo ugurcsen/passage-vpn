@@ -100,6 +100,16 @@ HAVE_OPENSSL=0
 command -v openssl >/dev/null 2>&1 && HAVE_OPENSSL=1
 [ "$HAVE_OPENSSL" = "0" ] && warn "openssl not found (needed to generate secrets)."
 
+# ---------- host kernel check ----------
+FWD_OK=1
+[ "$(sysctl -n net.ipv4.ip_forward 2>/dev/null)" = "1" ] || FWD_OK=0
+if [ "$FWD_OK" = "0" ]; then
+  warn "net.ipv4.ip_forward is not enabled on this host."
+  warn "VPN clients will connect but cannot route traffic."
+  warn "Fix: sudo sysctl -w net.ipv4.ip_forward=1"
+  warn "Permanent: add 'net.ipv4.ip_forward=1' to /etc/sysctl.conf"
+fi
+
 # ---------- environment detection ----------
 HAS_SRC=0
 [ -d frontend ] && [ -d openvpn ] && [ -d backend ] && HAS_SRC=1
