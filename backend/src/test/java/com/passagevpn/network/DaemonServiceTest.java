@@ -5,12 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.passagevpn.common.ApiException;
 import com.passagevpn.config.PassageProperties;
+import com.passagevpn.monitor.MgmtClientManager;
 import com.passagevpn.network.ServerConfig.Protocol;
 import com.passagevpn.profile.ProfileType;
 import com.passagevpn.setting.SettingKeys;
@@ -28,6 +30,7 @@ class DaemonServiceTest {
   private ConfigWriter configWriter;
   private NodeRegistryService nodeRegistryService;
   private PassageProperties properties;
+  private MgmtClientManager mgmtClientManager;
   private DaemonService service;
 
   private Daemon primary() {
@@ -67,6 +70,7 @@ class DaemonServiceTest {
     configWriter = mock(ConfigWriter.class);
     nodeRegistryService = mock(NodeRegistryService.class);
     properties = mock(PassageProperties.class);
+    mgmtClientManager = mock(MgmtClientManager.class);
     service =
         new DaemonService(
             repository,
@@ -75,7 +79,8 @@ class DaemonServiceTest {
             configWriter,
             properties,
             mock(com.passagevpn.audit.AuditLogService.class),
-            nodeRegistryService);
+            nodeRegistryService,
+            mgmtClientManager);
   }
 
   @Test
@@ -717,6 +722,43 @@ class DaemonServiceTest {
 
     verify(repository).delete(extra);
     verify(configWriter).removeDaemon(1);
+  }
+
+  @Test
+  void deleteSignalsLocalDaemonWithSigtermBeforeRemoval() {
+    Daemon extra = daemon("d1", 1, "Extra", 1195, "10.9.0.0", true, true);
+    when(repository.findById("d1")).thenReturn(Optional.of(extra));
+
+    service.delete("d1");
+
+    verify(mgmtClientManager).signal(1, "SIGTERM");
+    verify(repository).delete(extra);
+    verify(configWriter).removeDaemon(1);
+  }
+
+  @Test
+  void deleteSignalsRemoteDaemonWithSigtermBeforeRemoval() {
+    Daemon remote = daemon("r1", 1, "Remote", 1195, "10.9.0.0", false, true);
+    remote.setNodeId("n1");
+    when(repository.findById("r1")).thenReturn(Optional.of(remote));
+
+    service.delete("r1");
+
+    verify(mgmtClientManager).signal("n1", 1, "SIGTERM");
+    verify(repository).delete(remote);
+    // Remote daemons don't have local config files, so removeDaemon is not called
+    verify(configWriter, never()).removeDaemon(1);
+  }
+
+  @Test
+  void deletePrimaryDoesNotSignal() {
+    when(repository.findById("d0")).thenReturn(Optional.of(primary()));
+
+    assertThatThrownBy(() -> service.delete("d0"))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "primary_daemon");
+
+    verify(mgmtClientManager, never()).signal(any(int.class), any(String.class));
   }
 
   @Test

@@ -8,6 +8,53 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.17 — 2026-08-18
+
+Seventeenth **beta** milestone (SemVer pre-release): split-tunnel fix and
+zero-downtime daemon deletion. The `reapply_rules()` function in the OpenVPN
+container only processed the first daemon config, so non-primary daemons
+(e.g. split-tunnel daemon on port 1012) never received a MASQUERADE NAT
+rule — VPN clients on those daemons could not reach the internet or the VPN
+server itself. Daemon deletion now surgically stops only the deleted daemon's
+process via the management interface, leaving all other daemons and their
+clients undisturbed. Includes everything from `v0.1.0-beta.16` plus the
+changes below.
+
+### Split-tunnel NAT fix — multi-daemon reapply_rules
+- Rewrote `reapply_rules()` in `entrypoint.sh` to loop over **all**
+  `daemon-*.conf` files instead of only the first (`head -1`). Each daemon
+  now receives its own MASQUERADE NAT rule, fixing internet access and
+  hairpin routing for split-tunnel clients.
+- Added `--comment "passage-nat"` marker to MASQUERADE rules in
+  `apply-rules.sh` so orphan rules from deleted daemons can be identified
+  and cleaned up.
+- `reapply_rules()` now flushes all `passage-nat`-commented MASQUERADE
+  rules before re-adding them for active daemons, ensuring stale rules
+  from deleted daemons are removed.
+
+### Zero-downtime daemon deletion
+- `DaemonService.delete()` now sends `signal SIGTERM` to the daemon's
+  management interface before removing its config file. Only the deleted
+  daemon's clients disconnect; other daemons keep running.
+- `entrypoint.sh` file-watcher now distinguishes config-set changes
+  (daemon added/removed) from content changes (daemon modified). Set
+  changes only start new daemons and refresh firewall rules without
+  restarting running daemons. Content changes trigger a full `restart_all()`
+  as before.
+- Added `config_set_sig()` function that hashes the set of config file
+  paths (ignoring content) for set-change detection.
+
+### Tests
+- Added `deleteSignalsLocalDaemonWithSigtermBeforeRemoval`,
+  `deleteSignalsRemoteDaemonWithSigtermBeforeRemoval`, and
+  `deletePrimaryDoesNotSignal` tests to `DaemonServiceTest`.
+- Added shell tests for `config_set_sig()` (hash stability, set change,
+  content independence) and `reapply_rules()` (multi-daemon loop).
+- Added shell tests for `apply-rules.sh` verifying `--comment "passage-nat"`
+  marker on IPv4 and IPv6 MASQUERADE rules.
+
+---
+
 ## v0.1.0-beta.16 — 2026-08-18
 
 Sixteenth **beta** milestone (SemVer pre-release): critical fix for MFA VPN

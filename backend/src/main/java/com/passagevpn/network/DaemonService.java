@@ -3,6 +3,7 @@ package com.passagevpn.network;
 import com.passagevpn.audit.AuditLogService;
 import com.passagevpn.common.ApiException;
 import com.passagevpn.config.PassageProperties;
+import com.passagevpn.monitor.MgmtClientManager;
 import com.passagevpn.network.ServerConfig.Protocol;
 import com.passagevpn.profile.ProfileType;
 import com.passagevpn.setting.SettingKeys;
@@ -51,6 +52,7 @@ public class DaemonService {
   private final PassageProperties properties;
   private final AuditLogService auditLogService;
   private final NodeRegistryService nodeRegistryService;
+  private final MgmtClientManager mgmtClientManager;
 
   public DaemonService(
       DaemonRepository repository,
@@ -59,7 +61,8 @@ public class DaemonService {
       ConfigWriter configWriter,
       PassageProperties properties,
       AuditLogService auditLogService,
-      NodeRegistryService nodeRegistryService) {
+      NodeRegistryService nodeRegistryService,
+      MgmtClientManager mgmtClientManager) {
     this.repository = repository;
     this.settingRepository = settingRepository;
     this.generator = generator;
@@ -67,6 +70,7 @@ public class DaemonService {
     this.properties = properties;
     this.auditLogService = auditLogService;
     this.nodeRegistryService = nodeRegistryService;
+    this.mgmtClientManager = mgmtClientManager;
   }
 
   /**
@@ -212,12 +216,19 @@ public class DaemonService {
     return saved;
   }
 
-  /** Deletes a non-primary daemon and removes its config file. */
+  /** Deletes a non-primary daemon, stops its process via the management interface and removes its config file. */
   @Transactional
   public void delete(String id) {
     Daemon daemon = require(id);
     if (daemon.getDaemonIndex() == 0) {
       throw ApiException.badRequest("primary_daemon", "The primary daemon cannot be deleted");
+    }
+    // Stop the daemon process via the management interface so only its
+    // clients disconnect (other daemons keep running).
+    if (daemon.getNodeId() == null) {
+      mgmtClientManager.signal(daemon.getDaemonIndex(), "SIGTERM");
+    } else {
+      mgmtClientManager.signal(daemon.getNodeId(), daemon.getDaemonIndex(), "SIGTERM");
     }
     repository.delete(daemon);
     if (daemon.getNodeId() == null) {

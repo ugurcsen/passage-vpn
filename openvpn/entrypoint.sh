@@ -179,18 +179,28 @@ start_dnsmasq() {
     return 1
 }
 
-# (Re)applies the base firewall for the first daemon's pool. Runs after daemons
-# are up so routed mode can install its tun return route; re-run on config
-# reloads so pool/mode changes refresh NAT or return routes.
+# (Re)applies the base firewall for every daemon's pool.  First removes any
+# orphaned MASQUERADE rules left behind by deleted daemons (identified by
+# the "passage-nat" comment added by apply-rules.sh), then ensures each
+# running daemon has its own NAT rule.
 reapply_rules() {
-    local conf pool pool6 mode
-    conf="$(ls "$PASSAGE_CONFIG_DIR"/daemon-*.conf 2>/dev/null | head -1 || true)"
-    [[ -z "$conf" ]] && return 0
-    pool="$(extract_pool "$conf" 2>/dev/null || true)"
-    [[ -z "$pool" ]] && return 0
-    pool6="$(extract_pool6 "$conf" 2>/dev/null || true)"
-    mode="$(extract_mode "$conf" 2>/dev/null || true)"
-    PASSAGE_VPN_POOL="$pool" PASSAGE_VPN_POOL6="$pool6" PASSAGE_NETWORK_MODE="$mode" /etc/openvpn/scripts/apply-rules.sh || true
+    local pool pool6 mode
+    # 1. Remove orphaned passage-nat MASQUERADE rules (reverse order to
+    #    avoid index shifting while deleting by line number).
+    while IFS= read -r num; do
+        iptables -t nat -D POSTROUTING "$num" 2>/dev/null || true
+    done < <(iptables -t nat -L POSTROUTING -nv --line-numbers 2>/dev/null \
+        | grep "passage-nat" | awk '{print $1}' | sort -rn)
+    # 2. Add MASQUERADE for each active daemon.
+    for conf in "$PASSAGE_CONFIG_DIR"/daemon-*.conf; do
+        [[ -f "$conf" ]] || continue
+        pool="$(extract_pool "$conf" 2>/dev/null || true)"
+        [[ -z "$pool" ]] && continue
+        pool6="$(extract_pool6 "$conf" 2>/dev/null || true)"
+        mode="$(extract_mode "$conf" 2>/dev/null || true)"
+        PASSAGE_VPN_POOL="$pool" PASSAGE_VPN_POOL6="$pool6" PASSAGE_NETWORK_MODE="$mode" \
+            /etc/openvpn/scripts/apply-rules.sh || true
+    done
     start_dnsmasq || true
 }
 
@@ -220,6 +230,14 @@ conf_sig() {
         [ -f "$conf" ] && sig+="$(md5sum "$conf" | cut -d' ' -f1)"
     done
     echo "$sig"
+}
+
+# Hash of the *set* of daemon config file paths (ignores content).  Used by the
+# file-watcher to distinguish daemon add/remove (set change) from in-place
+# edit (content change) so that a daemon deletion only restarts the deleted
+# daemon rather than every running daemon.
+config_set_sig() {
+    ls "$PASSAGE_CONFIG_DIR"/daemon-*.conf 2>/dev/null | sort | md5sum | cut -d' ' -f1
 }
 
 dnsmasq_sig() {
@@ -279,14 +297,33 @@ fi
 # the running VPN daemons.
 (
     last_sig="$boot_sig"
+    last_config_set="$(config_set_sig)"
     last_dnsmasq="$(dnsmasq_sig)"
     while :; do
-        cur="$(conf_sig)"
-        if [ -n "$cur" ] && [ "$cur" != "$last_sig" ]; then
-            echo "[entrypoint] daemon config changed; restarting daemons"
+        cur_config_set="$(config_set_sig)"
+        cur_sig="$(conf_sig)"
+
+        if [ "$cur_config_set" != "$last_config_set" ]; then
+            # Daemon set changed (add/remove): start only new daemons and
+            # refresh firewall rules.  Existing daemons keep running.
+            echo "[entrypoint] daemon set changed; starting new daemons + cleaning rules"
+            for conf in "$PASSAGE_CONFIG_DIR"/daemon-*.conf; do
+                name="$(basename "$conf" .conf)"
+                pidfile="$PASSAGE_LOG_DIR/$name.pid"
+                if [ ! -f "$pidfile" ] || ! kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+                    start_daemon "$conf" || true
+                fi
+            done
+            reapply_rules
+            last_config_set="$cur_config_set"
+            last_sig="$cur_sig"
+        elif [ -n "$cur_sig" ] && [ "$cur_sig" != "$last_sig" ]; then
+            # Daemon content changed: full restart of all daemons.
+            echo "[entrypoint] daemon config modified; restarting daemons"
             restart_all
-            last_sig="$cur"
+            last_sig="$cur_sig"
         fi
+
         cur_dnsmasq="$(dnsmasq_sig)"
         if [ -n "$cur_dnsmasq" ] && [ "$cur_dnsmasq" != "$last_dnsmasq" ]; then
             echo "[entrypoint] dnsmasq config changed; refreshing resolver + firewall"

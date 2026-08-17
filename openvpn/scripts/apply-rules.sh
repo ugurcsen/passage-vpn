@@ -110,13 +110,13 @@ if [[ "$mode" == "routed" ]]; then
 fi
 
 # NAT mode (default): source NAT the VPN pool out of the uplink.
-if ! iptables -t nat -C POSTROUTING -s "$pool" -o "$iface" -j MASQUERADE 2>/dev/null; then
-    iptables -t nat -A POSTROUTING -s "$pool" -o "$iface" -j MASQUERADE
+if ! iptables -t nat -C POSTROUTING -s "$pool" -o "$iface" -m comment --comment "passage-nat" -j MASQUERADE 2>/dev/null; then
+    iptables -t nat -A POSTROUTING -s "$pool" -o "$iface" -m comment --comment "passage-nat" -j MASQUERADE
 fi
 
 if [[ -n "$pool6" ]]; then
-    if ! ip6tables -t nat -C POSTROUTING -s "$pool6" -o "$iface" -j MASQUERADE 2>/dev/null; then
-        ip6tables -t nat -A POSTROUTING -s "$pool6" -o "$iface" -j MASQUERADE
+    if ! ip6tables -t nat -C POSTROUTING -s "$pool6" -o "$iface" -m comment --comment "passage-nat" -j MASQUERADE 2>/dev/null; then
+        ip6tables -t nat -A POSTROUTING -s "$pool6" -o "$iface" -m comment --comment "passage-nat" -j MASQUERADE
     fi
 fi
 
