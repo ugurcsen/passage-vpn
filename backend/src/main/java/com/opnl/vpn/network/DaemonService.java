@@ -90,6 +90,35 @@ public class DaemonService {
   }
 
   /**
+   * Creates or updates daemon index 0 from the provided config. Used by the setup wizard to
+   * guarantee the primary daemon reflects the user-entered settings, even if a monitor poll already
+   * seeded the daemon with defaults.
+   */
+  @Transactional
+  public Daemon createOrUpdatePrimary(ServerConfig config) {
+    return repository
+        .findByDaemonIndex(0)
+        .map(
+            existing -> {
+              existing.setPort(config.port());
+              existing.setProto(config.proto());
+              existing.setSubnet(config.subnet());
+              existing.setSubnetMask(config.subnetMask());
+              existing.setDnsServers(config.dnsServers());
+              existing.setDomain(config.domain());
+              existing.setExtraRoutes(config.extraRoutes());
+              existing.setFullTunnel(config.fullTunnel());
+              existing.setClientCertNotRequired(config.clientCertNotRequired());
+              existing.setAuthUserPass(config.authUserPass());
+              existing.setAdminHost(config.adminHost());
+              existing.setIpv6Enabled(config.ipv6Enabled());
+              existing.setIpv6Subnet(blankToNull(config.ipv6Subnet()));
+              return repository.save(existing);
+            })
+        .orElseGet(() -> repository.save(toEntity(config, 0)));
+  }
+
+  /**
    * Rewrites every local daemon config into the shared volume; disables remove their config file.
    * Daemons assigned to a remote node run on that gateway and never touch the local volume.
    */
@@ -438,6 +467,18 @@ public class DaemonService {
               throw ApiException.conflict(
                   "daemon_subnet_taken", "Subnet " + request.subnet() + " is already in use");
             });
+    if (request.ipv6Subnet() != null && !request.ipv6Subnet().isBlank()) {
+      repository.findAll().stream()
+          .filter(d -> !d.getId().equals(excludedId))
+          .filter(d -> request.ipv6Subnet().equals(d.getIpv6Subnet()))
+          .findAny()
+          .ifPresent(
+              d -> {
+                throw ApiException.conflict(
+                    "daemon_ipv6_subnet_taken",
+                    "IPv6 subnet " + request.ipv6Subnet() + " is already in use");
+              });
+    }
   }
 
   /**

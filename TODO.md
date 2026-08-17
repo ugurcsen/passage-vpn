@@ -62,6 +62,18 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] 2.14 HIGH — docs: never run a full-tunnel VPN client on the VPN server host
       (black-holes host routing, requires OOB recovery); add an operational note to
       `README`/`docs/architecture.md`
+- [x] 2.15 MED — `DaemonService.validateUnique` does not check `ipv6Subnet`
+      uniqueness: two daemons can share the same IPv6 tunnel subnet (e.g.
+      `fd00:1::/64`). Fix: skip check when `ipv6Subnet` is blank/null, reject
+      duplicates otherwise; tests for duplicate, different, and empty IPv6 subnets.
+- [x] 2.16 HIGH — setup wizard settings not applied to first daemon: race
+      condition between `MonitorService.poll()` (fires 3s after startup) and
+      wizard. `list()` → `ensurePrimary()` creates daemon 0 with
+      `ServerConfig.defaults()` before wizard saves settings; subsequent
+      `ensurePrimary()` returns the stale daemon. Fix: new
+      `DaemonService.createOrUpdatePrimary(ServerConfig)` that updates existing
+      daemon fields; `SetupService.saveServerConfig()` calls it instead of
+      `ensurePrimary()`. Tests for create-or-update paths.
 
 **P4 — MFA integration completion (approved plan)**
 - [x] Client `static-challenge` directive in password-auth .ovpn profiles
@@ -85,6 +97,14 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       `POST /internal/auth/verify-otp` (`AuthService.verifyVpnOtp`) validates
       the TOTP second factor. CLI clients keep the inline `password\nOTP`
       static-challenge path (backend `verifyVpnLogin` unchanged).
+- [x] GENERIC profile MFA fix: Phase 2 (`client-crresponse`) does NOT receive
+      `$username` — only `$common_name` from the client cert. GENERIC profiles
+      (no client cert) have empty `$common_name` → pending file lookup fails
+      → `AUTH_FAILED`. Fix: Phase 1 keys pending data by `pendingId` instead of
+      username, writes pendingId to `/tmp/opnl-pending-latest` (well-known file
+      Phase 2 can always read); Phase 2 reads pendingId → looks up username from
+      `pending-data` file → sends correct username to backend. CN mismatch check
+      added as security guard for cert-bearing profiles.
 
 **P4.1 — Mandatory MFA (server-wide policy)**
 - [x] `require_mfa` server setting (existing settings hierarchy): when effective,

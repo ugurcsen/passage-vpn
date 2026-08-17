@@ -115,7 +115,7 @@ public class SetupService {
   private void saveServerConfig(ServerConfig config) {
     requireState(State.ADMIN_DONE);
     settingRepository.save(new ServerSetting("network", configGenerator.toJson(config)));
-    daemonService.ensurePrimary();
+    daemonService.createOrUpdatePrimary(config);
     setState(State.SERVER_DONE);
     log.info("Setup step 'server' completed: {}", config);
   }

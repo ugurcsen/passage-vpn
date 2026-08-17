@@ -85,7 +85,7 @@ class SetupServiceTest {
     when(settingRepository.findById("network")).thenReturn(Optional.empty());
     service.runStep("server", json(serverJson()));
     assertThat(service.state()).isEqualTo(SetupService.State.SERVER_DONE);
-    verify(daemonService).ensurePrimary();
+    verify(daemonService).createOrUpdatePrimary(any(ServerConfig.class));
 
     // step 3: pki
     service.runStep("pki", null);

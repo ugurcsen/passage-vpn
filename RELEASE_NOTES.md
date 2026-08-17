@@ -8,6 +8,54 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.14 — 2026-08-17
+
+Fourteenth **beta** milestone (SemVer pre-release): three bug fixes covering
+MFA VPN authentication on GENERIC profiles, IPv6 subnet collision guard, and
+setup wizard daemon seeding race condition. Includes everything from
+`v0.1.0-beta.13` plus the changes below.
+
+### MFA VPN auth fix for GENERIC profiles
+- `verify-user-pass.sh` Phase 2 (`client-crresponse`) does **not** receive
+  `$username` — only `$common_name` from the client certificate. GENERIC
+  profiles (no client cert) have empty `$common_name`, so the old
+  `/tmp/opnl-pending-$username` lookup failed → `missing_pending` →
+  `AUTH_FAILED`.
+- Phase 1 now keys pending data by `pendingId` (two files:
+  `/tmp/opnl-pending-<pendingId>` containing `"username:pendingId"` and
+  `/tmp/opnl-pending-latest` containing just the `pendingId`). Phase 2 reads
+  the well-known file, looks up the full pending data, and extracts both
+  `username` and `pendingId`.
+- CN-mismatch guard added: when a client certificate is present, its CN must
+  match the username from Phase 1; a mismatch silently denies the connection
+  (possible certificate-reuse attack).
+- Fallback preserved: if no pending file exists but `common_name` is set
+  (USER_LOCKED / SERVER_LOCKED profiles), Phase 2 falls back to the old
+  `common_name`-based path.
+
+### IPv6 subnet uniqueness validation
+- `DaemonService.validateUnique()` now checks `ipv6Subnet` in addition to
+  `subnet` and `port`. Two daemons sharing the same IPv6 tunnel subnet (e.g.
+  `fd00:1::/64`) are rejected with `daemon_ipv6_subnet_taken`.
+- Check is skipped when `ipv6Subnet` is blank/null (IPv6 disabled).
+- Tests: duplicate, different, and empty IPv6 subnet scenarios.
+
+### Setup wizard daemon seeding race condition
+- `MonitorService.poll()` fires 3 seconds after startup and calls
+  `daemonService.list()` → `ensurePrimary()`, which creates daemon 0 with
+  `ServerConfig.defaults()` (10.8.0.0/24, vpn.example.com, etc.) before the
+  user completes the wizard. The wizard's subsequent `ensurePrimary()` call
+  returns the stale daemon without updating it.
+- Fix: new `DaemonService.createOrUpdatePrimary(ServerConfig)` that updates an
+  existing daemon's fields from the provided config; `SetupService` calls it
+  instead of `ensurePrimary()`.
+- Tests: create-or-update and create-when-missing paths.
+
+### Verified
+- Backend suite green (**930+ tests**); frontend **31 files / 176 tests** green.
+
+---
+
 ## v0.1.0-beta.13 — 2026-08-17
 
 Thirteenth **beta** milestone (SemVer pre-release): makes daemon ports

@@ -291,6 +291,189 @@ class DaemonServiceTest {
   }
 
   @Test
+  void createRejectsDuplicateIpv6Subnet() {
+    OpnlProperties.OpenVpn openvpn = mock(OpnlProperties.OpenVpn.class);
+    when(openvpn.udpRangeStart()).thenReturn(1194);
+    when(openvpn.udpRangeEnd()).thenReturn(1200);
+    when(properties.openvpn()).thenReturn(openvpn);
+
+    Daemon existing = primary();
+    existing.setIpv6Enabled(true);
+    existing.setIpv6Subnet("fd00:1::/64");
+    when(repository.findByDaemonIndex(1)).thenReturn(Optional.empty());
+    when(repository.findAll()).thenReturn(List.of(existing));
+
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new DaemonService.DaemonRequest(
+                        1,
+                        "dup6",
+                        1195,
+                        Protocol.udp,
+                        "10.9.0.0",
+                        "255.255.255.0",
+                        List.of(),
+                        null,
+                        List.of(),
+                        true,
+                        false,
+                        true,
+                        null,
+                        null,
+                        true,
+                        "fd00:1::/64",
+                        true)))
+        .isInstanceOf(ApiException.class)
+        .hasFieldOrPropertyWithValue("code", "daemon_ipv6_subnet_taken");
+  }
+
+  @Test
+  void createAllowsDifferentIpv6Subnet() {
+    OpnlProperties.OpenVpn openvpn = mock(OpnlProperties.OpenVpn.class);
+    when(openvpn.udpRangeStart()).thenReturn(1194);
+    when(openvpn.udpRangeEnd()).thenReturn(1200);
+    when(properties.openvpn()).thenReturn(openvpn);
+
+    Daemon existing = primary();
+    existing.setIpv6Enabled(true);
+    existing.setIpv6Subnet("fd00:1::/64");
+    when(repository.findByDaemonIndex(1)).thenReturn(Optional.empty());
+    when(repository.findAll()).thenReturn(List.of(existing));
+    when(repository.save(any(Daemon.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.findAllByOrderByDaemonIndexAsc()).thenReturn(List.of(existing));
+    when(settingRepository.findById(SettingKeys.NETWORK_MODE)).thenReturn(Optional.empty());
+
+    service.create(
+        new DaemonService.DaemonRequest(
+            1,
+            "other6",
+            1195,
+            Protocol.udp,
+            "10.9.0.0",
+            "255.255.255.0",
+            List.of(),
+            null,
+            List.of(),
+            true,
+            false,
+            true,
+            null,
+            null,
+            true,
+            "fd00:2::/64",
+            true));
+
+    verify(repository, org.mockito.Mockito.atLeastOnce()).save(any(Daemon.class));
+  }
+
+  @Test
+  void createAllowsEmptyIpv6Subnet() {
+    OpnlProperties.OpenVpn openvpn = mock(OpnlProperties.OpenVpn.class);
+    when(openvpn.udpRangeStart()).thenReturn(1194);
+    when(openvpn.udpRangeEnd()).thenReturn(1200);
+    when(properties.openvpn()).thenReturn(openvpn);
+
+    when(repository.findByDaemonIndex(1)).thenReturn(Optional.empty());
+    when(repository.findAll()).thenReturn(List.of(primary()));
+    when(repository.save(any(Daemon.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.findAllByOrderByDaemonIndexAsc()).thenReturn(List.of(primary()));
+    when(settingRepository.findById(SettingKeys.NETWORK_MODE)).thenReturn(Optional.empty());
+
+    service.create(
+        new DaemonService.DaemonRequest(
+            1,
+            "no6",
+            1195,
+            Protocol.udp,
+            "10.9.0.0",
+            "255.255.255.0",
+            List.of(),
+            null,
+            List.of(),
+            true,
+            false,
+            true,
+            null,
+            null,
+            false,
+            null,
+            true));
+
+    verify(repository, org.mockito.Mockito.atLeastOnce()).save(any(Daemon.class));
+  }
+
+  @Test
+  void createOrUpdatePrimaryUpdatesExistingDaemon() {
+    Daemon existing = primary();
+    existing.setSubnet("10.8.0.0");
+    existing.setDomain(null);
+    when(repository.findByDaemonIndex(0)).thenReturn(Optional.of(existing));
+    when(repository.save(any(Daemon.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    ServerConfig config =
+        new ServerConfig(
+            0,
+            1195,
+            Protocol.tcp,
+            "10.9.0.0",
+            "255.255.255.0",
+            List.of("8.8.4.4"),
+            "vpn2.example.com",
+            List.of(),
+            false,
+            true,
+            false,
+            "vpn2.example.com",
+            true,
+            "fd00:99::/64");
+
+    Daemon result = service.createOrUpdatePrimary(config);
+
+    assertThat(result.getPort()).isEqualTo(1195);
+    assertThat(result.getProto()).isEqualTo(Protocol.tcp);
+    assertThat(result.getSubnet()).isEqualTo("10.9.0.0");
+    assertThat(result.getDomain()).isEqualTo("vpn2.example.com");
+    assertThat(result.getDnsServers()).containsExactly("8.8.4.4");
+    assertThat(result.isFullTunnel()).isFalse();
+    assertThat(result.isClientCertNotRequired()).isTrue();
+    assertThat(result.isAuthUserPass()).isFalse();
+    assertThat(result.isIpv6Enabled()).isTrue();
+    assertThat(result.getIpv6Subnet()).isEqualTo("fd00:99::/64");
+    verify(repository).save(any(Daemon.class));
+  }
+
+  @Test
+  void createOrUpdatePrimaryCreatesWhenMissing() {
+    when(repository.findByDaemonIndex(0)).thenReturn(Optional.empty());
+    when(repository.save(any(Daemon.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    ServerConfig config =
+        new ServerConfig(
+            0,
+            1194,
+            Protocol.udp,
+            "10.8.0.0",
+            "255.255.255.0",
+            List.of("1.1.1.1"),
+            null,
+            List.of(),
+            true,
+            false,
+            true,
+            "vpn.example.com",
+            false,
+            null);
+
+    Daemon result = service.createOrUpdatePrimary(config);
+
+    assertThat(result.getDaemonIndex()).isEqualTo(0);
+    assertThat(result.getSubnet()).isEqualTo("10.8.0.0");
+    assertThat(result.getDomain()).isNull();
+    verify(repository).save(any(Daemon.class));
+  }
+
+  @Test
   void createWritesAllConfigsAfterSave() {
     when(repository.findByDaemonIndex(1)).thenReturn(Optional.empty());
     when(repository.findAll()).thenReturn(List.of(primary()));
