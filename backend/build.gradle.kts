@@ -11,6 +11,8 @@ plugins {
 group = "com.passagevpn"
 version = "0.1.0-SNAPSHOT"
 
+description = "OpenVPN management panel"
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(25)

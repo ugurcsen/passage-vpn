@@ -3,6 +3,7 @@
 [![CI](https://github.com/ugurcsen/passage-vpn/actions/workflows/ci.yml/badge.svg)](https://github.com/ugurcsen/passage-vpn/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/ugurcsen/passage-vpn?color=blue&label=release)](https://github.com/ugurcsen/passage-vpn/releases)
 [![GHCR](https://img.shields.io/badge/images-ghcr.io/ugurcsen/passage-vpn-blue)](https://github.com/ugurcsen/passage-vpn/pkgs)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 A production-ready OpenVPN management panel replicating OpenVPN Access Server
 features on top of open source components. Source: **github.com/ugurcsen/passage-vpn**.
@@ -103,3 +104,7 @@ make test            # backend + frontend tests
 - **Releases** (tarball + changelog) — https://github.com/ugurcsen/passage-vpn/releases
 - **Issues / feature requests** — https://github.com/ugurcsen/passage-vpn/issues
 - **Container images** (backend / frontend / openvpn) — https://github.com/ugurcsen/passage-vpn/pkgs/container
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).
