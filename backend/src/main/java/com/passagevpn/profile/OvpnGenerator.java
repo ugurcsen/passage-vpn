@@ -31,7 +31,8 @@ public class OvpnGenerator {
       """;
 
   /** One endpoint a profile can connect to. */
-  public record Endpoint(String host, int port, Protocol proto, boolean ipv6Enabled, boolean fullTunnel) {}
+  public record Endpoint(
+      String host, int port, Protocol proto, boolean ipv6Enabled, boolean fullTunnel) {}
 
   /**
    * Generates the profile. Locked types embed the client certificate and key; GENERIC uses
@@ -44,9 +45,6 @@ public class OvpnGenerator {
    *
    * @param endpoints candidate endpoints in daemon-index order; the effective public host is
    *     already resolved by the caller.
-   * @param mfaChallenge when true and the profile uses password auth, an interactive {@code
-   *     static-challenge} prompt is added so the client can supply a TOTP code. A blank response is
-   *     tolerated by the backend when MFA is not required.
    */
   public String render(
       ProfileType type,
@@ -55,7 +53,6 @@ public class OvpnGenerator {
       String taKey,
       String cert,
       String key,
-      boolean mfaChallenge,
       boolean multiRemote,
       boolean fullTunnel) {
     if (endpoints == null || endpoints.isEmpty()) {
@@ -64,12 +61,7 @@ public class OvpnGenerator {
     List<Endpoint> effective =
         multiRemote && endpoints.size() > 1 ? endpoints : List.of(endpoints.get(0));
 
-    String authUserPass =
-        type == ProfileType.AUTO_LOGIN
-            ? ""
-            : mfaChallenge
-                ? "auth-user-pass\nstatic-challenge \"Verification code\" 1"
-                : "auth-user-pass";
+    String authUserPass = type == ProfileType.AUTO_LOGIN ? "" : "auth-user-pass";
     String certBlock =
         switch (type) {
           case AUTO_LOGIN, USER_LOCKED, SERVER_LOCKED ->

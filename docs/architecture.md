@@ -100,10 +100,9 @@ OpenVPN invokes scripts that call back into the backend over the restricted
 docker network (`/internal/**`, guarded by the mandatory `X-Internal-Token`
 shared secret):
 
-- `verify-user-pass.sh` — `auth-user-pass-verify` (password, optional inline
-  TOTP) against `/internal/auth/verify`; triggers the auth-pending flow when MFA
-  is required and completes it via `client-crresponse` →
-  `/internal/auth/verify-otp`.
+- `verify-user-pass.sh` — `auth-user-pass-verify` (password only) against
+  `/internal/auth/verify`; triggers the auth-pending flow when MFA is required
+  and completes it via `client-crresponse` → `/internal/auth/verify-otp`.
 - `client-connect.sh` — `/internal/connect`: the backend authorizes the user
   (banned/locked/max-connections), registers the session, records history and
   returns per-client iptables commands plus config pushes to apply.

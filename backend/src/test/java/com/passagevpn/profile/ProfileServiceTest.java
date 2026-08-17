@@ -120,54 +120,30 @@ class ProfileServiceTest {
   }
 
   @Test
-  void userLockedProfileAddsStaticChallengeWhenUserHasMfa() {
-    User mfaUser =
-        User.builder()
-            .id("u1")
-            .username("alice")
-            .role(User.Role.USER)
-            .mfaEnabled(true)
-            .mfaSecret("SECRET")
-            .createdAt(Instant.now())
-            .build();
-    when(userRepository.findById("u1")).thenReturn(Optional.of(mfaUser));
-
-    OvpnFile file = service.downloadForUser("u1", ProfileType.USER_LOCKED);
-
-    assertThat(file.content())
-        .contains("auth-user-pass")
-        .contains("static-challenge \"Verification code\" 1");
-  }
-
-  @Test
-  void userLockedProfileOmitsStaticChallengeWhenNoMfaInForce() {
+  void passwordAuthProfileOmitsStaticChallenge() {
     OvpnFile file = service.downloadForUser("u1", ProfileType.USER_LOCKED);
 
     assertThat(file.content()).contains("auth-user-pass").doesNotContain("static-challenge");
   }
 
   @Test
-  void genericProfileAddsStaticChallengeWhenServerRequiresMfaOnConnect() {
+  void genericProfileOmitsStaticChallengeEvenWithServerPolicy() {
     when(settingsService.serverSettings())
         .thenReturn(java.util.Map.of(SettingKeys.REQUIRE_MFA_ON_CONNECT, true));
 
     OvpnFile file = service.downloadForUser("u1", ProfileType.GENERIC);
 
-    assertThat(file.content())
-        .contains("auth-user-pass")
-        .contains("static-challenge \"Verification code\" 1");
+    assertThat(file.content()).contains("auth-user-pass").doesNotContain("static-challenge");
   }
 
   @Test
-  void serverLockedProfileAddsStaticChallengeWhenServerRequiresMfaOnConnect() {
+  void serverLockedProfileOmitsStaticChallengeEvenWithServerPolicy() {
     when(settingsService.serverSettings())
         .thenReturn(java.util.Map.of(SettingKeys.REQUIRE_MFA_ON_CONNECT, true));
 
     OvpnFile file = service.downloadForUser("u1", ProfileType.SERVER_LOCKED);
 
-    assertThat(file.content())
-        .contains("auth-user-pass")
-        .contains("static-challenge \"Verification code\" 1");
+    assertThat(file.content()).contains("auth-user-pass").doesNotContain("static-challenge");
   }
 
   @Test

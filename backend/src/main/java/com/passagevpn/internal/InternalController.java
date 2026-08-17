@@ -121,10 +121,9 @@ public class InternalController {
   }
 
   /**
-   * Credential verification for auth-user-pass-verify (phase 1). Supports password-only and
-   * password+TOTP (static-challenge MFA). When the account requires MFA and no code was supplied,
-   * the verify-user-pass.sh script triggers the auth-pending flow and completes it via {@link
-   * #verifyOtp}.
+   * Credential verification for auth-user-pass-verify (phase 1). Supports password-only
+   * authentication. When the account requires MFA, the verify-user-pass.sh script triggers the
+   * auth-pending flow and completes it via {@link #verifyOtp}.
    */
   @PostMapping("/auth/verify")
   public VerifyResult verify(@RequestBody VerifyRequest request) {

@@ -2,8 +2,7 @@
 # auth-user-pass-verify + client-crresponse script (OpenVPN `via-env` mode).
 #
 # Phase 1 (script_type=user-pass-verify):
-#   Verifies username/password (plus an inline TOTP from static-challenge
-#   clients, which arrive as "password\nOTP" in $password) against the backend.
+#   Verifies username/password against the backend.
 #   When the account requires MFA and no code was supplied, the backend returns
 #   a single-use pendingId; the script stashes it in two files:
 #     /tmp/passage-pending-<pendingId>  — "username:pendingId" (for Phase 2 lookup)

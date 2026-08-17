@@ -44,7 +44,6 @@ class OvpnGeneratorTest {
             "",
             "",
             false,
-            false,
             true);
     assertThat(profile).contains("tun-ipv6");
     assertThat(profile).contains("redirect-gateway ipv6");
@@ -61,7 +60,6 @@ class OvpnGeneratorTest {
             "",
             "",
             false,
-            false,
             true);
     assertThat(profile).doesNotContain("tun-ipv6");
     assertThat(profile).doesNotContain("redirect-gateway ipv6");
@@ -77,7 +75,6 @@ class OvpnGeneratorTest {
             "TA",
             "",
             "",
-            false,
             true,
             true);
     assertThat(profile).contains("proto udp").contains("remote vpn.example.com 1194");
@@ -97,7 +94,6 @@ class OvpnGeneratorTest {
             "TA",
             "",
             "",
-            false,
             true,
             true);
     assertThat(profile)
@@ -121,7 +117,6 @@ class OvpnGeneratorTest {
             "",
             "",
             false,
-            false,
             true);
     assertThat(profile).contains("remote vpn-eu.example.com 1194");
     assertThat(profile).doesNotContain("remote vpn-us.example.com");
@@ -131,17 +126,7 @@ class OvpnGeneratorTest {
   @Test
   void throwsWhenNoEndpointsProvided() {
     org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                generator.render(
-                    ProfileType.GENERIC,
-                    List.of(),
-                    "CA",
-                    "TA",
-                    "",
-                    "",
-                    false,
-                    false,
-                    true))
+            () -> generator.render(ProfileType.GENERIC, List.of(), "CA", "TA", "", "", false, true))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -150,22 +135,9 @@ class OvpnGeneratorTest {
     ServerConfig splitConfig = config(true);
     OvpnGenerator.Endpoint ep =
         new OvpnGenerator.Endpoint(
-            "vpn.example.com",
-            splitConfig.port(),
-            splitConfig.proto(),
-            true,
-            false);
+            "vpn.example.com", splitConfig.port(), splitConfig.proto(), true, false);
     String profile =
-        generator.render(
-            ProfileType.GENERIC,
-            List.of(ep),
-            "CA",
-            "TA",
-            "",
-            "",
-            false,
-            false,
-            false);
+        generator.render(ProfileType.GENERIC, List.of(ep), "CA", "TA", "", "", false, false);
     assertThat(profile).contains("tun-ipv6");
     assertThat(profile).doesNotContain("redirect-gateway ipv6");
   }

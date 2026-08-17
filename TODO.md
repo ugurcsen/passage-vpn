@@ -76,10 +76,9 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       `ensurePrimary()`. Tests for create-or-update paths.
 
 **P4 — MFA integration completion (approved plan)**
-- [x] Client `static-challenge` directive in password-auth .ovpn profiles
-      (USER_LOCKED/SERVER_LOCKED/GENERIC) when MFA is in force (user `mfaEnabled`
-      or server `require_mfa_on_connect`; AUTO_LOGIN excluded) — makes
-      MFA-on-connect actually prompt for OTP
+- [x] MFA-on-connect flow via auth-pending (removed `static-challenge` from
+      profiles; OpenVPN Connect ignores it; auth-pending + `client-crresponse`
+      handles all MFA prompts reliably)
 - [x] Admin MFA management UI on Users page (setup → QR + secret copy → verify
       code → enable; disable with confirm) — backend endpoints exist
       (`/api/admin/users/{id}/mfa/setup|enable|disable`)
@@ -90,13 +89,12 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       frontend (UsersPage MFA dialog, AccountPage) — run via SSH on production
       checkout: backend 213 green (spotlessCheck clean), frontend 76 green
 - [x] Docs: RELEASE_NOTES.md entry, docs/test-plan.md MFA E2E item
-- [x] OpenVPN Connect (iOS/Android/3.x) MFA fix: `static-challenge` is not
-      supported by Connect → server now uses the auth-pending flow
+- [x] MFA-on-connect flow: server uses the auth-pending flow
       (`auth-gen-token` + `client-crresponse`); `verify-user-pass.sh` writes a
       crtext auth-pending file and exits 2 when the account requires MFA,
       `POST /internal/auth/verify-otp` (`AuthService.verifyVpnOtp`) validates
-      the TOTP second factor. CLI clients keep the inline `password\nOTP`
-      static-challenge path (backend `verifyVpnLogin` unchanged).
+      the TOTP second factor. Profiles contain only `auth-user-pass` (no
+      `static-challenge`).
 - [x] GENERIC profile MFA fix: Phase 2 (`client-crresponse`) does NOT receive
       `$username` — only `$common_name` from the client cert. GENERIC profiles
       (no client cert) have empty `$common_name` → pending file lookup fails
@@ -348,7 +346,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] `auth-user-pass-verify` script → backend `/internal/auth/verify`
 - [x] Password + OTP verification, lockout, user ban checks
 - [x] Auto-login (cert-only) + `client-connect` validation path (Phase 3)
-- [x] `static-challenge` handling for MFA-on-connect (challenge via verify-user-pass script)
+- [x] MFA-on-connect via auth-pending flow (no `static-challenge` in profiles)
 - [x] Post-auth Python script hook support
 
 ### 2.5 Frontend

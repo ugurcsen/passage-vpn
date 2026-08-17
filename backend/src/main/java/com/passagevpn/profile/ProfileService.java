@@ -308,7 +308,6 @@ public class ProfileService {
             easyRsa.taKey(),
             certMaterial == null ? null : certMaterial[0],
             certMaterial == null ? null : certMaterial[1],
-            requiresMfaChallenge(user, type),
             multiRemote,
             targets.get(0).fullTunnel());
     String typePrefix = type.name().toLowerCase().replace('_', '-');
@@ -336,21 +335,5 @@ public class ProfileService {
     return userRepository
         .findById(userId)
         .orElseThrow(() -> ApiException.notFound("user_not_found", "User not found"));
-  }
-
-  /**
-   * Decides whether a profile must prompt for a TOTP code at connect time. AUTO_LOGIN is
-   * certificate-only and never prompts. USER_LOCKED follows the owning user's MFA state (or the
-   * server-wide require-mfa-on-connect policy); SERVER_LOCKED/GENERIC profiles are not bound to a
-   * single account, so only the server policy applies.
-   */
-  private boolean requiresMfaChallenge(User user, ProfileType type) {
-    if (type == ProfileType.AUTO_LOGIN) {
-      return false;
-    }
-    boolean serverPolicy =
-        Boolean.TRUE.equals(
-            settingsService.serverSettings().get(SettingKeys.REQUIRE_MFA_ON_CONNECT));
-    return type == ProfileType.USER_LOCKED ? user.isMfaEnabled() || serverPolicy : serverPolicy;
   }
 }
