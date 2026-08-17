@@ -8,6 +8,29 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.15 — 2026-08-17
+
+Fifteenth **beta** milestone (SemVer pre-release): documented host kernel
+prerequisites for VPN routing. Without `net.ipv4.ip_forward=1` on the host,
+VPN clients can establish a tunnel but cannot route traffic through the server
+(the classic "connected but no internet" symptom). Includes everything from
+`v0.1.0-beta.14` plus the changes below.
+
+### Host kernel prerequisites
+- [x] `docs/installation.md` — new **Host Kernel Requirements** subsection
+      under Requirements: explains why `net.ipv4.ip_forward=1` and
+      `net.ipv6.conf.all.forwarding=1` are mandatory, how to verify them, and
+      how to enable permanently via `/etc/sysctl.conf`.
+- [x] `install.sh` — preflight check warns when `net.ipv4.ip_forward` is not
+      enabled; the installer proceeds but prints a clear fix (temporary and
+      permanent).
+
+### Verified
+- Commit `d87029f` on `main`. No runtime changes; documentation + installer
+  guard only.
+
+---
+
 ## v0.1.0-beta.14 — 2026-08-17
 
 Fourteenth **beta** milestone (SemVer pre-release): three bug fixes covering
