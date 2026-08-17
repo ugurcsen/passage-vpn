@@ -8,6 +8,34 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.16 — 2026-08-18
+
+Sixteenth **beta** milestone (SemVer pre-release): critical fix for MFA VPN
+authentication when both `require_mfa` and `require_mfa_on_connect` are enabled.
+The `static-challenge` directive in OpenVPN profiles was interfering with the
+auth-pending flow, causing OTP codes to be rejected with a generic `AUTH_FAILED`.
+Includes everything from `v0.1.0-beta.15` plus the changes below.
+
+### MFA VPN auth fix — static-challenge removal
+- Removed `static-challenge` directive from all password-auth `.ovpn` profiles
+  (USER_LOCKED, SERVER_LOCKED, GENERIC). OpenVPN Connect silently ignores this
+  directive, but its presence disrupts the auth-pending flow that correctly
+  handles MFA prompts.
+- Removed `requiresMfaChallenge()` method from `ProfileService` and the
+  `mfaChallenge` parameter from `OvpnGenerator.render()`.
+- MFA-on-connect now relies solely on the auth-pending + `client-crresponse`
+  mechanism (`verify-user-pass.sh` → `/internal/auth/verify` → pending →
+  `/internal/auth/verify-otp`).
+- Updated tests: replaced static-challenge assertion tests with
+  static-challenge-absence tests.
+
+### Verified
+- Commit `9c51474` on `main`. Backend 500+ tests green, frontend build green.
+- Auth flow: password-only phase 1 → auth-pending when MFA required → OTP
+  verification via `client-crresponse`.
+
+---
+
 ## v0.1.0-beta.15 — 2026-08-17
 
 Fifteenth **beta** milestone (SemVer pre-release): documented host kernel
