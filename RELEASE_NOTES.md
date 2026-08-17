@@ -8,6 +8,17 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.18 — 2026-08-18
+
+Eighteenth **beta** milestone (SemVer pre-release): spotless formatting fix
+for the v0.1.0-beta.17 release. Includes everything from `v0.1.0-beta.17`
+plus the changes below.
+
+### Formatting
+- Applied spotless formatting to `DaemonService.java` Javadoc comment.
+
+---
+
 ## v0.1.0-beta.17 — 2026-08-18
 
 Seventeenth **beta** milestone (SemVer pre-release): split-tunnel fix and
