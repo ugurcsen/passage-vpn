@@ -288,7 +288,11 @@ public class ProfileService {
             .map(
                 e ->
                     new OvpnGenerator.Endpoint(
-                        e.host(), e.config().port(), e.config().proto(), e.config().ipv6Enabled()))
+                        e.host(),
+                        e.config().port(),
+                        e.config().proto(),
+                        e.config().ipv6Enabled(),
+                        e.config().fullTunnel()))
             .toList();
     // A pinned daemon always yields a single-endpoint profile; the multi-remote
     // setting only applies to the unpinned (load-balancing) path.
@@ -305,7 +309,8 @@ public class ProfileService {
             certMaterial == null ? null : certMaterial[0],
             certMaterial == null ? null : certMaterial[1],
             requiresMfaChallenge(user, type),
-            multiRemote);
+            multiRemote,
+            targets.get(0).fullTunnel());
     String typePrefix = type.name().toLowerCase().replace('_', '-');
     String daemonTag;
     if (daemonIndex != null) {

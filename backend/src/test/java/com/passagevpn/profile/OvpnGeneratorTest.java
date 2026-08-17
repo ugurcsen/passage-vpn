@@ -29,7 +29,8 @@ class OvpnGeneratorTest {
   }
 
   private OvpnGenerator.Endpoint endpoint(ServerConfig config, String host) {
-    return new OvpnGenerator.Endpoint(host, config.port(), config.proto(), config.ipv6Enabled());
+    return new OvpnGenerator.Endpoint(
+        host, config.port(), config.proto(), config.ipv6Enabled(), config.fullTunnel());
   }
 
   @Test
@@ -43,7 +44,8 @@ class OvpnGeneratorTest {
             "",
             "",
             false,
-            false);
+            false,
+            true);
     assertThat(profile).contains("tun-ipv6");
     assertThat(profile).contains("redirect-gateway ipv6");
   }
@@ -59,7 +61,8 @@ class OvpnGeneratorTest {
             "",
             "",
             false,
-            false);
+            false,
+            true);
     assertThat(profile).doesNotContain("tun-ipv6");
     assertThat(profile).doesNotContain("redirect-gateway ipv6");
   }
@@ -75,6 +78,7 @@ class OvpnGeneratorTest {
             "",
             "",
             false,
+            true,
             true);
     assertThat(profile).contains("proto udp").contains("remote vpn.example.com 1194");
     assertThat(profile).doesNotContain("remote-random");
@@ -83,7 +87,8 @@ class OvpnGeneratorTest {
   @Test
   void multiRemoteRendersEveryEndpointWithProtoAndRandom() {
     OvpnGenerator.Endpoint tcp =
-        new OvpnGenerator.Endpoint("vpn-us.example.com", 1195, ServerConfig.Protocol.tcp, false);
+        new OvpnGenerator.Endpoint(
+            "vpn-us.example.com", 1195, ServerConfig.Protocol.tcp, false, true);
     String profile =
         generator.render(
             ProfileType.GENERIC,
@@ -93,6 +98,7 @@ class OvpnGeneratorTest {
             "",
             "",
             false,
+            true,
             true);
     assertThat(profile)
         .contains("remote vpn-eu.example.com 1194 udp")
@@ -104,7 +110,8 @@ class OvpnGeneratorTest {
   @Test
   void multiRemoteDisabledUsesFirstEndpointOnly() {
     OvpnGenerator.Endpoint second =
-        new OvpnGenerator.Endpoint("vpn-us.example.com", 1195, ServerConfig.Protocol.tcp, false);
+        new OvpnGenerator.Endpoint(
+            "vpn-us.example.com", 1195, ServerConfig.Protocol.tcp, false, true);
     String profile =
         generator.render(
             ProfileType.GENERIC,
@@ -114,7 +121,8 @@ class OvpnGeneratorTest {
             "",
             "",
             false,
-            false);
+            false,
+            true);
     assertThat(profile).contains("remote vpn-eu.example.com 1194");
     assertThat(profile).doesNotContain("remote vpn-us.example.com");
     assertThat(profile).doesNotContain("remote-random");
@@ -124,7 +132,41 @@ class OvpnGeneratorTest {
   void throwsWhenNoEndpointsProvided() {
     org.assertj.core.api.Assertions.assertThatThrownBy(
             () ->
-                generator.render(ProfileType.GENERIC, List.of(), "CA", "TA", "", "", false, false))
+                generator.render(
+                    ProfileType.GENERIC,
+                    List.of(),
+                    "CA",
+                    "TA",
+                    "",
+                    "",
+                    false,
+                    false,
+                    true))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void splitTunnelOmitsRedirectGatewayIpv6() {
+    ServerConfig splitConfig = config(true);
+    OvpnGenerator.Endpoint ep =
+        new OvpnGenerator.Endpoint(
+            "vpn.example.com",
+            splitConfig.port(),
+            splitConfig.proto(),
+            true,
+            false);
+    String profile =
+        generator.render(
+            ProfileType.GENERIC,
+            List.of(ep),
+            "CA",
+            "TA",
+            "",
+            "",
+            false,
+            false,
+            false);
+    assertThat(profile).contains("tun-ipv6");
+    assertThat(profile).doesNotContain("redirect-gateway ipv6");
   }
 }

@@ -31,7 +31,7 @@ public class OvpnGenerator {
       """;
 
   /** One endpoint a profile can connect to. */
-  public record Endpoint(String host, int port, Protocol proto, boolean ipv6Enabled) {}
+  public record Endpoint(String host, int port, Protocol proto, boolean ipv6Enabled, boolean fullTunnel) {}
 
   /**
    * Generates the profile. Locked types embed the client certificate and key; GENERIC uses
@@ -56,7 +56,8 @@ public class OvpnGenerator {
       String cert,
       String key,
       boolean mfaChallenge,
-      boolean multiRemote) {
+      boolean multiRemote,
+      boolean fullTunnel) {
     if (endpoints == null || endpoints.isEmpty()) {
       throw new IllegalArgumentException("At least one remote endpoint is required");
     }
@@ -80,7 +81,17 @@ public class OvpnGenerator {
     // the server runs dual-stack. Server pushes alone are ignored by several
     // clients (notably OpenVPN Connect), so the directives are embedded in the
     // profile itself.
-    String ipv6 = effective.get(0).ipv6Enabled() ? "tun-ipv6\nredirect-gateway ipv6" : "";
+    //
+    // Split-tunnel profiles must NOT embed `redirect-gateway ipv6` because
+    // OpenVPN Connect on macOS interprets it as a full-tunnel directive and
+    // redirects ALL IPv4 traffic into the VPN as well (adds 0/1 + 128/1 routes).
+    // Only `tun-ipv6` is emitted; the server pushes IPv6 routes via daemon.conf.
+    boolean dualStack = effective.get(0).ipv6Enabled();
+    boolean fullTun = effective.get(0).fullTunnel();
+    String ipv6 = "";
+    if (dualStack) {
+      ipv6 = fullTun ? "tun-ipv6\nredirect-gateway ipv6" : "tun-ipv6";
+    }
 
     return CLIENT_PREAMBLE
         .replace("__REMOTE_BLOCK__", remoteBlock(effective))
