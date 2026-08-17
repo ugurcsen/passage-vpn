@@ -45,7 +45,7 @@ function stubFetch() {
     vi.fn().mockImplementation((url: string) => {
       if (url.startsWith("/api/auth/me")) return Promise.resolve(json(meBody(role)));
       if (url.startsWith("/api/public/brand")) {
-        return Promise.resolve(json({ name: "OpenVPN Panel", primaryColor: "#4f8cff", footer: "", logoUrl: null }));
+        return Promise.resolve(json({ name: "PassageVPN", primaryColor: "#4f8cff", footer: "", logoUrl: null }));
       }
       if (url.startsWith("/api/portal/profiles")) return Promise.resolve(json(profileTypes));
       if (url.startsWith("/api/admin/users")) return Promise.resolve(json([]));
@@ -65,7 +65,7 @@ describe("role-based route guarding", () => {
   beforeEach(() => {
     role = "USER";
     localStorage.clear();
-    localStorage.setItem("opnl.access", "test-token");
+    localStorage.setItem("passage.access", "test-token");
     setPath("/");
     stubFetch();
   });

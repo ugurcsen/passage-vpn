@@ -25,15 +25,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && ln -s /usr/share/easy-rsa/easyrsa /usr/local/bin/easyrsa \
     && rm -rf /var/lib/apt/lists/*
 
-ENV OPNL_DATA_DIR=/var/lib/opnl \
-    OPNL_PKI_DIR=/etc/opnl/pki \
-    OPNL_CCD_DIR=/etc/opnl/ccd \
-    OPNL_CONFIG_DIR=/etc/opnl/config \
-    OPNL_SCRIPTS_SRC_DIR=/app/openvpn-scripts \
+ENV PASSAGE_DATA_DIR=/var/lib/passage \
+    PASSAGE_PKI_DIR=/etc/passage/pki \
+    PASSAGE_CCD_DIR=/etc/passage/ccd \
+    PASSAGE_CONFIG_DIR=/etc/passage/config \
+    PASSAGE_SCRIPTS_SRC_DIR=/app/openvpn-scripts \
     # Bounded JVM heap (60% of the container limit) + tight metaspace so the JVM
     # never balloons past the container memory cgroup; exit on OOM instead of hanging.
     JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=60 -XX:MaxMetaspaceSize=256m -XX:+ExitOnOutOfMemoryError"
-RUN mkdir -p "$OPNL_DATA_DIR" "$OPNL_PKI_DIR" "$OPNL_CCD_DIR" "$OPNL_CONFIG_DIR"
+RUN mkdir -p "$PASSAGE_DATA_DIR" "$PASSAGE_PKI_DIR" "$PASSAGE_CCD_DIR" "$PASSAGE_CONFIG_DIR"
 
 WORKDIR /app
 COPY --from=build /workspace/build/libs/*.jar app.jar

@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: ${OPNL_DB_URL:jdbc:postgresql://localhost:5432/opnl}
-    username: ${OPNL_DB_USER:opnl}
-    password: ${OPNL_DB_PASSWORD:opnl}
+    url: ${PASSAGE_DB_URL:jdbc:postgresql://localhost:5432/passage}
+    username: ${PASSAGE_DB_USER:passage}
+    password: ${PASSAGE_DB_PASSWORD:passage}
     driver-class-name: org.postgresql.Driver
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect

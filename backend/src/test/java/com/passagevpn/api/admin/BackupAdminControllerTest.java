@@ -1,0 +1,129 @@
+package com.passagevpn.api.admin;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.passagevpn.backup.BackupService;
+import com.passagevpn.common.ApiException;
+import com.passagevpn.common.GlobalExceptionHandler;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+/** Web-layer tests for the backup admin endpoints. */
+class BackupAdminControllerTest {
+
+  private BackupService backupService;
+  private MockMvc mvc;
+
+  @BeforeEach
+  void setUp() throws Exception {
+    backupService = mock(BackupService.class);
+    mvc =
+        MockMvcBuilders.standaloneSetup(new BackupAdminController(backupService))
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
+  }
+
+  @Test
+  void listReturnsBackupInfos() throws Exception {
+    when(backupService.listBackups())
+        .thenReturn(List.of(new BackupInfo("passage-backup-20260101.zip", 42, Instant.now())));
+
+    mvc.perform(get("/api/admin/backups"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].name").value("passage-backup-20260101.zip"))
+        .andExpect(jsonPath("$[0].sizeBytes").value(42));
+  }
+
+  @Test
+  void createDelegatesToService() throws Exception {
+    when(backupService.createBackup())
+        .thenReturn(new BackupInfo("passage-backup-20260101.zip", 42, Instant.now()));
+
+    mvc.perform(post("/api/admin/backups"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.name").value("passage-backup-20260101.zip"));
+  }
+
+  @Test
+  void downloadStreamsArchiveWithAttachmentHeader() throws Exception {
+    Path file = Files.createTempFile("backup", ".zip");
+    Files.writeString(file, "archive-bytes");
+    when(backupService.resolveBackup("passage-backup-20260101.zip")).thenReturn(file);
+
+    mvc.perform(get("/api/admin/backups/passage-backup-20260101.zip/download"))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    "Content-Disposition", "attachment; filename=\"passage-backup-20260101.zip\""));
+  }
+
+  @Test
+  void restoreDelegatesToService() throws Exception {
+    when(backupService.restore("passage-backup-20260101.zip"))
+        .thenReturn(new RestoreResult(true, "Restored"));
+
+    mvc.perform(post("/api/admin/backups/passage-backup-20260101.zip/restore"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.restartRequired").value(true))
+        .andExpect(jsonPath("$.message").value("Restored"));
+    verify(backupService).restore("passage-backup-20260101.zip");
+  }
+
+  @Test
+  void importForwardsUploadedArchive() throws Exception {
+    when(backupService.importArchive(ArgumentMatchers.any(), ArgumentMatchers.eq("uploaded.zip")))
+        .thenReturn(new BackupInfo("uploaded.zip", 42, Instant.now()));
+
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file", "uploaded.zip", "application/zip", "archive-bytes".getBytes());
+
+    mvc.perform(multipart("/api/admin/backups/import").file(file))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.name").value("uploaded.zip"))
+        .andExpect(jsonPath("$.sizeBytes").value(42));
+    verify(backupService)
+        .importArchive(ArgumentMatchers.any(), ArgumentMatchers.eq("uploaded.zip"));
+  }
+
+  @Test
+  void importRejectsMissingFile() throws Exception {
+    mvc.perform(
+            multipart("/api/admin/backups/import")
+                .file(new MockMultipartFile("file", "", "application/zip", new byte[0])))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void importMapsServiceFailureToBadRequest() throws Exception {
+    when(backupService.importArchive(ArgumentMatchers.any(), ArgumentMatchers.eq("uploaded.zip")))
+        .thenThrow(ApiException.badRequest("invalid_backup", "not a valid backup"));
+
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file", "uploaded.zip", "application/zip", "archive-bytes".getBytes());
+
+    mvc.perform(multipart("/api/admin/backups/import").file(file))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("invalid_backup"));
+    verify(backupService)
+        .importArchive(ArgumentMatchers.any(), ArgumentMatchers.eq("uploaded.zip"));
+  }
+}

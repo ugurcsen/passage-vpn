@@ -8,7 +8,7 @@ import { ToastProvider } from "@/hooks/useToast";
 import { BackupsPage } from "@/pages/BackupsPage";
 
 const backup = {
-  name: "opnl-backup-20260813-100000.zip",
+  name: "passage-backup-20260813-100000.zip",
   sizeBytes: 2048,
   createdAt: "2026-08-13T10:00:00Z",
 };

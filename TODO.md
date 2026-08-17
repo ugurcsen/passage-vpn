@@ -1,4 +1,4 @@
-# TODO — OpenVPN Management Panel
+# TODO — PassageVPN
 
 Development roadmap for the OpenVPN Access Server–like management panel built on
 OpenVPN Community Edition + Easy-RSA + OpenVPN Management Interface.
@@ -101,7 +101,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       `$username` — only `$common_name` from the client cert. GENERIC profiles
       (no client cert) have empty `$common_name` → pending file lookup fails
       → `AUTH_FAILED`. Fix: Phase 1 keys pending data by `pendingId` instead of
-      username, writes pendingId to `/tmp/opnl-pending-latest` (well-known file
+      username, writes pendingId to `/tmp/passage-pending-latest` (well-known file
       Phase 2 can always read); Phase 2 reads pendingId → looks up username from
       `pending-data` file → sends correct username to backend. CN mismatch check
       added as security guard for cert-bearing profiles.
@@ -208,15 +208,15 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       `/internal/seed-admin`, `/internal/seed-demo`)
 - [x] B2 — auth-pending nonce binding: phase-1 verify returns a single-use 120s
       `pendingId`; `verify-otp` consumes it (fail-closed); `verify-user-pass.sh`
-      stashes it in `/tmp/opnl-pending-<user>` between phases
-- [x] B3 — `OPNL_BOOTSTRAP_TOKEN` + `SeedGuard`: seed-admin/seed-demo require
+      stashes it in `/tmp/passage-pending-<user>` between phases
+- [x] B3 — `PASSAGE_BOOTSTRAP_TOKEN` + `SeedGuard`: seed-admin/seed-demo require
       `X-Bootstrap-Token` when configured; Makefile targets pass it
 - [x] B4 — backend HTTP listener no longer published to the host (traffic enters via
       frontend nginx on :80; `/internal/**` stays network-internal)
 - [x] C1 — verify reason normalization: `account_locked`/`account_disabled` →
       `invalid_credentials` (no account-state leak to connecting clients)
 - [x] C2 — `IpFailureTracker` per-IP sliding-window lockout on VPN auth failures
-      (reuses `opnl.auth.lockout-*` settings; `ip_blocked` fail-fast)
+      (reuses `passage.auth.lockout-*` settings; `ip_blocked` fail-fast)
 - [x] C3 — RESELLER privilege-escalation fix: `assertCanManageUser` limits non-admin
       actors to managing USER-role accounts only (`resetPassword`/`updateUser`/`deleteUser`/
       `setBanned`/static-IP/settings now take the acting user and reject ADMIN/RESELLER
@@ -232,7 +232,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 **P5 — Multi-node cert/config distribution (approved plan: A/B/C)**
 - [x] A — shorter certificate lifetime + rotation policy: `EASYRSA_CERT_EXPIRE` 3650→730
-      (`OPNL_PKI_CERT_EXPIRE`), CRL generated for ≥ cert lifetime; server settings
+      (`PASSAGE_PKI_CERT_EXPIRE`), CRL generated for ≥ cert lifetime; server settings
       `cert_auto_rotate` (`off`/`notify`/`auto`, default `notify`) + `cert_rotate_days_before`
       (default 14); daily scheduler auto-rotates (audit `CERT_ROTATE_AUTO`) only
       account-bound VALID certs; portal "certificate expires soon" warning on AccountPage
@@ -244,10 +244,10 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
       cert/key, CCD, scripts, dnsmasq), `AgentConfigSyncService` atomic write +
       entrypoint-watcher reload, compose `node` profile volumes
 - [x] Live E2E on the staging host: agent mTLS registration + heartbeats, bundle pull
-      (17 files), central→node management connection (opnl-node-openvpn:7508), node
+      (17 files), central→node management connection (passage-node-openvpn:7508), node
       openvpn daemon running, CRL revocation propagation (revoke → new bundle →
       node `crl.pem` matches central). Real bugs found & fixed: agent env vars
-      (`OPNL_JWT_SECRET`/`OPNL_OPENVPN_MGMT_PASSWORD`), `@Nullable DnsmasqConfigService`
+      (`PASSAGE_JWT_SECRET`/`PASSAGE_OPENVPN_MGMT_PASSWORD`), `@Nullable DnsmasqConfigService`
       for the agent profile, `@Autowired AgentRegistrationService`, nginx backend DNS
       caching (`resolver 127.0.0.11` + variable `proxy_pass`), 9443 connector
       `SSLEnabled`, keytool-based truststore bootstrap
@@ -305,7 +305,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] `ServerConfigGenerator` — renders `server.conf` from settings
 - [x] Multi-daemon support (`daemons` entity) — per-daemon conf + management port
 - [x] Auto daemon port allocation: publish a configurable UDP/TCP host range
-      (`OPNL_OPENVPN_PORT[_END]`, `OPNL_OPENVPN_TCP_PORT[_END]`); daemons without
+      (`PASSAGE_OPENVPN_PORT[_END]`, `PASSAGE_OPENVPN_TCP_PORT[_END]`); daemons without
       an explicit port get the next free port of their protocol range and out-of-range
       ports are rejected, so added daemons are always reachable
 - [x] Apply flow: write conf → management `signal` reload / container restart
@@ -342,7 +342,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] TOTP MFA (Google Authenticator compatible) — enable/disable/reset (admin API)
 - [x] Brute-force lockout policy (attempts + lock duration)
 - [x] Rate limiting (bucket4j) on login/MFA/refresh/internal-verify; CSRF disabled (stateless bearer API)
-- [x] `AuthProvider` SPI: local now; LDAP/RADIUS/SAML stub interfaces (selectable via `opnl.auth.provider`)
+- [x] `AuthProvider` SPI: local now; LDAP/RADIUS/SAML stub interfaces (selectable via `passage.auth.provider`)
 
 ### 2.4 VPN authentication integration
 - [x] `auth-user-pass-verify` script → backend `/internal/auth/verify`
@@ -460,7 +460,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] JVM heap/metaspace bounded via `JAVA_TOOL_OPTIONS` (`MaxRAMPercentage=60`, metaspace 256m, exit on OOM) — `backend/Dockerfile`
 - [x] Frontend: route-level lazy loading (per-page chunks) + `mui-x` split into grid/charts chunks — `App.tsx`, `vite.config.ts`
 - [x] nginx: `gzip_static` (pre-compressed assets), immutable caching for hashed `/assets/`, `gzip_vary` — `nginx.conf`, `frontend/Dockerfile`
-- [x] Tomcat request thread pool capped at 50 (`OPNL_TOMCAT_THREADS`) — `application.yml`
+- [x] Tomcat request thread pool capped at 50 (`PASSAGE_TOMCAT_THREADS`) — `application.yml`
 - [x] Docker Compose resource limits (CPU/mem) for openvpn/backend/frontend/agent
 - [x] Backend image: BuildKit Gradle cache mounts, `.dockerignore`, runtime trim kept on glibc Temurin (Alpine rejected: sqlite-jdbc JNI is glibc-only)
 - [x] CI: Gradle dependency cache via `gradle/actions/setup-gradle` — `.github/workflows/ci.yml`

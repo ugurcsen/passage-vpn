@@ -19,19 +19,19 @@ Two deployment paths are supported:
 
 1. **Create a release.** Tag a commit and push; the `release.yml` workflow builds
    the backend/frontend/openvpn images into GHCR and attaches
-   `opnl-vpn-<tag>.tar.gz` to the GitHub Release. You can also build the same
+   `passage-vpn-<tag>.tar.gz` to the GitHub Release. You can also build the same
    tarball locally from a tagged commit:
 
    ```bash
-   make release     # requires a git tag on HEAD → release/opnl-vpn-<tag>.tar.gz
+   make release     # requires a git tag on HEAD → release/passage-vpn-<tag>.tar.gz
    ```
 
 2. **On the server**, download the tarball and unpack it:
 
    ```bash
-   curl -fsSL -o opnl-vpn.tar.gz https://github.com/ugurcsen/opnl-vpn/releases/download/<tag>/opnl-vpn-<tag>.tar.gz
-   tar -xzf opnl-vpn.tar.gz
-   cd opnl-vpn-<tag>
+   curl -fsSL -o passage-vpn.tar.gz https://github.com/ugurcsen/passage-vpn/releases/download/<tag>/passage-vpn-<tag>.tar.gz
+   tar -xzf passage-vpn.tar.gz
+   cd passage-vpn-<tag>
    ```
 
    The tarball contains only: `install.sh`, `docker-compose.yml`,
@@ -53,10 +53,10 @@ Two deployment paths are supported:
    all secrets the backend requires: the JWT signing secret, the admin password,
    the internal token and the OpenVPN management-interface password. The admin
    password is printed at the end of the install (also in `.env` as
-   `OPNL_ADMIN_PASSWORD`).
+   `PASSAGE_ADMIN_PASSWORD`).
 
 4. Complete the setup wizard at `http://<server>:` and log in with
-   username `admin` and the password in `.env` (`OPNL_ADMIN_PASSWORD`).
+   username `admin` and the password in `.env` (`PASSAGE_ADMIN_PASSWORD`).
 
 ### Upgrades
 
@@ -67,7 +67,7 @@ logs) lives in Docker named volumes and is preserved.
 ## Development: build from source
 
 ```bash
-git clone <repo> && cd opnl-vpn
+git clone <repo> && cd passage-vpn
 cp .env.example .env        # then adjust (see docs/configuration.md)
 ./install.sh                # interactive; ./install.sh -y for defaults
 ```
@@ -88,15 +88,15 @@ runs the full backend + frontend test suite.
 ## Notes
 
 - **Swagger/OpenAPI is off by default** in the shipped `.env.example`
-  (`OPNL_API_DOCS_ENABLED=false`) so the API surface is not exposed in
+  (`PASSAGE_API_DOCS_ENABLED=false`) so the API surface is not exposed in
   production. Enable it only for development.
-- The backend refuses to start without `OPNL_INTERNAL_TOKEN` and
-  `OPNL_OPENVPN_MGMT_PASSWORD` — replace the placeholders in `.env`.
+- The backend refuses to start without `PASSAGE_INTERNAL_TOKEN` and
+  `PASSAGE_OPENVPN_MGMT_PASSWORD` — replace the placeholders in `.env`.
 - Backups: in a full checkout `make backup` archives the `data/` directory (agent TLS
   + DB dump). Release-tarball deployments have no Makefile — back up the Docker named
   volumes directly instead, e.g.
-  `docker run --rm -v opnl_data:/data -v "$PWD":/backup alpine tar czf /backup/opnl-data.tar.gz -C /data .`
-  and repeat for `opnl-pki`, `opnl-ccd`, `opnl-config`, `opnl-logs`.
-- The release images are tagged `ghcr.io/ugurcsen/opnl-vpn/{backend,frontend,openvpn}:<tag>`
-  — override with `OPNL_IMAGE_REGISTRY` / `OPNL_IMAGE_NAMESPACE` / `OPNL_IMAGE_TAG`
+  `docker run --rm -v passage_data:/data -v "$PWD":/backup alpine tar czf /backup/passage-data.tar.gz -C /data .`
+  and repeat for `passage-pki`, `passage-ccd`, `passage-config`, `passage-logs`.
+- The release images are tagged `ghcr.io/ugurcsen/passage-vpn/{backend,frontend,openvpn}:<tag>`
+  — override with `PASSAGE_IMAGE_REGISTRY` / `PASSAGE_IMAGE_NAMESPACE` / `PASSAGE_IMAGE_TAG`
   if you host them elsewhere.

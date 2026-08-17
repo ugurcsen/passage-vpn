@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =========================================================
-# OpenVPN management panel — interactive installer
+# PassageVPN management panel — interactive installer
 # Usage: ./install.sh [options]
 #   Interactive: run without options on a terminal.
 #   Non-interactive (safe defaults):  ./install.sh -y
@@ -38,7 +38,7 @@ for arg in "$@"; do
     -y|--yes) YES=1 ;;
     -h|--help)
       cat <<'EOF'
-OpenVPN management panel — interactive installer.
+PassageVPN management panel — interactive installer.
 
 Usage: ./install.sh [options]
 
@@ -139,7 +139,7 @@ if [ "$MODE" = "release" ] && [ -z "$TAG" ]; then
   ask "Image tag (the release you downloaded, e.g. v0.1.0)" "latest"
   TAG="$REPLY"
 fi
-[ "$MODE" = "release" ] && export OPNL_IMAGE_TAG="$TAG"
+[ "$MODE" = "release" ] && export PASSAGE_IMAGE_TAG="$TAG"
 
 # ---------- profile ----------
 if [ -z "$PROFILE" ]; then
@@ -197,10 +197,10 @@ fi
 ADMIN_PASSWORD=""
 if [ "$HAVE_OPENSSL" = "1" ]; then
   for spec in \
-    "OPNL_JWT_SECRET:openssl rand -base64 48 | tr -d '\n'" \
-    "OPNL_ADMIN_PASSWORD:openssl rand -base64 18 | tr -d '/+='" \
-    "OPNL_INTERNAL_TOKEN:openssl rand -hex 32" \
-    "OPNL_OPENVPN_MGMT_PASSWORD:openssl rand -base64 24 | tr -d '/+='" ; do
+    "PASSAGE_JWT_SECRET:openssl rand -base64 48 | tr -d '\n'" \
+    "PASSAGE_ADMIN_PASSWORD:openssl rand -base64 18 | tr -d '/+='" \
+    "PASSAGE_INTERNAL_TOKEN:openssl rand -hex 32" \
+    "PASSAGE_OPENVPN_MGMT_PASSWORD:openssl rand -base64 24 | tr -d '/+='" ; do
     key="${spec%%:*}"
     gen="${spec#*:}"
     current="$(grep -E "^${key}=" .env 2>/dev/null | head -1 | cut -d= -f2- || true)"
@@ -212,10 +212,10 @@ if [ "$HAVE_OPENSSL" = "1" ]; then
     sed -i.bak "s|^${key}=.*|${key}=${val}|" .env
     rm -f .env.bak
     info "Generated $key"
-    [ "$key" = "OPNL_ADMIN_PASSWORD" ] && ADMIN_PASSWORD="$val"
+    [ "$key" = "PASSAGE_ADMIN_PASSWORD" ] && ADMIN_PASSWORD="$val"
   done
 else
-  warn "openssl missing — cannot generate secrets; set OPNL_JWT_SECRET, OPNL_INTERNAL_TOKEN and OPNL_OPENVPN_MGMT_PASSWORD manually in .env (the backend refuses to start with placeholders)."
+  warn "openssl missing — cannot generate secrets; set PASSAGE_JWT_SECRET, PASSAGE_INTERNAL_TOKEN and PASSAGE_OPENVPN_MGMT_PASSWORD manually in .env (the backend refuses to start with placeholders)."
 fi
 
 # ---------- optional reset ----------
@@ -237,7 +237,7 @@ patch_stale_network() {
   warn "docker-compose.yml pins hardcoded network subnets (172.18.0.0/16, fd00:2::/112)."
   warn "These collide with other stacks on this host ('Pool overlaps') — removing them so Docker auto-allocates."
   if [ "$INTERACTIVE" = "1" ] && ! confirm "Patch docker-compose.yml (backup: docker-compose.yml.bak)?" "1"; then
-    fail "Aborted: remove the ipam block under 'networks.opnl-net' in docker-compose.yml manually, then re-run."
+    fail "Aborted: remove the ipam block under 'networks.passage-net' in docker-compose.yml manually, then re-run."
   fi
   tmp="$(mktemp)"
   awk '
@@ -249,7 +249,7 @@ patch_stale_network() {
     {
       if (in_ipam) {
         if ($0 ~ /^[^ ]/ || indent($0) <= ipam_ind) {
-          in_ipam = 0; in_opnl = 0
+          in_ipam = 0; in_passage = 0
           if (!ipam_drop) printf "%s", buf
           buf = ""
         } else {
@@ -258,10 +258,10 @@ patch_stale_network() {
           next
         }
       }
-      if ($0 ~ /^[a-zA-Z]/) { in_networks = 0; in_opnl = 0 }
+      if ($0 ~ /^[a-zA-Z]/) { in_networks = 0; in_passage = 0 }
       if ($0 == "networks:") in_networks = 1
-      if (in_networks && $0 ~ /^  opnl-net:/) in_opnl = 1
-      if (in_opnl && $0 ~ /^    ipam:[[:space:]]*$/) {
+      if (in_networks && $0 ~ /^  passage-net:/) in_passage = 1
+      if (in_passage && $0 ~ /^    ipam:[[:space:]]*$/) {
         in_ipam = 1; ipam_drop = 0; ipam_ind = 4; buf = $0 "\n"
         next
       }
@@ -274,7 +274,7 @@ patch_stale_network() {
     info "Removed hardcoded network subnets from docker-compose.yml (backup: docker-compose.yml.bak)."
   else
     rm -f "$tmp"
-    fail "Could not patch docker-compose.yml automatically — remove the ipam block under 'networks.opnl-net' manually, then re-run."
+    fail "Could not patch docker-compose.yml automatically — remove the ipam block under 'networks.passage-net' manually, then re-run."
   fi
 }
 patch_stale_network
@@ -282,7 +282,7 @@ patch_stale_network
 # ---------- build & start ----------
 info "Starting services (mode=$MODE, profile=$PROFILE) ..."
 COMPOSE_CMD="docker compose"
-[ "$PROFILE" = "postgres" ] && export OPNL_PROFILE=postgres && COMPOSE_CMD="$COMPOSE_CMD -f docker-compose.yml -f docker-compose.postgres.yml"
+[ "$PROFILE" = "postgres" ] && export PASSAGE_PROFILE=postgres && COMPOSE_CMD="$COMPOSE_CMD -f docker-compose.yml -f docker-compose.postgres.yml"
 
 # Helper hints adapt to the environment: a full checkout has the Makefile; the
 # deploy-only release tarball (no Makefile) falls back to docker compose.
@@ -302,14 +302,14 @@ up_retry() {
   if $COMPOSE_CMD up -d "$@"; then
     return 0
   fi
-  # A failed 'up' can leave the opnl_opnl-net network (or its pool) behind; if nothing
+  # A failed 'up' can leave the passage_passage-net network (or its pool) behind; if nothing
   # is attached, drop it and retry once before giving up.
-  if docker network inspect opnl_opnl-net >/dev/null 2>&1; then
-    if [ -n "$(docker network inspect -f '{{json .Containers}}' opnl_opnl-net 2>/dev/null | sed 's/[{}]//g; s/[[:space:]]//g')" ]; then
-      fail "Failed to start containers: 'opnl_opnl-net' still has attached containers — resolve manually and re-run."
+  if docker network inspect passage_passage-net >/dev/null 2>&1; then
+    if [ -n "$(docker network inspect -f '{{json .Containers}}' passage_passage-net 2>/dev/null | sed 's/[{}]//g; s/[[:space:]]//g')" ]; then
+      fail "Failed to start containers: 'passage_passage-net' still has attached containers — resolve manually and re-run."
     fi
-    warn "Failed to start; removing orphaned 'opnl_opnl-net' network and retrying once..."
-    docker network rm opnl_opnl-net >/dev/null 2>&1 || true
+    warn "Failed to start; removing orphaned 'passage_passage-net' network and retrying once..."
+    docker network rm passage_passage-net >/dev/null 2>&1 || true
     sleep 1
     $COMPOSE_CMD up -d "$@" || fail "Failed to start containers."
   else
@@ -331,7 +331,7 @@ fi
 info "Waiting for backend to become healthy..."
 backend_up=0
 for i in $(seq 1 60); do
-  status="$(docker inspect -f '{{.State.Health.Status}}' opnl-backend 2>/dev/null || true)"
+  status="$(docker inspect -f '{{.State.Health.Status}}' passage-backend 2>/dev/null || true)"
   if [ "$status" = "healthy" ]; then
     backend_up=1
     info "Backend is up."
@@ -341,7 +341,7 @@ for i in $(seq 1 60); do
 done
 [ "$backend_up" = "0" ] && warn "Backend not healthy yet — check '$HELPER_LOGS'."
 
-FRONTEND_PORT="$(grep -E '^OPNL_FRONTEND_PORT=' .env 2>/dev/null | cut -d= -f2- || true)"
+FRONTEND_PORT="$(grep -E '^PASSAGE_FRONTEND_PORT=' .env 2>/dev/null | cut -d= -f2- || true)"
 FRONTEND_PORT="${FRONTEND_PORT:-80}"
 
 cat <<EOF
@@ -351,7 +351,7 @@ ${GREEN}Installation complete.${NC}
   Web panel : http://localhost:${FRONTEND_PORT}
 
   Login     : username "admin"
-  Password  : $([ -n "$ADMIN_PASSWORD" ] && echo "$ADMIN_PASSWORD" || echo "(see OPNL_ADMIN_PASSWORD in .env)")
+  Password  : $([ -n "$ADMIN_PASSWORD" ] && echo "$ADMIN_PASSWORD" || echo "(see PASSAGE_ADMIN_PASSWORD in .env)")
 
 First-run: open the panel and complete the setup wizard (/setup).
 Useful: $HELPER_LOGS | $HELPER_DOWN | $HELPER_UP | $HELPER_BACKUP

@@ -2,8 +2,8 @@
 
 How the panel decides what a connected VPN client may reach, and how those
 decisions become iptables rules inside the OpenVPN container. Backend
-implementation lives in `com.opnl.vpn.access` (`AccessRule`, `RuleEngine`,
-`AccessRuleService`) and `com.opnl.vpn.dns` (`DnsRecord`,
+implementation lives in `com.passagevpn.access` (`AccessRule`, `RuleEngine`,
+`AccessRuleService`) and `com.passagevpn.dns` (`DnsRecord`,
 `DnsOverrideService`); enforcement scripts are in `openvpn/scripts/`.
 
 ## 1. Rule model
@@ -48,29 +48,29 @@ iptables chain.
 
 ## 3. Rendering to iptables
 
-Each client gets a dedicated chain named `OPNL_` + the first 6 bytes of the
-SHA-256 of the common name, e.g. `OPNL_1a2b3c4d5e6f` (`RuleEngine.chainName`).
+Each client gets a dedicated chain named `PASSAGE_` + the first 6 bytes of the
+SHA-256 of the common name, e.g. `PASSAGE_1a2b3c4d5e6f` (`RuleEngine.chainName`).
 On connect the backend returns the exact `iptables` argv lists; the container
 executes them (see `client-connect.sh`).
 
 Per-chain, in order:
 
 ```
-iptables -N OPNL_<hash>
-iptables -A OPNL_<hash> -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-iptables -A OPNL_<hash> -p udp --dport 53 -j ACCEPT      # DNS always allowed
-iptables -A OPNL_<hash> -p tcp --dport 53 -j ACCEPT
+iptables -N PASSAGE_<hash>
+iptables -A PASSAGE_<hash> -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A PASSAGE_<hash> -p udp --dport 53 -j ACCEPT      # DNS always allowed
+iptables -A PASSAGE_<hash> -p tcp --dport 53 -j ACCEPT
 <one ACCEPT/DROP line per rule match, source = client's VPN IP>
 <one DROP line per scope-denied DNS-override address>     # §6
-iptables -A OPNL_<hash> -j DROP                           # default deny (if any rule exists)
-iptables -I FORWARD -s <client-vpn-ip> -j OPNL_<hash>     # hook into forwarding
+iptables -A PASSAGE_<hash> -j DROP                           # default deny (if any rule exists)
+iptables -I FORWARD -s <client-vpn-ip> -j PASSAGE_<hash>     # hook into forwarding
 ```
 
 Teardown (disconnect) removes the FORWARD jump and deletes the chain:
 
 ```
-iptables -D FORWARD -s <client-vpn-ip> -j OPNL_<hash>
-iptables -F OPNL_<hash> && iptables -X OPNL_<hash>
+iptables -D FORWARD -s <client-vpn-ip> -j PASSAGE_<hash>
+iptables -F PASSAGE_<hash> && iptables -X PASSAGE_<hash>
 ```
 
 A rule's destination expands to match fragments:
@@ -93,11 +93,11 @@ base rules, which the per-client chains then narrow:
 
 - `FORWARD` policy `ACCEPT` plus a `ESTABLISHED,RELATED` return-path rule.
 - **NAT mode** (default): `MASQUERADE` of the VPN pool out of the uplink
-  interface (`OPNL_FIREWALL_IFACE`, default `eth0`).
-- **Routed mode** (`OPNL_NETWORK_MODE=routed`): no masquerade; the VPN pool
+  interface (`PASSAGE_FIREWALL_IFACE`, default `eth0`).
+- **Routed mode** (`PASSAGE_NETWORK_MODE=routed`): no masquerade; the VPN pool
   must be routed back to the host and an explicit `ip route` into the tun
   device is installed (deferred until the tun exists).
-- `OPNL_DOMAINS` / `OPNL_DOMAINS6` chains pin every domain-rule address to
+- `PASSAGE_DOMAINS` / `PASSAGE_DOMAINS6` chains pin every domain-rule address to
   `RETURN` then `DROP` (see §5).
 
 ## 4. Static IPs and group pools
@@ -116,12 +116,12 @@ An IPv6 pool (`STATIC_IPV6_POOL`) is used the same way for dual-stack rules.
 
 The backend renders two dnsmasq config files into the shared volume:
 
-- `dnsmasq.d/opnl-domains.conf` — A/AAAA pins for every domain used in an
+- `dnsmasq.d/passage-domains.conf` — A/AAAA pins for every domain used in an
   **enabled access rule** (override addresses win over public DNS).
-- `dnsmasq.d/opnl-dns-overrides.conf` — admin-defined override hostnames.
+- `dnsmasq.d/passage-dns-overrides.conf` — admin-defined override hostnames.
 
 The container's dnsmasq serves these authoritatively to VPN clients. The
-`OPNL_DOMAINS`/`OPNL_DOMAINS6` iptables chains and the per-client rules match
+`PASSAGE_DOMAINS`/`PASSAGE_DOMAINS6` iptables chains and the per-client rules match
 **the same pinned addresses**, so what a client resolves is exactly what the
 firewall allows/blocks. When the pinning file changes, the container restarts
 dnsmasq (not just a SIGHUP) to avoid a stale cache diverging from the
@@ -145,7 +145,7 @@ blocked from the denied addresses.
 ## 7. Dual-stack
 
 When the serving daemon is dual-stack, the engine also emits an `ip6tables`
-mirror chain (`OPNL_<hash>6`) scoped to the client's virtual IPv6 address:
+mirror chain (`PASSAGE_<hash>6`) scoped to the client's virtual IPv6 address:
 same terminal policy, same per-rule destinations (IPv6 forms), DNS over IPv6
 allowed. The IPv6 chain is only emitted when the client actually has a virtual
 IPv6 address; IPv4-only clients get IPv4 rules only. DNS pinning includes AAAA

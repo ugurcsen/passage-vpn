@@ -309,7 +309,7 @@ describe("download helpers", () => {
   });
 
   it("downloadBackup downloads the archive with the attachment filename", async () => {
-    localStorage.setItem("opnl.access", "tok-1");
+    localStorage.setItem("passage.access", "tok-1");
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(new Blob(["data"]), {
         status: 200,

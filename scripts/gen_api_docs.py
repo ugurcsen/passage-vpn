@@ -66,7 +66,7 @@ def main():
 
     out = []
     info = spec.get("info", {})
-    out.append(f"# API Reference — {info.get('title', 'OpenVPN Panel')}")
+    out.append(f"# API Reference — {info.get('title', 'PassageVPN')}")
     out.append("")
     out.append("> Generated from the live OpenAPI document. Endpoints under `/api/admin/**`")
     out.append("> require an `ADMIN` (or scoped `GROUP_ADMIN`) role; `/api/portal/**` endpoints are")
@@ -88,7 +88,7 @@ def main():
         out.append("")
         out.append("Login via `POST /api/auth/login` (or `/api/auth/mfa`) and pass the returned")
         out.append("access token as `Authorization: Bearer <token>`. Automation can instead use an")
-        out.append("API token as `X-API-Token: opnl_...` (see the Admin - API tokens endpoints).")
+        out.append("API token as `X-API-Token: passage_...` (see the Admin - API tokens endpoints).")
         out.append("")
 
     out.append("## Endpoints")

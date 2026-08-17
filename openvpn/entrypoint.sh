@@ -6,7 +6,7 @@
 # backend can write configs and signal reloads later without container restart.
 set -e
 
-mkdir -p "$OPNL_CONFIG_DIR" "$OPNL_CCD_DIR" "$OPNL_PKI_DIR" "$OPNL_LOG_DIR"
+mkdir -p "$PASSAGE_CONFIG_DIR" "$PASSAGE_CCD_DIR" "$PASSAGE_PKI_DIR" "$PASSAGE_LOG_DIR"
 
 # --- Base firewall ---
 mask_to_prefix() {
@@ -126,7 +126,7 @@ server_ip6_of() {
 # addresses (dual-stack daemons) are included the same way.
 tun_ips_of() {
     local conf ip
-    for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do
+    for conf in "$PASSAGE_CONFIG_DIR"/daemon-*.conf; do
         ip="$(server_ip_of "$conf" 2>/dev/null || true)"
         [ -n "$ip" ] && echo "$ip"
         ip="$(server_ip6_of "$(extract_pool6 "$conf" 2>/dev/null || true)" 2>/dev/null || true)"
@@ -135,12 +135,12 @@ tun_ips_of() {
 }
 
 # Starts dnsmasq once per container boot and SIGHUPs it on later reloads so the
-# backend's domain-pinning config (opnl-domains.conf) is re-read. The resolver
+# backend's domain-pinning config (passage-domains.conf) is re-read. The resolver
 # listens on loopback plus every daemon tun server IP; when the set of tun IPs
 # changes (new daemon/pool) the process is restarted instead of reloaded.
 start_dnsmasq() {
     local ip ips current wanted args pid tries
-    mkdir -p "$OPNL_CONFIG_DIR/dnsmasq.d"
+    mkdir -p "$PASSAGE_CONFIG_DIR/dnsmasq.d"
     ips=()
     while IFS= read -r ip; do
         [ -n "$ip" ] && ips+=("$ip")
@@ -184,13 +184,13 @@ start_dnsmasq() {
 # reloads so pool/mode changes refresh NAT or return routes.
 reapply_rules() {
     local conf pool pool6 mode
-    conf="$(ls "$OPNL_CONFIG_DIR"/daemon-*.conf 2>/dev/null | head -1 || true)"
+    conf="$(ls "$PASSAGE_CONFIG_DIR"/daemon-*.conf 2>/dev/null | head -1 || true)"
     [[ -z "$conf" ]] && return 0
     pool="$(extract_pool "$conf" 2>/dev/null || true)"
     [[ -z "$pool" ]] && return 0
     pool6="$(extract_pool6 "$conf" 2>/dev/null || true)"
     mode="$(extract_mode "$conf" 2>/dev/null || true)"
-    OPNL_VPN_POOL="$pool" OPNL_VPN_POOL6="$pool6" OPNL_NETWORK_MODE="$mode" /etc/openvpn/scripts/apply-rules.sh || true
+    PASSAGE_VPN_POOL="$pool" PASSAGE_VPN_POOL6="$pool6" PASSAGE_NETWORK_MODE="$mode" /etc/openvpn/scripts/apply-rules.sh || true
     start_dnsmasq || true
 }
 
@@ -200,13 +200,13 @@ start_daemon() {
     name="$(basename "$conf" .conf)"
     openvpn --config "$conf" \
         --daemon "$name" \
-        --log-append "$OPNL_LOG_DIR/$name.log" \
-        --status "$OPNL_LOG_DIR/$name.status" 5 \
-        --writepid "$OPNL_LOG_DIR/$name.pid" || {
+        --log-append "$PASSAGE_LOG_DIR/$name.log" \
+        --status "$PASSAGE_LOG_DIR/$name.status" 5 \
+        --writepid "$PASSAGE_LOG_DIR/$name.pid" || {
         echo "[entrypoint] ERROR starting $name (config: $conf)" >&2
         return 1
     }
-    echo "[entrypoint] started $name (pid $(cat "$OPNL_LOG_DIR/$name.pid"))"
+    echo "[entrypoint] started $name (pid $(cat "$PASSAGE_LOG_DIR/$name.pid"))"
 }
 
 shopt -s nullglob
@@ -216,7 +216,7 @@ conf_sig() {
     # Include the management password files: a password rotation must also
     # reload the daemons, otherwise the old password stays active until the
     # next unrelated config change.
-    for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf "$OPNL_CONFIG_DIR"/daemon-*.mgmt-pass; do
+    for conf in "$PASSAGE_CONFIG_DIR"/daemon-*.conf "$PASSAGE_CONFIG_DIR"/daemon-*.mgmt-pass; do
         [ -f "$conf" ] && sig+="$(md5sum "$conf" | cut -d' ' -f1)"
     done
     echo "$sig"
@@ -224,14 +224,14 @@ conf_sig() {
 
 dnsmasq_sig() {
     local sig="" conf
-    for conf in "$OPNL_CONFIG_DIR"/dnsmasq.d/*.conf; do
+    for conf in "$PASSAGE_CONFIG_DIR"/dnsmasq.d/*.conf; do
         [ -f "$conf" ] && sig+="$(md5sum "$conf" | cut -d' ' -f1)"
     done
     echo "$sig"
 }
 
-# Called when the pinning config (opnl-domains.conf) changes: refreshes the
-# OPNL_DOMAINS chain then RESTARTS dnsmasq. A plain SIGHUP would re-read the
+# Called when the pinning config (passage-domains.conf) changes: refreshes the
+# PASSAGE_DOMAINS chain then RESTARTS dnsmasq. A plain SIGHUP would re-read the
 # config but keep the stale cache, so clients could keep resolving a domain to
 # an old address that no longer matches the firewall.
 refresh_dnsmasq_d() {
@@ -247,11 +247,11 @@ refresh_dnsmasq_d() {
 
 restart_all() {
     # SIGTERM running daemons gracefully; configs are re-read on next connect.
-    for pidfile in "$OPNL_LOG_DIR"/daemon-*.pid; do
+    for pidfile in "$PASSAGE_LOG_DIR"/daemon-*.pid; do
         [ -f "$pidfile" ] && kill -TERM "$(cat "$pidfile")" 2>/dev/null || true
     done
     sleep 1
-    for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do
+    for conf in "$PASSAGE_CONFIG_DIR"/daemon-*.conf; do
         start_daemon "$conf" || true
     done
     reapply_rules
@@ -259,7 +259,7 @@ restart_all() {
 
 # Start whatever is present on boot.
 boot_sig=""
-for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do
+for conf in "$PASSAGE_CONFIG_DIR"/daemon-*.conf; do
     start_daemon "$conf"
     boot_sig="$(conf_sig)"
 done
@@ -274,8 +274,8 @@ fi
 
 # Watch the shared config volume: when the backend writes/updates daemon configs
 # (first-run wizard, settings changes), reload the daemons without a restart.
-# The dnsmasq pinning config (opnl-domains.conf) is watched separately so access
-# rule changes refresh the resolver and the OPNL_DOMAINS chain without touching
+# The dnsmasq pinning config (passage-domains.conf) is watched separately so access
+# rule changes refresh the resolver and the PASSAGE_DOMAINS chain without touching
 # the running VPN daemons.
 (
     last_sig="$boot_sig"

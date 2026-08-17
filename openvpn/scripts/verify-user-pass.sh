@@ -6,8 +6,8 @@
 #   clients, which arrive as "password\nOTP" in $password) against the backend.
 #   When the account requires MFA and no code was supplied, the backend returns
 #   a single-use pendingId; the script stashes it in two files:
-#     /tmp/opnl-pending-<pendingId>  — "username:pendingId" (for Phase 2 lookup)
-#     /tmp/opnl-pending-latest       — just the pendingId (Phase 2 entry point)
+#     /tmp/passage-pending-<pendingId>  — "username:pendingId" (for Phase 2 lookup)
+#     /tmp/passage-pending-latest       — just the pendingId (Phase 2 entry point)
 #   and writes an auth-pending file with a crtext prompt and exits 2, so
 #   auth-pending capable clients (OpenVPN Connect, OpenVPN 3) prompt for the
 #   TOTP code.
@@ -26,11 +26,11 @@
 # Contract: exit 0 = authenticated/controlled, 1 = denied, 2 = auth pending.
 set -euo pipefail
 
-OPNL_INTERNAL_BASE_URL="${OPNL_INTERNAL_BASE_URL:-http://backend:8080}"
+PASSAGE_INTERNAL_BASE_URL="${PASSAGE_INTERNAL_BASE_URL:-http://backend:8080}"
 
 call_internal() { # $1 = endpoint path, $2 = JSON body
     curl -sS --max-time 8 \
-        -X POST "$OPNL_INTERNAL_BASE_URL$1" \
+        -X POST "$PASSAGE_INTERNAL_BASE_URL$1" \
         -H 'Content-Type: application/json' \
         -H 'X-Internal-Token: __INTERNAL_TOKEN__' \
         -d "$2"
@@ -45,8 +45,8 @@ if [[ "${script_type:-}" == "client-crresponse" ]]; then
     # username from the environment alone.
     #
     # Instead Phase 1 writes two files:
-    #   /tmp/opnl-pending-<pendingId>  — contains "username:pendingId"
-    #   /tmp/opnl-pending-latest       — contains just the pendingId
+    #   /tmp/passage-pending-<pendingId>  — contains "username:pendingId"
+    #   /tmp/passage-pending-latest       — contains just the pendingId
     # Phase 2 reads the latest pendingId, looks up the full pending data,
     # and extracts both username and pendingId from it.
     otp=""
@@ -57,12 +57,12 @@ if [[ "${script_type:-}" == "client-crresponse" ]]; then
 
     auth_user=""
     pending_id=""
-    latest_file="/tmp/opnl-pending-latest"
+    latest_file="/tmp/passage-pending-latest"
     if [[ -r "$latest_file" ]]; then
         pending_id="$(cat "$latest_file" 2>/dev/null || true)"
         rm -f "$latest_file"
         if [[ -n "$pending_id" ]]; then
-            pending_file="/tmp/opnl-pending-$pending_id"
+            pending_file="/tmp/passage-pending-$pending_id"
             if [[ -r "$pending_file" ]]; then
                 data="$(cat "$pending_file" 2>/dev/null || true)"
                 rm -f "$pending_file"
@@ -142,9 +142,9 @@ if [[ "$reason" == "mfa_required" ]]; then
             pending_id="$(printf '%s' "$resp" | jq -r '.pendingId // ""' 2>/dev/null || true)"
             if [[ -n "$pending_id" ]]; then
                 umask 077
-                printf '%s:%s' "$username" "$pending_id" > "/tmp/opnl-pending-$pending_id"
-                printf '%s' "$pending_id" > "/tmp/opnl-pending-latest"
-                chmod 600 "/tmp/opnl-pending-$pending_id" "/tmp/opnl-pending-latest"
+                printf '%s:%s' "$username" "$pending_id" > "/tmp/passage-pending-$pending_id"
+                printf '%s' "$pending_id" > "/tmp/passage-pending-latest"
+                chmod 600 "/tmp/passage-pending-$pending_id" "/tmp/passage-pending-latest"
             fi
         fi
         # Signal auth-pending: 120s timeout, crtext method, prompt text.

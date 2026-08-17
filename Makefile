@@ -92,21 +92,21 @@ migrate: ## Apply DB migrations (via backend Flyway on boot; manual run for loca
 seed-admin: ## Create initial admin user (non-wizard path)
 	curl -sS -X POST http://localhost:8080/internal/seed-admin \
 		-H 'Content-Type: application/json' \
-		-H "X-Internal-Token: $${OPNL_INTERNAL_TOKEN:-change-me-internal-token}" \
-		-H "X-Bootstrap-Token: $${OPNL_BOOTSTRAP_TOKEN:-}" \
-		-d "{\"username\":\"admin\",\"password\":\"$${OPNL_ADMIN_PASSWORD:-change-me}\"}"
+		-H "X-Internal-Token: $${PASSAGE_INTERNAL_TOKEN:-change-me-internal-token}" \
+		-H "X-Bootstrap-Token: $${PASSAGE_BOOTSTRAP_TOKEN:-}" \
+		-d "{\"username\":\"admin\",\"password\":\"$${PASSAGE_ADMIN_PASSWORD:-change-me}\"}"
 
 seed-demo: ## Load demo data (sample users/groups/rules); needs setup complete
 	@code=$$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/internal/seed-demo \
 		-H 'Content-Type: application/json' \
-		-H "X-Internal-Token: $${OPNL_INTERNAL_TOKEN:-change-me-internal-token}" \
-		-H "X-Bootstrap-Token: $${OPNL_BOOTSTRAP_TOKEN:-}" \
+		-H "X-Internal-Token: $${PASSAGE_INTERNAL_TOKEN:-change-me-internal-token}" \
+		-H "X-Bootstrap-Token: $${PASSAGE_BOOTSTRAP_TOKEN:-}" \
 		-d '{"force":false}'); \
 	[ "$$code" = "200" ] && echo "Demo data loaded" || { echo "seed-demo failed (HTTP $$code)"; exit 1; }
 
 backup: ## Produce backup archive (config + PKI + DB dump)
 	@test -d data || { echo "No data dir"; exit 1; }
-	@ts=$$(date +%Y%m%d-%H%M%S); tar -czf backup-opnl-$$ts.tar.gz -C data . && echo "Wrote backup-opnl-$$ts.tar.gz"
+	@ts=$$(date +%Y%m%d-%H%M%S); tar -czf backup-passage-$$ts.tar.gz -C data . && echo "Wrote backup-passage-$$ts.tar.gz"
 
 api-docs: ## Regenerate docs/api.md from a running backend + show swagger URL
 	@code=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/v3/api-docs); \
@@ -132,11 +132,11 @@ reset: ## Stop services and wipe runtime data (danger!)
 install: ## Single-command install (see install.sh)
 	./install.sh
 
-release: ## Build deploy-only tarball release/opnl-vpn-<git-tag>.tar.gz (requires a tag on HEAD)
+release: ## Build deploy-only tarball release/passage-vpn-<git-tag>.tar.gz (requires a tag on HEAD)
 	@tag="$$(git describe --tags --exact-match 2>/dev/null)" || { echo "error: no git tag on HEAD — tag the commit first"; exit 1; }; \
 	rm -rf release; \
-	mkdir -p "release/opnl-vpn-$$tag"; \
-	cp docker-compose.yml docker-compose.postgres.yml .env.example install.sh "release/opnl-vpn-$$tag/"; \
-	cp docs/installation.md "release/opnl-vpn-$$tag/README.md"; \
-	cd release && tar -czf "opnl-vpn-$$tag.tar.gz" "opnl-vpn-$$tag"; \
-	echo "Wrote release/opnl-vpn-$$tag.tar.gz (deploy-only files, no source)"
+	mkdir -p "release/passage-vpn-$$tag"; \
+	cp docker-compose.yml docker-compose.postgres.yml .env.example install.sh "release/passage-vpn-$$tag/"; \
+	cp docs/installation.md "release/passage-vpn-$$tag/README.md"; \
+	cd release && tar -czf "passage-vpn-$$tag.tar.gz" "passage-vpn-$$tag"; \
+	echo "Wrote release/passage-vpn-$$tag.tar.gz (deploy-only files, no source)"

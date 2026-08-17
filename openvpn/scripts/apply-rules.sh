@@ -6,23 +6,23 @@
 # chains are added dynamically by client-connect.sh and torn down by
 # client-disconnect.sh, so no static rule references individual clients.
 #
-# Dual-stack: when OPNL_VPN_POOL6 is set, an ip6tables mirror of the base rules
-# (forwarding, NAT, OPNL_DOMAINS6) is installed and IPv6 forwarding is enabled.
+# Dual-stack: when PASSAGE_VPN_POOL6 is set, an ip6tables mirror of the base rules
+# (forwarding, NAT, PASSAGE_DOMAINS6) is installed and IPv6 forwarding is enabled.
 #
 # Env:
-#   OPNL_VPN_POOL      VPN client subnet in CIDR form (required).
-#   OPNL_VPN_POOL6     VPN client IPv6 subnet in CIDR form (optional).
-#   OPNL_FIREWALL_IFACE  Uplink interface the VPN pool is routed out of (default eth0).
-#   OPNL_NETWORK_MODE  "nat" (masquerade) or "routed" (no NAT) (default nat).
+#   PASSAGE_VPN_POOL      VPN client subnet in CIDR form (required).
+#   PASSAGE_VPN_POOL6     VPN client IPv6 subnet in CIDR form (optional).
+#   PASSAGE_FIREWALL_IFACE  Uplink interface the VPN pool is routed out of (default eth0).
+#   PASSAGE_NETWORK_MODE  "nat" (masquerade) or "routed" (no NAT) (default nat).
 set -euo pipefail
 
-iface="${OPNL_FIREWALL_IFACE:-eth0}"
-pool="${OPNL_VPN_POOL:-}"
-pool6="${OPNL_VPN_POOL6:-}"
-mode="${OPNL_NETWORK_MODE:-nat}"
+iface="${PASSAGE_FIREWALL_IFACE:-eth0}"
+pool="${PASSAGE_VPN_POOL:-}"
+pool6="${PASSAGE_VPN_POOL6:-}"
+mode="${PASSAGE_NETWORK_MODE:-nat}"
 
 if [[ -z "$pool" ]]; then
-    echo "apply-rules: OPNL_VPN_POOL not set; skipping" >&2
+    echo "apply-rules: PASSAGE_VPN_POOL not set; skipping" >&2
     exit 0
 fi
 
@@ -46,13 +46,13 @@ if [[ -n "$pool6" ]]; then
 fi
 
 # Domain matcher chain: one RETURN per pinned domain address taken from the
-# backend-generated dnsmasq config (opnl-domains.conf), then DROP. This is the
+# backend-generated dnsmasq config (passage-domains.conf), then DROP. This is the
 # address set the per-client rules and the VPN DNS agree on, so a domain rule's
 # ALLOW/DENY and the addresses clients actually resolve to stay consistent.
-# Inspect with: iptables -L OPNL_DOMAINS.
+# Inspect with: iptables -L PASSAGE_DOMAINS.
 apply_domain_rules() {
-    local conf="${OPNL_CONFIG_DIR:-/etc/opnl/config}/dnsmasq.d/opnl-domains.conf"
-    local chain="OPNL_DOMAINS"
+    local conf="${PASSAGE_CONFIG_DIR:-/etc/passage/config}/dnsmasq.d/passage-domains.conf"
+    local chain="PASSAGE_DOMAINS"
     if ! iptables -N "$chain" 2>/dev/null; then
         iptables -F "$chain"
     fi
@@ -69,8 +69,8 @@ apply_domain_rules() {
 # IPv6 mirror of apply_domain_rules: matches the AAAA pins dnsmasq serves for
 # access-rule domains when the primary daemon is dual-stack.
 apply_domain_rules6() {
-    local conf="${OPNL_CONFIG_DIR:-/etc/opnl/config}/dnsmasq.d/opnl-domains.conf"
-    local chain="OPNL_DOMAINS6"
+    local conf="${PASSAGE_CONFIG_DIR:-/etc/passage/config}/dnsmasq.d/passage-domains.conf"
+    local chain="PASSAGE_DOMAINS6"
     if ! ip6tables -N "$chain" 2>/dev/null; then
         ip6tables -F "$chain"
     fi

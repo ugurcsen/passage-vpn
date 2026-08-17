@@ -1,4 +1,4 @@
-# API Reference — OpenVPN Panel
+# API Reference — PassageVPN
 
 > Generated from the live OpenAPI document. Endpoints under `/api/admin/**`
 > require an `ADMIN` (or scoped `GROUP_ADMIN`) role; `/api/portal/**` endpoints are
@@ -13,7 +13,7 @@
 
 Login via `POST /api/auth/login` (or `/api/auth/mfa`) and pass the returned
 access token as `Authorization: Bearer <token>`. Automation can instead use an
-API token as `X-API-Token: opnl_...` (see the Admin - API tokens endpoints).
+API token as `X-API-Token: passage_...` (see the Admin - API tokens endpoints).
 
 ## Endpoints
 

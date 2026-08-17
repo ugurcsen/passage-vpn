@@ -1,11 +1,12 @@
-# OpenVPN Management Panel
+# PassageVPN
 
-[![CI](https://github.com/ugurcsen/opnl-vpn/actions/workflows/ci.yml/badge.svg)](https://github.com/ugurcsen/opnl-vpn/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/ugurcsen/opnl-vpn?color=blue&label=release)](https://github.com/ugurcsen/opnl-vpn/releases)
-[![GHCR](https://img.shields.io/badge/images-ghcr.io/ugurcsen/opnl-vpn-blue)](https://github.com/ugurcsen/opnl-vpn/pkgs)
+[![CI](https://github.com/ugurcsen/passage-vpn/actions/workflows/ci.yml/badge.svg)](https://github.com/ugurcsen/passage-vpn/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ugurcsen/passage-vpn?color=blue&label=release)](https://github.com/ugurcsen/passage-vpn/releases)
+[![GHCR](https://img.shields.io/badge/images-ghcr.io/ugurcsen/passage-vpn-blue)](https://github.com/ugurcsen/passage-vpn/pkgs)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 A production-ready OpenVPN management panel replicating OpenVPN Access Server
-features on top of open source components. Source: **github.com/ugurcsen/opnl-vpn**.
+features on top of open source components. Source: **github.com/ugurcsen/passage-vpn**.
 
 - **Backend**: Java 25, Spring Boot 3.5, Gradle (Kotlin DSL), SQLite (validated against a PostgreSQL profile)
 - **Frontend**: React 18 + TypeScript, Vite, MUI v6, TanStack Query
@@ -20,7 +21,7 @@ See `AGENTS.md` for the agent/developer guide, `TODO.md` for the phased roadmap,
 | `docs/architecture.md` | Component topology, backend module map, VPN/management integration, security model |
 | `docs/access-rules.md` | Firewall + DNS control: rule model, iptables rendering, domain pinning, dual-stack |
 | `docs/api.md` | REST API reference (regenerated with `make api-docs`) |
-| `docs/configuration.md` | Environment variables reference (all `OPNL_*` settings) |
+| `docs/configuration.md` | Environment variables reference (all `PASSAGE_*` settings) |
 | `docs/installation.md` | Deployment: dev build vs. source-free release tarball (`--mode=release`) |
 | `docs/ROADMAP.md` | Milestone status for the current release cycle |
 
@@ -29,7 +30,7 @@ See `AGENTS.md` for the agent/developer guide, `TODO.md` for the phased roadmap,
 Build everything locally from source — needs the repo and a build toolchain:
 
 ```bash
-git clone git@github.com:ugurcsen/opnl-vpn.git && cd opnl-vpn
+git clone git@github.com:ugurcsen/passage-vpn.git && cd passage-vpn
 ./install.sh                 # single-command install (docker compose up -d --build)
 # or manually:
 cp .env.example .env         # edit secrets
@@ -39,25 +40,25 @@ make logs                    # follow logs; open http://localhost:8080
 
 ## Production install (no source on the server)
 
-Deploy from the **deploy-only release tarball** (`opnl-vpn-<tag>.tar.gz`),
+Deploy from the **deploy-only release tarball** (`passage-vpn-<tag>.tar.gz`),
 which contains just the compose files, env template and installer. Prebuilt
-images are pulled from `ghcr.io/ugurcsen/opnl-vpn`, so the server never needs
+images are pulled from `ghcr.io/ugurcsen/passage-vpn`, so the server never needs
 the source tree or a build toolchain:
 
 ```bash
-curl -fsSL -o opnl-vpn.tar.gz https://github.com/ugurcsen/opnl-vpn/releases/download/<tag>/opnl-vpn-<tag>.tar.gz
-tar -xzf opnl-vpn.tar.gz && cd opnl-vpn-<tag>
+curl -fsSL -o passage-vpn.tar.gz https://github.com/ugurcsen/passage-vpn/releases/download/<tag>/passage-vpn-<tag>.tar.gz
+tar -xzf passage-vpn.tar.gz && cd passage-vpn-<tag>
 ./install.sh --mode=release --tag=<tag>     # pulls images, starts services
 ```
 
 `<tag>` is a release version such as `v0.1.0-beta.6` (see
-[Releases](https://github.com/ugurcsen/opnl-vpn/releases)). You can also build
+[Releases](https://github.com/ugurcsen/passage-vpn/releases)). You can also build
 the same tarball locally from a tagged commit with `make release`. Full details
 in `docs/installation.md`.
 
 On first boot complete the setup wizard (admin account → VPN server → PKI).
 Alternatively bootstrap non-interactively with `make seed-admin` and try the
-sample dataset with `make seed-demo` (or set `OPNL_DEMO_MODE=true` in `.env`
+sample dataset with `make seed-demo` (or set `PASSAGE_DEMO_MODE=true` in `.env`
 to auto-load it on first boot). Demo users use the password `demo-password-1`.
 
 > **Operational note:** never run a full-tunnel VPN client on the VPN server
@@ -76,7 +77,7 @@ to auto-load it on first boot). Demo users use the password `demo-password-1`.
 | Access control | Rules per user/group/global (IP/subnet, protocol/port, group subnet, domain), full/split tunnel, DNS overrides with scoped access, dual-stack iptables/ip6tables enforcement |
 | Monitoring | Online users, traffic, session history, live dashboard, WebSocket push, multi-daemon status/kill |
 | Nodes | `openvpn_nodes` registry + VPN Nodes page; node-aware status/kill/monitoring; backend `agent` profile registers remote gateways via `/internal/node/*` |
-| Operations | Branding, config report, backup/restore, audit log, demo/seed mode, PostgreSQL profile (`OPNL_PROFILE=postgres`) |
+| Operations | Branding, config report, backup/restore, audit log, demo/seed mode, PostgreSQL profile (`PASSAGE_PROFILE=postgres`) |
 
 ## Documentation
 
@@ -97,9 +98,17 @@ make frontend-dev    # Vite dev server on :5173 (proxies /api + /ws)
 make test            # backend + frontend tests
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding conventions, and the pull request process.
+
 ## GitHub resources
 
-- **Repository** — https://github.com/ugurcsen/opnl-vpn
-- **Releases** (tarball + changelog) — https://github.com/ugurcsen/opnl-vpn/releases
-- **Issues / feature requests** — https://github.com/ugurcsen/opnl-vpn/issues
-- **Container images** (backend / frontend / openvpn) — https://github.com/ugurcsen/opnl-vpn/pkgs/container
+- **Repository** — https://github.com/ugurcsen/passage-vpn
+- **Releases** (tarball + changelog) — https://github.com/ugurcsen/passage-vpn/releases
+- **Issues / feature requests** — https://github.com/ugurcsen/passage-vpn/issues
+- **Container images** (backend / frontend / openvpn) — https://github.com/ugurcsen/passage-vpn/pkgs/container
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).

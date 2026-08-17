@@ -48,7 +48,7 @@ describe("AppLayout navigation by role", () => {
   beforeEach(() => {
     role = "USER";
     localStorage.clear();
-    localStorage.setItem("opnl.access", "test-token");
+    localStorage.setItem("passage.access", "test-token");
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation((url: string) => {

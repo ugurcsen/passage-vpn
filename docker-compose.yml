@@ -1,11 +1,11 @@
-name: opnl
+name: passage
 
 services:
   # --- OpenVPN daemon(s) + management interface ---
   openvpn:
     build: ./openvpn
-    image: ${OPNL_IMAGE_REGISTRY:-ghcr.io}/${OPNL_IMAGE_NAMESPACE:-ugurcsen/opnl-vpn}/openvpn:${OPNL_IMAGE_TAG:-latest}
-    container_name: opnl-openvpn
+    image: ${PASSAGE_IMAGE_REGISTRY:-ghcr.io}/${PASSAGE_IMAGE_NAMESPACE:-ugurcsen/passage-vpn}/openvpn:${PASSAGE_IMAGE_TAG:-latest}
+    container_name: passage-openvpn
     restart: unless-stopped
     mem_limit: 256m
     cpus: 0.5
@@ -19,21 +19,21 @@ services:
       - net.ipv6.conf.default.forwarding=1
       - net.ipv6.conf.all.disable_ipv6=0
     volumes:
-      - opnl-pki:/etc/opnl/pki        # PKI lives in pki/run (easyrsa cannot rm -rf a mountpoint)
-      - opnl-ccd:/etc/opnl/ccd
-      - opnl-config:/etc/opnl/config
-      - opnl-logs:/var/log/opnl
+      - passage-pki:/etc/passage/pki        # PKI lives in pki/run (easyrsa cannot rm -rf a mountpoint)
+      - passage-ccd:/etc/passage/ccd
+      - passage-config:/etc/passage/config
+      - passage-logs:/var/log/passage
     environment:
-      OPNL_INTERNAL_BASE_URL: http://backend:8080
-      OPNL_PKI_DIR: /etc/opnl/pki/run
+      PASSAGE_INTERNAL_BASE_URL: http://backend:8080
+      PASSAGE_PKI_DIR: /etc/passage/pki/run
     networks:
-      - opnl-net
+      - passage-net
     ports:
       # Published daemon port ranges (base..end per protocol). *_END defaults to the base, i.e. a
-      # single published port; widen it (e.g. OPNL_OPENVPN_PORT_END=1199) so additional daemons
+      # single published port; widen it (e.g. PASSAGE_OPENVPN_PORT_END=1199) so additional daemons
       # are reachable. Container side equals the host side: a daemon's configured port is both.
-      - "${OPNL_OPENVPN_PORT:-1194}-${OPNL_OPENVPN_PORT_END:-1194}:${OPNL_OPENVPN_PORT:-1194}-${OPNL_OPENVPN_PORT_END:-1194}/udp"
-      - "${OPNL_OPENVPN_TCP_PORT:-1195}-${OPNL_OPENVPN_TCP_PORT_END:-1195}:${OPNL_OPENVPN_TCP_PORT:-1195}-${OPNL_OPENVPN_TCP_PORT_END:-1195}/tcp"
+      - "${PASSAGE_OPENVPN_PORT:-1194}-${PASSAGE_OPENVPN_PORT_END:-1194}:${PASSAGE_OPENVPN_PORT:-1194}-${PASSAGE_OPENVPN_PORT_END:-1194}/udp"
+      - "${PASSAGE_OPENVPN_TCP_PORT:-1195}-${PASSAGE_OPENVPN_TCP_PORT_END:-1195}:${PASSAGE_OPENVPN_TCP_PORT:-1195}-${PASSAGE_OPENVPN_TCP_PORT_END:-1195}/tcp"
     expose:
       - "7505-7510"        # management interface per daemon (daemon 0 = 7505)
 
@@ -42,15 +42,15 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    image: ${OPNL_IMAGE_REGISTRY:-ghcr.io}/${OPNL_IMAGE_NAMESPACE:-ugurcsen/opnl-vpn}/backend:${OPNL_IMAGE_TAG:-latest}
-    container_name: opnl-backend
+    image: ${PASSAGE_IMAGE_REGISTRY:-ghcr.io}/${PASSAGE_IMAGE_NAMESPACE:-ugurcsen/passage-vpn}/backend:${PASSAGE_IMAGE_TAG:-latest}
+    container_name: passage-backend
     restart: unless-stopped
     mem_limit: 1g
     cpus: 2.0
     healthcheck:
-      # curl is present in the runtime image; OPNL_SERVER_PORT is expanded inside the
+      # curl is present in the runtime image; PASSAGE_SERVER_PORT is expanded inside the
       # container ($$ escapes compose interpolation so it can vary per deployment).
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$${OPNL_SERVER_PORT:-8080}/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$${PASSAGE_SERVER_PORT:-8080}/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -58,60 +58,60 @@ services:
     env_file:
       - .env
     environment:
-      OPNL_DATA_DIR: /var/lib/opnl
-      OPNL_DB_URL: "jdbc:sqlite:/var/lib/opnl/opnl.db?journal_mode=WAL&busy_timeout=5000&foreign_keys=on"
-      OPNL_PKI_DIR: /etc/opnl/pki/run
-      OPNL_CCD_DIR: /etc/opnl/ccd
-      OPNL_CONFIG_DIR: /etc/opnl/config
-      OPNL_SCRIPTS_DIR: /etc/opnl/config/scripts
-      OPNL_SCRIPTS_SRC_DIR: /app/openvpn-scripts
-      OPNL_LOG_DIR: /var/log/opnl
-      OPNL_OPENVPN_MGMT_HOST: openvpn
-      OPNL_OPENVPN_MGMT_PORT: 7505
-      OPNL_OPENVPN_MGMT_PASSWORD: ${OPNL_OPENVPN_MGMT_PASSWORD:-}
-      OPNL_INTERNAL_BASE_URL: http://backend:8080
-      OPNL_INTERNAL_TOKEN: ${OPNL_INTERNAL_TOKEN:-change-me-internal-token}
-      OPNL_BOOTSTRAP_TOKEN: ${OPNL_BOOTSTRAP_TOKEN:-}
-      OPNL_INTERNAL_MTLS_PORT: ${OPNL_INTERNAL_MTLS_PORT:-9443}
-      OPNL_INTERNAL_TLS_DIR: /var/lib/opnl/internal-tls
-      OPNL_TRUSTED_PROXIES: ${OPNL_TRUSTED_PROXIES:-172.16.0.0/12}
+      PASSAGE_DATA_DIR: /var/lib/passage
+      PASSAGE_DB_URL: "jdbc:sqlite:/var/lib/passage/passage.db?journal_mode=WAL&busy_timeout=5000&foreign_keys=on"
+      PASSAGE_PKI_DIR: /etc/passage/pki/run
+      PASSAGE_CCD_DIR: /etc/passage/ccd
+      PASSAGE_CONFIG_DIR: /etc/passage/config
+      PASSAGE_SCRIPTS_DIR: /etc/passage/config/scripts
+      PASSAGE_SCRIPTS_SRC_DIR: /app/openvpn-scripts
+      PASSAGE_LOG_DIR: /var/log/passage
+      PASSAGE_OPENVPN_MGMT_HOST: openvpn
+      PASSAGE_OPENVPN_MGMT_PORT: 7505
+      PASSAGE_OPENVPN_MGMT_PASSWORD: ${PASSAGE_OPENVPN_MGMT_PASSWORD:-}
+      PASSAGE_INTERNAL_BASE_URL: http://backend:8080
+      PASSAGE_INTERNAL_TOKEN: ${PASSAGE_INTERNAL_TOKEN:-change-me-internal-token}
+      PASSAGE_BOOTSTRAP_TOKEN: ${PASSAGE_BOOTSTRAP_TOKEN:-}
+      PASSAGE_INTERNAL_MTLS_PORT: ${PASSAGE_INTERNAL_MTLS_PORT:-9443}
+      PASSAGE_INTERNAL_TLS_DIR: /var/lib/passage/internal-tls
+      PASSAGE_TRUSTED_PROXIES: ${PASSAGE_TRUSTED_PROXIES:-172.16.0.0/12}
     volumes:
-      - opnl-data:/var/lib/opnl
-      - opnl-pki:/etc/opnl/pki
-      - opnl-ccd:/etc/opnl/ccd
-      - opnl-config:/etc/opnl/config
-      - opnl-logs:/var/log/opnl
+      - passage-data:/var/lib/passage
+      - passage-pki:/etc/passage/pki
+      - passage-ccd:/etc/passage/ccd
+      - passage-config:/etc/passage/config
+      - passage-logs:/var/log/passage
     depends_on:
       - openvpn
     networks:
-      - opnl-net
+      - passage-net
 
   # --- Frontend (nginx: static React + reverse proxy to backend) ---
   frontend:
     build: ./frontend
-    image: ${OPNL_IMAGE_REGISTRY:-ghcr.io}/${OPNL_IMAGE_NAMESPACE:-ugurcsen/opnl-vpn}/frontend:${OPNL_IMAGE_TAG:-latest}
-    container_name: opnl-frontend
+    image: ${PASSAGE_IMAGE_REGISTRY:-ghcr.io}/${PASSAGE_IMAGE_NAMESPACE:-ugurcsen/passage-vpn}/frontend:${PASSAGE_IMAGE_TAG:-latest}
+    container_name: passage-frontend
     restart: unless-stopped
     mem_limit: 128m
     cpus: 0.25
     depends_on:
       - backend
     networks:
-      - opnl-net
+      - passage-net
     ports:
-      - "${OPNL_FRONTEND_PORT:-80}:80"
+      - "${PASSAGE_FRONTEND_PORT:-80}:80"
 
   # --- Remote node gateway (opt-in; start on a gateway node with --profile node) ---
   # Registers/heartbeats to the central backend over the internal mTLS endpoint, must
   # present an agent client certificate (see /api/admin/nodes/{id}/agent-cert), and pulls
   # its config bundle (daemon configs, PKI incl. the CRL, CCD, scripts, dnsmasq) from the
   # central backend so its OpenVPN daemons are provisioned and updated like the local ones.
-  #   docker compose --profile node up -d opnl-node-openvpn opnl-agent
-  opnl-node-openvpn:
+  #   docker compose --profile node up -d passage-node-openvpn passage-agent
+  passage-node-openvpn:
     profiles: ["node"]
     build: ./openvpn
-    image: ${OPNL_IMAGE_REGISTRY:-ghcr.io}/${OPNL_IMAGE_NAMESPACE:-ugurcsen/opnl-vpn}/openvpn:${OPNL_IMAGE_TAG:-latest}
-    container_name: opnl-node-openvpn
+    image: ${PASSAGE_IMAGE_REGISTRY:-ghcr.io}/${PASSAGE_IMAGE_NAMESPACE:-ugurcsen/passage-vpn}/openvpn:${PASSAGE_IMAGE_TAG:-latest}
+    container_name: passage-node-openvpn
     restart: unless-stopped
     mem_limit: 256m
     cpus: 0.5
@@ -125,72 +125,72 @@ services:
       - net.ipv6.conf.default.forwarding=1
       - net.ipv6.conf.all.disable_ipv6=0
     volumes:
-      - opnl-node-pki:/etc/opnl/pki
-      - opnl-node-ccd:/etc/opnl/ccd
-      - opnl-node-config:/etc/opnl/config
-      - opnl-node-logs:/var/log/opnl
+      - passage-node-pki:/etc/passage/pki
+      - passage-node-ccd:/etc/passage/ccd
+      - passage-node-config:/etc/passage/config
+      - passage-node-logs:/var/log/passage
     environment:
-      OPNL_PKI_DIR: /etc/opnl/pki/run
+      PASSAGE_PKI_DIR: /etc/passage/pki/run
       # Script callbacks (verify-user-pass, client-connect, ...) reach the CENTRAL backend.
       # Defaults to the compose-internal URL for single-host testing; on a real remote gateway
       # point this at the central backend's reachable address (e.g. https://vpn.example.com:9443).
-      OPNL_INTERNAL_BASE_URL: ${OPNL_NODE_INTERNAL_BASE_URL:-http://backend:8080}
+      PASSAGE_INTERNAL_BASE_URL: ${PASSAGE_NODE_INTERNAL_BASE_URL:-http://backend:8080}
     networks:
-      - opnl-net
+      - passage-net
     ports:
-      - "${OPNL_NODE_OPENVPN_PORT:-1196}-${OPNL_NODE_OPENVPN_PORT_END:-1196}:${OPNL_NODE_OPENVPN_PORT:-1196}-${OPNL_NODE_OPENVPN_PORT_END:-1196}/udp"
-      - "${OPNL_NODE_OPENVPN_TCP_PORT:-1197}-${OPNL_NODE_OPENVPN_TCP_PORT_END:-1197}:${OPNL_NODE_OPENVPN_TCP_PORT:-1197}-${OPNL_NODE_OPENVPN_TCP_PORT_END:-1197}/tcp"
+      - "${PASSAGE_NODE_OPENVPN_PORT:-1196}-${PASSAGE_NODE_OPENVPN_PORT_END:-1196}:${PASSAGE_NODE_OPENVPN_PORT:-1196}-${PASSAGE_NODE_OPENVPN_PORT_END:-1196}/udp"
+      - "${PASSAGE_NODE_OPENVPN_TCP_PORT:-1197}-${PASSAGE_NODE_OPENVPN_TCP_PORT_END:-1197}:${PASSAGE_NODE_OPENVPN_TCP_PORT:-1197}-${PASSAGE_NODE_OPENVPN_TCP_PORT_END:-1197}/tcp"
     expose:
       - "7505-7510"        # management interface per daemon (daemon 0 = 7505)
 
-  opnl-agent:
+  passage-agent:
     profiles: ["node"]
     build:
       context: .
       dockerfile: backend/Dockerfile
-    image: ${OPNL_IMAGE_REGISTRY:-ghcr.io}/${OPNL_IMAGE_NAMESPACE:-ugurcsen/opnl-vpn}/backend:${OPNL_IMAGE_TAG:-latest}
-    container_name: opnl-node-agent
+    image: ${PASSAGE_IMAGE_REGISTRY:-ghcr.io}/${PASSAGE_IMAGE_NAMESPACE:-ugurcsen/passage-vpn}/backend:${PASSAGE_IMAGE_TAG:-latest}
+    container_name: passage-node-agent
     restart: unless-stopped
     mem_limit: 512m
     cpus: 1.0
     environment:
-      OPNL_PROFILE: agent
-      OPNL_AGENT_CENTRAL_BASE_URL: ${OPNL_AGENT_CENTRAL_BASE_URL:-https://backend:9443}
-      OPNL_AGENT_NODE_NAME: ${OPNL_AGENT_NODE_NAME:-}
-      OPNL_AGENT_MGMT_HOST: ${OPNL_AGENT_MGMT_HOST:-openvpn}
-      OPNL_AGENT_MGMT_PORT_BASE: ${OPNL_AGENT_MGMT_PORT_BASE:-7505}
-      OPNL_AGENT_ADMIN_IP: ${OPNL_AGENT_ADMIN_IP:-}
-      OPNL_AGENT_MGMT_PASSWORD: ${OPNL_AGENT_MGMT_PASSWORD:-}
-      OPNL_AGENT_HEARTBEAT_SECONDS: ${OPNL_AGENT_HEARTBEAT_SECONDS:-30}
-      OPNL_AGENT_SYNC_SECONDS: ${OPNL_AGENT_SYNC_SECONDS:-60}
-      OPNL_AGENT_TLS_CA: ${OPNL_AGENT_TLS_CA:-/etc/opnl/agent/tls/ca.crt}
-      OPNL_AGENT_TLS_CERT: ${OPNL_AGENT_TLS_CERT:-/etc/opnl/agent/tls/client.crt}
-      OPNL_AGENT_TLS_KEY: ${OPNL_AGENT_TLS_KEY:-/etc/opnl/agent/tls/client.key}
-      OPNL_INTERNAL_TOKEN: ${OPNL_INTERNAL_TOKEN:-change-me-internal-token}
+      PASSAGE_PROFILE: agent
+      PASSAGE_AGENT_CENTRAL_BASE_URL: ${PASSAGE_AGENT_CENTRAL_BASE_URL:-https://backend:9443}
+      PASSAGE_AGENT_NODE_NAME: ${PASSAGE_AGENT_NODE_NAME:-}
+      PASSAGE_AGENT_MGMT_HOST: ${PASSAGE_AGENT_MGMT_HOST:-openvpn}
+      PASSAGE_AGENT_MGMT_PORT_BASE: ${PASSAGE_AGENT_MGMT_PORT_BASE:-7505}
+      PASSAGE_AGENT_ADMIN_IP: ${PASSAGE_AGENT_ADMIN_IP:-}
+      PASSAGE_AGENT_MGMT_PASSWORD: ${PASSAGE_AGENT_MGMT_PASSWORD:-}
+      PASSAGE_AGENT_HEARTBEAT_SECONDS: ${PASSAGE_AGENT_HEARTBEAT_SECONDS:-30}
+      PASSAGE_AGENT_SYNC_SECONDS: ${PASSAGE_AGENT_SYNC_SECONDS:-60}
+      PASSAGE_AGENT_TLS_CA: ${PASSAGE_AGENT_TLS_CA:-/etc/passage/agent/tls/ca.crt}
+      PASSAGE_AGENT_TLS_CERT: ${PASSAGE_AGENT_TLS_CERT:-/etc/passage/agent/tls/client.crt}
+      PASSAGE_AGENT_TLS_KEY: ${PASSAGE_AGENT_TLS_KEY:-/etc/passage/agent/tls/client.key}
+      PASSAGE_INTERNAL_TOKEN: ${PASSAGE_INTERNAL_TOKEN:-change-me-internal-token}
       # Core secrets the agent image needs to pass its own startup checks (SecurityBootstrapCheck
       # and JwtService are profile-independent). Same values as the central backend. Soft defaults
       # keep `docker compose build` usable without a .env; the backend's own fail-fast checks
       # (SecurityBootstrapCheck / JwtService 32-byte minimum) still refuse to start otherwise.
-      OPNL_JWT_SECRET: ${OPNL_JWT_SECRET:-}
-      OPNL_OPENVPN_MGMT_PASSWORD: ${OPNL_OPENVPN_MGMT_PASSWORD:-}
-      OPNL_SERVER_PORT: ${OPNL_SERVER_PORT:-8080}
+      PASSAGE_JWT_SECRET: ${PASSAGE_JWT_SECRET:-}
+      PASSAGE_OPENVPN_MGMT_PASSWORD: ${PASSAGE_OPENVPN_MGMT_PASSWORD:-}
+      PASSAGE_SERVER_PORT: ${PASSAGE_SERVER_PORT:-8080}
       # The gateway volumes the agent provisions for its own openvpn container (same layout
       # as the central stack, so the pulled daemon configs are valid here verbatim).
-      OPNL_PKI_DIR: /etc/opnl/pki/run
-      OPNL_CCD_DIR: /etc/opnl/ccd
-      OPNL_CONFIG_DIR: /etc/opnl/config
-      OPNL_SCRIPTS_DIR: /etc/opnl/config/scripts
-      OPNL_LOG_DIR: /var/log/opnl
+      PASSAGE_PKI_DIR: /etc/passage/pki/run
+      PASSAGE_CCD_DIR: /etc/passage/ccd
+      PASSAGE_CONFIG_DIR: /etc/passage/config
+      PASSAGE_SCRIPTS_DIR: /etc/passage/config/scripts
+      PASSAGE_LOG_DIR: /var/log/passage
     volumes:
-      - ${OPNL_AGENT_TLS_DIR:-./data/agent-tls}:/etc/opnl/agent/tls:ro
-      - opnl-node-pki:/etc/opnl/pki
-      - opnl-node-ccd:/etc/opnl/ccd
-      - opnl-node-config:/etc/opnl/config
-      - opnl-node-logs:/var/log/opnl
+      - ${PASSAGE_AGENT_TLS_DIR:-./data/agent-tls}:/etc/passage/agent/tls:ro
+      - passage-node-pki:/etc/passage/pki
+      - passage-node-ccd:/etc/passage/ccd
+      - passage-node-config:/etc/passage/config
+      - passage-node-logs:/var/log/passage
     depends_on:
-      - opnl-node-openvpn
+      - passage-node-openvpn
     networks:
-      - opnl-net
+      - passage-net
     expose:
       - "8080"
 
@@ -203,23 +203,23 @@ services:
       context: .
       dockerfile: backend/Dockerfile
       target: build
-    image: opnl-backend-build
+    image: passage-backend-build
     entrypoint: ["./gradlew"]
     networks:
-      - opnl-net
+      - passage-net
 
   frontend-build:
     profiles: ["ci"]
     build:
       context: ./frontend
       target: build
-    image: opnl-frontend-build
+    image: passage-frontend-build
     entrypoint: ["npm"]
     networks:
-      - opnl-net
+      - passage-net
 
 networks:
-  opnl-net:
+  passage-net:
     driver: bridge
     enable_ipv6: true
     # No explicit ipam subnets: Docker auto-allocates IPv4 from its default address
@@ -228,12 +228,12 @@ networks:
     # ("invalid pool request: Pool overlaps with other one on this address space").
 
 volumes:
-  opnl-data:
-  opnl-pki:
-  opnl-ccd:
-  opnl-config:
-  opnl-logs:
-  opnl-node-pki:
-  opnl-node-ccd:
-  opnl-node-config:
-  opnl-node-logs:
+  passage-data:
+  passage-pki:
+  passage-ccd:
+  passage-config:
+  passage-logs:
+  passage-node-pki:
+  passage-node-ccd:
+  passage-node-config:
+  passage-node-logs:

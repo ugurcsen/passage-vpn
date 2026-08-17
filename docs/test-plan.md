@@ -1,4 +1,4 @@
-# Test Plan — OpenVPN Management Panel
+# Test Plan — PassageVPN
 
 Living test strategy for the management panel (backend Java 25 + Spring Boot, frontend
 React + TypeScript + MUI, OpenVPN Community 2.6). Companion to `TODO.md` and
@@ -48,8 +48,8 @@ cd frontend && npm run lint && npm run test
 
 Live E2E (§6) runs against the staging host:
 `ssh root@65.21.108.250` — API at `http://127.0.0.1/api` (use `127.0.0.1`, not
-`localhost`); `/internal/**` is only reachable from the `opnl-openvpn` container
-(`docker exec opnl-openvpn curl http://backend:8080/internal/...`); UI at
+`localhost`); `/internal/**` is only reachable from the `passage-openvpn` container
+(`docker exec passage-openvpn curl http://backend:8080/internal/...`); UI at
 `http://65.21.108.250`. API rate limit is 20 requests/60 s per IP (throttle probes).
 
 ## 4. Test inventory (current state — pulled live from staging `make test`, 2026-08-16)
@@ -112,7 +112,7 @@ Scenario fields: **ID · Purpose · Preconditions · Steps · Expected**.
 
 **E2E-01 · Fresh install wizard** — `PASS` (verified on clean install, 2026-08-14, see
 `test-findings.md` §M6)
-- Pre: empty `OPNL_DATA_DIR`, wizard admin credentials in `.env`.
+- Pre: empty `PASSAGE_DATA_DIR`, wizard admin credentials in `.env`.
 - Steps: reach `/setup` → create admin → configure server (admin host, port) → provision PKI → finish.
 - Expected: setup state `COMPLETE`; CA, `server.crt`/`.key`, `ta.key`, CRL, `index.txt`
   present; login no longer redirects to `/setup`; re-running steps → 409.
@@ -363,7 +363,7 @@ Scenario fields: **ID · Purpose · Preconditions · Steps · Expected**.
 
 **E2E-51 · Real OpenVPN client handshake** — `PASS`
 - Pre: disposable user with a real cert + AUTO_LOGIN profile, client inside the
-  `opnl-openvpn` container (or separate client host/VM — see finding 2.14).
+  `passage-openvpn` container (or separate client host/VM — see finding 2.14).
 - Steps: connect → wait for "Initialization Sequence Completed" → check daemon status.
 - Expected: TLS handshake + auth against live server; `activeConnections` increments;
   connection log row created; client gets `10.8.0.2` (pool); `AES-256-GCM` data channel.
@@ -371,7 +371,7 @@ Scenario fields: **ID · Purpose · Preconditions · Steps · Expected**.
 **E2E-52 · Static IP via CCD + iptables enforcement** — `PASS`
 - Steps: set static IP `10.8.0.199` → connect → while connected dump `iptables -L -n`.
 - Expected: client interface configured with `10.8.0.199/24` (PUSH `ifconfig`);
-  per-user chain `OPNL_<hash>` exists with the static-IP rule; `OPNL_DOMAINS` chain
+  per-user chain `PASSAGE_<hash>` exists with the static-IP rule; `PASSAGE_DOMAINS` chain
   present; base default-deny in force.
 
 **E2E-53 · Admin disconnect (management interface)** — `PASS`
@@ -415,7 +415,7 @@ resolved or have an accepted-finding record. Expected runbook:
 - Backend: builders for `User`, `Group`, `AccessRule`, `Certificate`, `ProfileToken`,
   `DnsRecord`, `Daemon`; shared `ServerConfig.defaults()`.
 - Frontend: MSW or mocked `api()` for `/api/**` in Vitest; React Query wrappers.
-- Live staging: `.env` from `.env.example`; dedicated `OPNL_DATA_DIR` volume. Reusable
+- Live staging: `.env` from `.env.example`; dedicated `PASSAGE_DATA_DIR` volume. Reusable
   identities (reset via DB bcrypt hash, argon-less): `admin` / `qa_lead`(GROUP_ADMIN,
   Marketing) / `devops_lead`(GROUP_ADMIN, DevOps) / demo users. Disposable users
   (`e2e_crud`, `e2e_live`, …) are created and deleted per scenario; leftover rows are

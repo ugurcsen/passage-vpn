@@ -3,7 +3,7 @@ import { apiPublic, endpoints, type Brand } from "@/lib/api";
 
 /** Fallback brand used before the public endpoint responds (and in tests). */
 export const defaultBrand: Brand = {
-  name: "OpenVPN Panel",
+  name: "PassageVPN",
   primaryColor: "#4f8cff",
   footer: "",
   logoUrl: null,

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useLiveStatus } from "@/hooks/useLiveStatus";
 import type { MonitorSnapshot } from "@/lib/api";
 
-const ACCESS_KEY = "opnl.access";
+const ACCESS_KEY = "passage.access";
 
 interface FakeWs {
   url: string;

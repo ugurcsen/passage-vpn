@@ -1,4 +1,4 @@
-# Test Findings — OpenVPN Management Panel
+# Test Findings — PassageVPN
 
 Living log of issues found during live E2E testing of the management panel, together with
 their root cause and remediation. Companion to `docs/test-plan.md` and `TODO.md`. Update
@@ -42,7 +42,7 @@ case with wrong status code / masking, `[LOW]` polish / hardening.
 ### 2.1 CRIT — `client-cert-not-required` is a removed OpenVPN 2.6 option
 
 **Location**
-- `backend/src/main/java/com/opnl/vpn/network/ServerConfigGenerator.java:53`
+- `backend/src/main/java/com/passage/vpn/network/ServerConfigGenerator.java:53`
   ```java
   .replace("__CLIENT_CERT_NOT_REQUIRED__",
       config.clientCertNotRequired() ? "client-cert-not-required" : "")
@@ -137,7 +137,7 @@ picked up until the container is recreated.
 
 **Location** `openvpn/Dockerfile:38`
 ```bash
-HEALTHCHECK CMD bash -c 'if [ -n "$(ls "$OPNL_CONFIG_DIR"/daemon-*.conf 2>/dev/null)" ]; \
+HEALTHCHECK CMD bash -c 'if [ -n "$(ls "$PASSAGE_CONFIG_DIR"/daemon-*.conf 2>/dev/null)" ]; \
   then pgrep -f "openvpn --config.*daemon" >/dev/null || exit 1; fi; exit 0'
 ```
 
@@ -155,9 +155,9 @@ while some daemons (and therefore whole access modes, e.g. GENERIC) are down.
 1. Compare every `daemon-*.conf` with a live pidfile:
    ```bash
    ok=1
-   for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do
+   for conf in "$PASSAGE_CONFIG_DIR"/daemon-*.conf; do
      name="$(basename "$conf" .conf)"
-     pidfile="$OPNL_LOG_DIR/$name.pid"
+     pidfile="$PASSAGE_LOG_DIR/$name.pid"
      if [ ! -f "$pidfile" ] || ! kill -0 "$(cat "$pidfile")" 2>/dev/null; then ok=0; fi
    done
    [ "$ok" -eq 1 ]
@@ -170,13 +170,13 @@ while some daemons (and therefore whole access modes, e.g. GENERIC) are down.
 ### 2.4 MED — Profile-token create with `null` userId returns 500
 
 **Location**
-- `backend/src/main/java/com/opnl/vpn/api/admin/ProfileAdminController.java:77`
+- `backend/src/main/java/com/passage/vpn/api/admin/ProfileAdminController.java:77`
   ```java
   public record CreateTokenRequest(
       String userId, @NotNull ProfileType profileType, Instant expiresAt, Integer usesLeft) {}
   ```
   → `userId` has no `@NotBlank`.
-- `backend/src/main/java/com/opnl/vpn/profile/ProfileService.java` `createToken(...)`
+- `backend/src/main/java/com/passage/vpn/profile/ProfileService.java` `createToken(...)`
   → `requireUser(userId)` → `userRepository.findById(null)`.
 
 **Evidence** `POST /api/admin/profile-tokens` with `{"profileType":"USER_LOCKED"}`
@@ -202,7 +202,7 @@ falls into the catch-all `Exception` handler → 500.
 
 ### 2.5 MED — Unknown `/api/**` path returns 500 instead of 404
 
-**Location** `backend/src/main/java/com/opnl/vpn/common/GlobalExceptionHandler.java`
+**Location** `backend/src/main/java/com/passage/vpn/common/GlobalExceptionHandler.java`
 (no handler for `NoResourceFoundException`; falls through to `Exception` → 500).
 
 **Evidence** `GET /api/admin/status` → `500 {"code":"internal_error"}` with
@@ -232,7 +232,7 @@ errors.
 
 ### 2.6 LOW — MFA pre-auth token is replayable
 
-**Location** `backend/src/main/java/com/opnl/vpn/auth/AuthService.java` `mfa(...)`
+**Location** `backend/src/main/java/com/passage/vpn/auth/AuthService.java` `mfa(...)`
 - Parses `preAuthToken` (a JWT with an `mfa` claim type), checks `isMfaChallenge(claims)`
   and expiry only; there is no one-time-use revocation.
 
@@ -257,9 +257,9 @@ its time window — but challenge tokens are not single-use as the API contract 
 ### 2.7 LOW — Access rule `dstCidr` accepts malformed CIDR
 
 **Location**
-- `backend/src/main/java/com/opnl/vpn/access/AccessRuleDto.java` — `dstCidr` has no
+- `backend/src/main/java/com/passage/vpn/access/AccessRuleDto.java` — `dstCidr` has no
   format validation (only `@NotNull` on `targetType`/`action`).
-- `backend/src/main/java/com/opnl/vpn/access/AccessRuleService.java` `apply(...)` — sets
+- `backend/src/main/java/com/passage/vpn/access/AccessRuleService.java` `apply(...)` — sets
   `dstCidr` blindly.
 
 **Evidence** `POST /api/admin/rules` with `"dstCidr":"not-a-cidr"` returned `200` and
@@ -279,7 +279,7 @@ matches or fail at connect time, affecting real traffic.
 ### 2.8 MED — Session rows stay "Active" after daemon restart (stale connection logs)
 
 **Location**
-- `backend/src/main/java/com/opnl/vpn/monitor/ConnectionLogService.java` `sessionEnded(...)`
+- `backend/src/main/java/com/passage/vpn/monitor/ConnectionLogService.java` `sessionEnded(...)`
   (and the `client-disconnect.sh` → `/internal/disconnect` callback path).
 - `frontend/src/pages/StatusPage.tsx` "Recent sessions" table rendering.
 
@@ -453,8 +453,8 @@ equals the server host.
 ### 2.15 HIGH — Cert restore flips the index to VALID without restoring on-disk artifacts
 
 **Location**
-- `backend/src/main/java/com/opnl/vpn/pki/CertService.java` (`unrevokeCert` / `restore`)
-- `backend/src/main/java/com/opnl/vpn/pki/EasyRsaService.java`
+- `backend/src/main/java/com/passage/vpn/pki/CertService.java` (`unrevokeCert` / `restore`)
+- `backend/src/main/java/com/passage/vpn/pki/EasyRsaService.java`
 
 **Repro** (live staging, OpenVPN 2.6.20 stack):
 ```
@@ -503,7 +503,7 @@ Regressions: `unrevokeCertRestoresIssuedCertAndPrivateKey`,
 
 ### 2.16 HIGH — Web-login lockout never triggers (`@Transactional` rollback)
 
-**Location** `backend/src/main/java/com/opnl/vpn/auth/AuthService.java` — `login(...)`
+**Location** `backend/src/main/java/com/passage/vpn/auth/AuthService.java` — `login(...)`
 (e.g. `@Transactional` method that throws `ApiException` after `recordFailure(...)` and
 the `LOGIN_FAILED` audit write).
 
@@ -577,7 +577,7 @@ Recorded during testing so they are not re-reported as bugs:
 Verified on a clean install (images rebuilt, volumes wiped, `.env` preserved):
 
 - **Wizard (setup state COMPLETE)**: admin step (credentials from `.env`), VPN server
-  step (defaults; daemon created, `adminHost` = `OPNL_OPENVPN_ADMIN_HOST`), PKI step →
+  step (defaults; daemon created, `adminHost` = `PASSAGE_OPENVPN_ADMIN_HOST`), PKI step →
   "Certificate authority initialized." CA, `server.crt`/`server.key`, `ta.key`, CRL and
   `index.txt` all present in the PKI dir.
 - **Login** with the wizard admin → Dashboard renders all nav pages + the demo-data
@@ -606,7 +606,7 @@ Verified on a clean install (images rebuilt, volumes wiped, `.env` preserved):
   ACCEPTed. After an abrupt client kill, the server's inactivity timeout
   (`--ping-restart`; note the server doubles the client's 120 to **240s**) fires
   `client-disconnect`, the backend session clears (`/api/admin/connections` → 0 active),
-  and the per-client iptables chain is removed (only the base `OPNL_DOMAINS` chain
+  and the per-client iptables chain is removed (only the base `PASSAGE_DOMAINS` chain
   remains).
 - **Connect-test caveat**: use a separate host/VM or a disposable `docker run
   --cap-add=NET_ADMIN --device /dev/net/tun` client container, never the server host
@@ -651,8 +651,8 @@ unit/integration covered). Highlights:
   AUTO_LOGIN profile → "Initialization Sequence Completed", TLS handshake,
   `AES-256-GCM` data channel, virtual IP `10.8.0.2` from the pool; **static IP
   `10.8.0.199`** applied to the client interface via PUSH `ifconfig`; while connected,
-  `iptables -L -n` shows the per-user chain `OPNL_<hash>` (rule keyed on the static IP)
-  and the `OPNL_DOMAINS` chain; connection log rows record bytes + `disconnected_at`;
+  `iptables -L -n` shows the per-user chain `PASSAGE_<hash>` (rule keyed on the static IP)
+  and the `PASSAGE_DOMAINS` chain; connection log rows record bytes + `disconnected_at`;
   `POST /api/admin/connections/e2e_live/disconnect` (management interface) terminates the
   session (200, row closed).
 - **UI (browser)**: login page renders (fresh reload) with branded name; admin login →
@@ -752,11 +752,11 @@ revoked and removed."
 Findings were reproduced on the staging host:
 
 ```bash
-docker logs --tail 200 opnl-backend                      # backend errors / stack traces
-docker logs --tail 50  opnl-openvpn                      # openvpn fatal errors
-ls -la /var/lib/docker/volumes/opnl_opnl-config/_data/   # daemon-*.conf vs running pids
-docker exec opnl-openvpn bash -c 'pgrep -af openvpn'      # which daemons are actually up
-ls /var/lib/opnl/pki ...                                 # cert issuance / CRL state
+docker logs --tail 200 passage-backend                      # backend errors / stack traces
+docker logs --tail 50  passage-openvpn                      # openvpn fatal errors
+ls -la /var/lib/docker/volumes/passage_passage-config/_data/   # daemon-*.conf vs running pids
+docker exec passage-openvpn bash -c 'pgrep -af openvpn'      # which daemons are actually up
+ls /var/lib/passage/pki ...                                 # cert issuance / CRL state
 ```
 
 Suggested regression run after fixes:

@@ -1,10 +1,10 @@
 spring:
   application:
-    name: opnl-vpn
+    name: passage-vpn
   profiles:
-    active: ${OPNL_PROFILE:sqlite}
+    active: ${PASSAGE_PROFILE:sqlite}
   datasource:
-    url: ${OPNL_DB_URL:jdbc:sqlite:./data/opnl.db?journal_mode=WAL&busy_timeout=5000&foreign_keys=on}
+    url: ${PASSAGE_DB_URL:jdbc:sqlite:./data/passage.db?journal_mode=WAL&busy_timeout=5000&foreign_keys=on}
     driver-class-name: org.sqlite.JDBC
     hikari:
       maximum-pool-size: 5
@@ -28,17 +28,17 @@ spring:
     time-zone: UTC
 
 server:
-  port: ${OPNL_SERVER_PORT:8080}
+  port: ${PASSAGE_SERVER_PORT:8080}
   shutdown: graceful
   forward-headers-strategy: native
   tomcat:
     threads:
       # Bounded request threads: the panel is a small fleet admin tool, not a public API.
-      max: ${OPNL_TOMCAT_THREADS:50}
+      max: ${PASSAGE_TOMCAT_THREADS:50}
     remoteip:
       remote-ip-header: X-Forwarded-For
       protocol-header: X-Forwarded-Proto
-      trusted-proxies: ${OPNL_TRUSTED_PROXIES:172.16.0.0/12}
+      trusted-proxies: ${PASSAGE_TRUSTED_PROXIES:172.16.0.0/12}
   error:
     include-message: never
 
@@ -56,53 +56,53 @@ springdoc:
     path: /swagger-ui.html
     try-it-out-enabled: true
     persist-authorization: true
-    enabled: ${OPNL_API_DOCS_ENABLED:true}
+    enabled: ${PASSAGE_API_DOCS_ENABLED:true}
   api-docs:
     path: /v3/api-docs
-    enabled: ${OPNL_API_DOCS_ENABLED:true}
+    enabled: ${PASSAGE_API_DOCS_ENABLED:true}
 
-opnl:
-  data-dir: ${OPNL_DATA_DIR:./data}
-  brand-name: ${OPNL_BRAND_NAME:OpenVPN Panel}
-  demo-mode: ${OPNL_DEMO_MODE:false}
-  internal-token: ${OPNL_INTERNAL_TOKEN:change-me-internal-token}
+passage:
+  data-dir: ${PASSAGE_DATA_DIR:./data}
+  brand-name: ${PASSAGE_BRAND_NAME:OpenVPN Panel}
+  demo-mode: ${PASSAGE_DEMO_MODE:false}
+  internal-token: ${PASSAGE_INTERNAL_TOKEN:change-me-internal-token}
   jwt:
-    secret: ${OPNL_JWT_SECRET:}
+    secret: ${PASSAGE_JWT_SECRET:}
     access-ttl-seconds: 900
     refresh-ttl-days: 14
   auth:
-    provider: ${OPNL_AUTH_PROVIDER:local}
+    provider: ${PASSAGE_AUTH_PROVIDER:local}
     lockout-max-attempts: 5
     lockout-window-seconds: 300
     lockout-duration-seconds: 300
-    rate-limit-max-requests: ${OPNL_AUTH_RATE_LIMIT_MAX:20}
-    rate-limit-window-seconds: ${OPNL_AUTH_RATE_LIMIT_WINDOW:60}
+    rate-limit-max-requests: ${PASSAGE_AUTH_RATE_LIMIT_MAX:20}
+    rate-limit-window-seconds: ${PASSAGE_AUTH_RATE_LIMIT_WINDOW:60}
   openvpn:
-    mgmt-host: ${OPNL_OPENVPN_MGMT_HOST:openvpn}
-    mgmt-port: ${OPNL_OPENVPN_MGMT_PORT:7505}
-    mgmt-password: ${OPNL_OPENVPN_MGMT_PASSWORD:}
-    admin-host: ${OPNL_OPENVPN_ADMIN_HOST:localhost}
-    pki-dir: ${OPNL_PKI_DIR:./data/pki}
-    ccd-dir: ${OPNL_CCD_DIR:./data/ccd}
-    config-dir: ${OPNL_CONFIG_DIR:./data/config}
-    scripts-dir: ${OPNL_SCRIPTS_DIR:./data/config/scripts}
-    scripts-src-dir: ${OPNL_SCRIPTS_SRC_DIR:./openvpn/scripts}
-    easyrsa-bin: ${OPNL_EASY_RSA_BIN:easyrsa}
-    cert-expire-days: ${OPNL_PKI_CERT_EXPIRE:730}
-    log-dir: ${OPNL_LOG_DIR:./data/config/logs}
-    internal-base-url: ${OPNL_INTERNAL_BASE_URL:http://backend:8080}
+    mgmt-host: ${PASSAGE_OPENVPN_MGMT_HOST:openvpn}
+    mgmt-port: ${PASSAGE_OPENVPN_MGMT_PORT:7505}
+    mgmt-password: ${PASSAGE_OPENVPN_MGMT_PASSWORD:}
+    admin-host: ${PASSAGE_OPENVPN_ADMIN_HOST:localhost}
+    pki-dir: ${PASSAGE_PKI_DIR:./data/pki}
+    ccd-dir: ${PASSAGE_CCD_DIR:./data/ccd}
+    config-dir: ${PASSAGE_CONFIG_DIR:./data/config}
+    scripts-dir: ${PASSAGE_SCRIPTS_DIR:./data/config/scripts}
+    scripts-src-dir: ${PASSAGE_SCRIPTS_SRC_DIR:./openvpn/scripts}
+    easyrsa-bin: ${PASSAGE_EASY_RSA_BIN:easyrsa}
+    cert-expire-days: ${PASSAGE_PKI_CERT_EXPIRE:730}
+    log-dir: ${PASSAGE_LOG_DIR:./data/config/logs}
+    internal-base-url: ${PASSAGE_INTERNAL_BASE_URL:http://backend:8080}
     # Host-published daemon port ranges (must match docker-compose.yml). When
     # *_END equals the base the range is a single port; additional daemons are
     # auto-assigned the next free port within the range of their protocol.
-    udp-port-base: ${OPNL_OPENVPN_PORT:1194}
-    udp-port-end: ${OPNL_OPENVPN_PORT_END:1194}
-    tcp-port-base: ${OPNL_OPENVPN_TCP_PORT:1195}
-    tcp-port-end: ${OPNL_OPENVPN_TCP_PORT_END:1195}
+    udp-port-base: ${PASSAGE_OPENVPN_PORT:1194}
+    udp-port-end: ${PASSAGE_OPENVPN_PORT_END:1194}
+    tcp-port-base: ${PASSAGE_OPENVPN_TCP_PORT:1195}
+    tcp-port-end: ${PASSAGE_OPENVPN_TCP_PORT_END:1195}
   internal:
-    mtls-port: ${OPNL_INTERNAL_MTLS_PORT:9443}
-    tls-dir: ${OPNL_INTERNAL_TLS_DIR:./data/internal-tls}
+    mtls-port: ${PASSAGE_INTERNAL_MTLS_PORT:9443}
+    tls-dir: ${PASSAGE_INTERNAL_TLS_DIR:./data/internal-tls}
 
 logging:
   level:
-    root: ${OPNL_LOG_LEVEL:INFO}
-    com.opnl.vpn: DEBUG
+    root: ${PASSAGE_LOG_LEVEL:INFO}
+    com.passagevpn: DEBUG

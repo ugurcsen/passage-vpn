@@ -10,7 +10,7 @@ import { ApiTokensPage } from "@/pages/ApiTokensPage";
 const token = {
   id: "t1",
   label: "ci-deploy",
-  prefix: "opnl_3f2a9b…",
+  prefix: "passage_3f2a9b…",
   role: "ADMIN",
   expiresAt: null,
   createdAt: "2026-08-13T10:00:00Z",
@@ -51,14 +51,14 @@ describe("ApiTokensPage", () => {
   it("lists existing tokens", async () => {
     renderPage();
     expect(await screen.findByText("ci-deploy")).toBeInTheDocument();
-    expect(screen.getByText("opnl_3f2a9b…")).toBeInTheDocument();
+    expect(screen.getByText("passage_3f2a9b…")).toBeInTheDocument();
     expect(screen.getByText("ADMIN")).toBeInTheDocument();
   });
 
   it("creates a token and shows the one-time plaintext", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).includes("/api-tokens") && init?.method === "POST") {
-        return Promise.resolve(json({ token, rawToken: "opnl_secretonce" }));
+        return Promise.resolve(json({ token, rawToken: "passage_secretonce" }));
       }
       return Promise.resolve(json([token]));
     });
@@ -71,7 +71,7 @@ describe("ApiTokensPage", () => {
     await userEvent.type(within(dialog).getByLabelText(/^label\s*\*?$/i), "nightly-report");
     await userEvent.click(within(dialog).getByRole("button", { name: "Create" }));
 
-    expect(await screen.findByText(/opnl_secretonce/)).toBeInTheDocument();
+    expect(await screen.findByText(/passage_secretonce/)).toBeInTheDocument();
     const createCall = fetchMock.mock.calls.find(
       (c) => String(c[0]).includes("/api-tokens") && c[1]?.method === "POST",
     );

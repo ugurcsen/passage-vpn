@@ -8,8 +8,10 @@ plugins {
     id("jacoco")
 }
 
-group = "com.opnl"
+group = "com.passagevpn"
 version = "0.1.0-SNAPSHOT"
+
+description = "OpenVPN management panel"
 
 java {
     toolchain {
@@ -84,7 +86,10 @@ tasks.withType<Test> {
         events("passed", "skipped", "failed")
     }
     // Hermetic tests: use a temp dir for SQLite files
-    environment("OPNL_DB_URL", "jdbc:sqlite:${layout.buildDirectory.get().asFile.resolve("testdb.sqlite")}")
+    environment("PASSAGE_DB_URL", "jdbc:sqlite:${layout.buildDirectory.get().asFile.resolve("testdb.sqlite")}")
+    environment("PASSAGE_JWT_SECRET", "test-secret-that-is-at-least-32-bytes-long-for-jwt")
+    environment("PASSAGE_INTERNAL_TOKEN", "test-internal-token-for-unit-tests-only")
+    environment("PASSAGE_OPENVPN_MGMT_PASSWORD", "test-mgmt-password")
     // A fresh DB each run avoids Flyway checksum drift across builds.
     doFirst {
         fileTree(layout.buildDirectory.get().asFile).matching { include("testdb.sqlite*") }.forEach { it.delete() }

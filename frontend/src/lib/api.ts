@@ -1,7 +1,7 @@
 const API_BASE = "/api";
 
-const TOKEN_KEY = "opnl.access";
-const REFRESH_KEY = "opnl.refresh";
+const TOKEN_KEY = "passage.access";
+const REFRESH_KEY = "passage.refresh";
 
 export const tokenStore = {
   get access() {

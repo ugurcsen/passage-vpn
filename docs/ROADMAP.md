@@ -11,7 +11,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 1. Pick an item from the milestone below; flip its checkbox to `[~]` while working.
 2. Implement code + unit tests (backend and frontend where applicable).
-3. Run verification **via SSH on the production checkout** (`root@65.21.108.250:/root/opnl_vpn`):
+3. Run verification **via SSH on the production checkout** (`root@65.21.108.250:/root/passage_vpn`):
    - `./gradlew test` and `./gradlew spotlessCheck`
    - `npm run test` (and `npm run lint`)
 4. Sync changed files to the server checkout (`scp`), commit there with the repo
@@ -99,7 +99,7 @@ Work started under M3 has been split: completed items shipped in
       `AuthServiceTest` hook success/failure/timeout cases.
 - [x] **4.2 Domain-based control via dnsmasq** — `AccessRule` domain target
       (`dstDomain`, Flyway V11) resolved to IPs by `RuleEngine`; per-domain
-      entries rendered into `/etc/dnsmasq.d/opnl-domains.conf` and the matching
+      entries rendered into `/etc/dnsmasq.d/passage-domains.conf` and the matching
       iptables rules by `apply-rules.sh`; domain picker on the Access Rules page.
       Tests: `RuleEngineTest` domain resolution, `ServerConfigGeneratorTest`
       dnsmasq config rendering.
@@ -123,7 +123,7 @@ Work started under M3 has been split: completed items shipped in
       scope-DENY lines from `RuleEngine.scopeDenyIpsFor`; chain terminal stays
       ACCEPT when only scope denials exist, DROP otherwise). Overrides also win
       over public DNS when an access-rule domain matches. Written to
-      `/etc/dnsmasq.d/opnl-dns-overrides.conf` by `DnsmasqConfigService`.
+      `/etc/dnsmasq.d/passage-dns-overrides.conf` by `DnsmasqConfigService`.
       Tests: `DnsOverrideServiceTest`, `DnsRecordAdminControllerTest`,
       `RuleEngineTest`/`ServerConfigGeneratorTest`/`DnsmasqConfigServiceTest`
       extensions, `DnsOverridesPage` (+ frontend tests). Live E2E on production
@@ -144,7 +144,7 @@ Work started under M3 has been split: completed items shipped in
       Status page.
 - [x] **5.3 Backend `agent` Spring profile** — lightweight agent managing its own
       openvpn container, registering/heartbeating to the central backend via
-      `/internal/node/*` (network-restricted, `OPNL_INTERNAL_TOKEN`).
+      `/internal/node/*` (network-restricted, `PASSAGE_INTERNAL_TOKEN`).
       `application-agent.yml`.
 - [x] **5.4 PostgreSQL profile validation** — end-to-end validation of
       `docker-compose.postgres.yml` + `application-postgres.yml`; all Flyway
@@ -155,7 +155,7 @@ Work started under M3 has been split: completed items shipped in
 
 ## M6 — Release Hardening — TARGET `v0.1.0-beta.1`
 
-- [x] **6.1 Demo/seed mode** — `make seed-demo` / `OPNL_DEMO_MODE`: sample users,
+- [x] **6.1 Demo/seed mode** — `make seed-demo` / `PASSAGE_DEMO_MODE`: sample users,
       groups, access rules, certs and connection history.
 - [x] **6.2 CI docker build job** — docker build job in `.github/workflows/ci.yml`
       (`docker compose build` for backend/frontend/openvpn images).
@@ -172,15 +172,15 @@ Work started under M3 has been split: completed items shipped in
 - [x] **7.1 Mandatory management-interface password** — per-daemon password
       files (`daemon-<idx>.mgmt-pass`, 0600) referenced from `daemon.conf`;
       `MgmtHandshake` authenticates every management connection; `MgmtClientManager`
-      fails closed when a local/remote password is missing; `OPNL_OPENVPN_MGMT_PASSWORD`
+      fails closed when a local/remote password is missing; `PASSAGE_OPENVPN_MGMT_PASSWORD`
       enforced at startup (`SecurityBootstrapCheck`) and config-write time.
 - [x] **7.2 mTLS transport for node agents** — internal CA + keystore generated
       on boot (`InternalTlsBootstrap`), mTLS-only Tomcat connector
-      (`opnl.internal.mtls-port`, 9443); per-node client certs issued via
+      (`passage.internal.mtls-port`, 9443); per-node client certs issued via
       `POST /api/admin/nodes/{id}/agent-cert` (CN `agent-<nodeName>`); the agent
-      authenticates with `opnl.agent.tls-ca|cert|key`; requests outside the mTLS
+      authenticates with `passage.agent.tls-ca|cert|key`; requests outside the mTLS
       port or with a mismatched cert are rejected.
-- [x] **7.3 Mandatory internal token + fail-fast startup** — `OPNL_INTERNAL_TOKEN`
+- [x] **7.3 Mandatory internal token + fail-fast startup** — `PASSAGE_INTERNAL_TOKEN`
       required, blank/`change-me-internal-token` rejected by `InternalTokenFilter`
       and at startup; `NodeSecurityCheck` warns on nodes without a management
       password.

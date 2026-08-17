@@ -10,8 +10,8 @@ Environment provided by the backend:
     common_name   certificate common name (equals the username here)
     remote_ip     client source address
 
-This example appends a JSON line per login to /var/log/opnl/post-auth.log
-(OPNL_LOG_DIR, mounted into the backend container). Replace the body with
+This example appends a JSON line per login to /var/log/passage/post-auth.log
+(PASSAGE_LOG_DIR, mounted into the backend container). Replace the body with
 your own logic (SIEM push, device registration, ...).
 """
 
@@ -19,7 +19,7 @@ import json
 import logging
 import os
 
-LOG_DIR = os.environ.get("OPNL_LOG_DIR", "/var/log/opnl")
+LOG_DIR = os.environ.get("PASSAGE_LOG_DIR", "/var/log/passage")
 LOG_FILE = os.path.join(LOG_DIR, "post-auth.log")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

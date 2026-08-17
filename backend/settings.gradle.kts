@@ -1,1 +1,1 @@
-rootProject.name = "opnl-vpn-backend"
+rootProject.name = "passage-vpn-backend"
