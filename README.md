@@ -98,6 +98,10 @@ make frontend-dev    # Vite dev server on :5173 (proxies /api + /ws)
 make test            # backend + frontend tests
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding conventions, and the pull request process.
+
 ## GitHub resources
 
 - **Repository** — https://github.com/ugurcsen/passage-vpn
