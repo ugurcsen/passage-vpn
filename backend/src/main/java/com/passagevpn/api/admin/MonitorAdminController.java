@@ -1,0 +1,27 @@
+package com.passagevpn.api.admin;
+
+import com.passagevpn.monitor.MonitorService;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/** Admin monitoring: full live snapshot (REST fallback for the WebSocket push). */
+@RestController
+@RequestMapping("/api/admin/monitor")
+@PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Admin - Monitor", description = "Live monitoring snapshot (admin-only)")
+public class MonitorAdminController {
+
+  private final MonitorService monitorService;
+
+  public MonitorAdminController(MonitorService monitorService) {
+    this.monitorService = monitorService;
+  }
+
+  @GetMapping
+  public MonitorSnapshotDto snapshot() {
+    return monitorService.latestSnapshot();
+  }
+}

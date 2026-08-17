@@ -36,7 +36,7 @@ const ConnectionLogsPage = lazy(() => import("@/pages/ConnectionLogsPage").then(
 const PortalPage = lazy(() => import("@/pages/PortalPage").then((m) => ({ default: m.PortalPage })));
 const AccountPage = lazy(() => import("@/pages/AccountPage").then((m) => ({ default: m.AccountPage })));
 
-const THEME_KEY = "opnl.theme";
+const THEME_KEY = "passage.theme";
 
 /** Dark mode is the default; the choice persists across reloads. */
 function loadDarkMode(): boolean {

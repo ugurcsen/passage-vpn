@@ -1,4 +1,4 @@
-# Architecture — OpenVPN Management Panel
+# Architecture — PassageVPN
 
 This document describes how the management panel is put together: the runtime
 topology, the responsibilities of each component, how the backend talks to
@@ -14,8 +14,8 @@ The panel is a set of cooperating containers deployed with Docker Compose:
 | `backend` | Spring Boot 3.5 application: web API, PKI, config generation, monitoring, access control, node registry. Java 25, Gradle (Kotlin DSL), JPA + Hibernate, SQLite (WAL) with a portable PostgreSQL profile. |
 | `frontend` | React 18 + TypeScript SPA served by nginx; static bundle that calls `/api/**`, `/api/portal/**` and consumes `/ws` WebSocket events. Vite build. |
 | `openvpn` | Alpine container running OpenVPN 2.7 (one daemon per generated config), Easy-RSA 3.1 (hosted in the backend via subprocess), dnsmasq (VPN DNS + domain pinning) and the iptables/ip6tables firewall that enforces access rules. Requires `NET_ADMIN`. |
-| `db` | Not a separate container for SQLite — the database is a file in the shared `opnl-data` volume. A PostgreSQL profile (`OPNL_PROFILE=postgres`) swaps in a real database service. |
-| `opnl-agent` | Optional (compose `--profile node`): the backend's `agent` Spring profile running on a remote gateway node; registers and heartbeats to the central backend and pulls + provisions its config bundle (daemon configs, PKI incl. the CRL, CCD, scripts, dnsmasq) so the node's daemons appear in the panel and run like the local ones. |
+| `db` | Not a separate container for SQLite — the database is a file in the shared `passage-data` volume. A PostgreSQL profile (`PASSAGE_PROFILE=postgres`) swaps in a real database service. |
+| `passage-agent` | Optional (compose `--profile node`): the backend's `agent` Spring profile running on a remote gateway node; registers and heartbeats to the central backend and pulls + provisions its config bundle (daemon configs, PKI incl. the CRL, CCD, scripts, dnsmasq) so the node's daemons appear in the panel and run like the local ones. |
 
 ```
                     +--------------------------------------------+
@@ -39,8 +39,8 @@ The panel is a set of cooperating containers deployed with Docker Compose:
                                          |   config volume
                                          |   (write, read-only in openvpn)
                                          v
-                              opnl-data / opnl-pki / opnl-ccd /
-                              opnl-config / opnl-logs volumes
+                              passage-data / passage-pki / passage-ccd /
+                              passage-config / passage-logs volumes
 ```
 
 ## 2. Runtime topology and data flow
@@ -49,12 +49,12 @@ The panel is a set of cooperating containers deployed with Docker Compose:
 
 All state that must survive restarts lives in Docker volumes:
 
-- `opnl-data` — SQLite database (`opnl.db`), backups.
-- `opnl-pki` — Easy-RSA PKI (`pki/run`), CA, issued certificates, CRL.
-- `opnl-ccd` — per-user client-config-dir files (static IPs, pushed options).
-- `opnl-config` — generated `daemon-N.conf` files plus `dnsmasq.d/*.conf`;
+- `passage-data` — SQLite database (`passage.db`), backups.
+- `passage-pki` — Easy-RSA PKI (`pki/run`), CA, issued certificates, CRL.
+- `passage-ccd` — per-user client-config-dir files (static IPs, pushed options).
+- `passage-config` — generated `daemon-N.conf` files plus `dnsmasq.d/*.conf`;
   written by the backend, mounted **read-only** into the openvpn container.
-- `opnl-logs` — daemon logs, OpenVPN status files, audit/access logs.
+- `passage-logs` — daemon logs, OpenVPN status files, audit/access logs.
 
 ### 2.2 Config generation and hot reload
 
@@ -67,8 +67,8 @@ the running daemons and starts fresh ones (`restart_all`). Base firewall
 (`apply-rules.sh`) and dnsmasq are re-applied on every reload. First boot with
 no configs leaves the container idle until the setup wizard provisions it.
 
-The dnsmasq pinning file `dnsmasq.d/opnl-domains.conf` is watched separately:
-changes refresh the `OPNL_DOMAINS`/`OPNL_DOMAINS6` iptables chains and restart
+The dnsmasq pinning file `dnsmasq.d/passage-domains.conf` is watched separately:
+changes refresh the `PASSAGE_DOMAINS`/`PASSAGE_DOMAINS6` iptables chains and restart
 dnsmasq (a plain SIGHUP would keep the stale cache and diverge from the
 firewall).
 
@@ -85,7 +85,7 @@ the monitor.
 The management interface is **password-protected**: every generated daemon
 config points at a per-daemon password file (`daemon-<index>.mgmt-pass`, mode
 0600) via `management 0.0.0.0 <port> <file>`, and the backend authenticates on
-connect (`MgmtHandshake`). Both the local backend (`OPNL_OPENVPN_MGMT_PASSWORD`)
+connect (`MgmtHandshake`). Both the local backend (`PASSAGE_OPENVPN_MGMT_PASSWORD`)
 and every registered node must carry a management password; connections to a
 daemon without one are refused (fail closed). Startup fails fast when the local
 password is missing or still the placeholder (`SecurityBootstrapCheck`).
@@ -117,7 +117,7 @@ the container after a successful VPN login (SIEM push, device registration…).
 
 ## 3. Backend module map
 
-Package root `com.opnl.vpn` (`backend/src/main/java/com/opnl/vpn`):
+Package root `com.passagevpn` (`backend/src/main/java/com/passage/vpn`):
 
 | Package | Responsibility |
 |---|---|
@@ -165,7 +165,7 @@ Package root `com.opnl.vpn` (`backend/src/main/java/com/opnl/vpn`):
 - Passwords hashed with BCrypt (`BCryptPasswordEncoder`); accounts support
   TOTP MFA (`AuthService`).
 - JWT: short-lived access token + rotating refresh token, stateless sessions.
-- API tokens (`opnl_...`) for automation, exchanged via `X-API-Token`.
+- API tokens (`passage_...`) for automation, exchanged via `X-API-Token`.
 - Brute-force lockout via the `RateLimitFilter` on auth endpoints and per-account
   lock/ban state.
 
@@ -178,7 +178,7 @@ authorization via `@PreAuthorize("hasRole('ADMIN')")` etc. and the Swagger
 groups it is bound to (including their subgroups), the `USER` accounts that are
 members of those groups, their per-user settings/static IPs, and the connection
 logs of those users; it cannot grant or manage other admins, create new root
-groups, or delete the root groups it manages. `GroupScope` in `com.opnl.vpn.group`
+groups, or delete the root groups it manages. `GroupScope` in `com.passagevpn.group`
 resolves the managed scope (root group + descendants). API tokens always carry
 the `ADMIN` role.
 
@@ -187,7 +187,7 @@ the `ADMIN` role.
 - **Multi-daemon**: one `daemon-N.conf` per listening daemon (distinct
   port/protocol/subnet). All are managed from a single panel and monitored
   independently. Docker Compose publishes a configurable UDP/TCP port range
-  (`OPNL_OPENVPN_PORT[_END]` / `OPNL_OPENVPN_TCP_PORT[_END]`, single port by
+  (`PASSAGE_OPENVPN_PORT[_END]` / `PASSAGE_OPENVPN_TCP_PORT[_END]`, single port by
   default); a daemon's configured port is both the container listen port and the
   externally advertised port, so the backend auto-assigns the next free port of
   the protocol range when a new daemon is created without a port and rejects
@@ -208,10 +208,10 @@ the backend agree on a single source of truth: the **published port range**.
 
 | Gateway | Protocol | Range env vars | Default |
 |---|---|---|---|
-| central | UDP | `OPNL_OPENVPN_PORT` … `OPNL_OPENVPN_PORT_END` | `1194`–`1194` |
-| central | TCP | `OPNL_OPENVPN_TCP_PORT` … `OPNL_OPENVPN_TCP_PORT_END` | `1195`–`1195` |
-| remote node | UDP | `OPNL_NODE_OPENVPN_PORT` … `OPNL_NODE_OPENVPN_PORT_END` | `1196`–`1196` |
-| remote node | TCP | `OPNL_NODE_OPENVPN_TCP_PORT` … `OPNL_NODE_OPENVPN_TCP_PORT_END` | `1197`–`1197` |
+| central | UDP | `PASSAGE_OPENVPN_PORT` … `PASSAGE_OPENVPN_PORT_END` | `1194`–`1194` |
+| central | TCP | `PASSAGE_OPENVPN_TCP_PORT` … `PASSAGE_OPENVPN_TCP_PORT_END` | `1195`–`1195` |
+| remote node | UDP | `PASSAGE_NODE_OPENVPN_PORT` … `PASSAGE_NODE_OPENVPN_PORT_END` | `1196`–`1196` |
+| remote node | TCP | `PASSAGE_NODE_OPENVPN_TCP_PORT` … `PASSAGE_NODE_OPENVPN_TCP_PORT_END` | `1197`–`1197` |
 
 Each is mapped **identity** (`"<base>-<end>:<base>-<end>/udp|tcp"`), so the
 container listens on the very port the host publishes. The node gateway uses its
@@ -246,14 +246,14 @@ above.
   chains are generated by the same rule engine and enforced in both tables.
 - **Multi-node**: registered `openvpn_nodes` map a node to a management host and
   port base. Status/kill/monitoring route per (node, daemon). The `agent`
-  Spring profile (`com.opnl.vpn.node`) turns a backend image into a node agent
+  Spring profile (`com.passagevpn.node`) turns a backend image into a node agent
   that registers and heartbeats via `/internal/node/*`.
   - **Transport security**: the agent talks to the central backend over an
-    mTLS-only connector (`opnl.internal.mtls-port`, default 9443). The central
+    mTLS-only connector (`passage.internal.mtls-port`, default 9443). The central
     backend generates its internal CA + server keystore on first boot
     (`InternalTlsBootstrap`) and issues one client certificate per node via
     `POST /api/admin/nodes/{id}/agent-cert` (CN `agent-<nodeName>`); the agent
-    presents it through `opnl.agent.tls-ca|cert|key`. Requests that do not
+    presents it through `passage.agent.tls-ca|cert|key`. Requests that do not
     arrive on the mTLS port, lack a client cert, or carry a cert for a
     different node are rejected (`mtls_required` / `client_cert_required` /
     `cert_identity_mismatch`). `X-Internal-Token` remains as defense-in-depth.
@@ -272,27 +272,27 @@ above.
     gateways), CCD overrides, connect scripts and dnsmasq domains. The bundle
     carries a content hash (`version`, SHA-256 over all entries). The remote
     agent (`AgentConfigSyncService`, `@Profile("agent")`) polls it on a fixed
-    schedule (`opnl.agent.sync-seconds`, default 60s) and skips applying when
+    schedule (`passage.agent.sync-seconds`, default 60s) and skips applying when
     the hash is unchanged; otherwise it writes everything atomically (temp file
     + atomic move) into the shared gateway volumes, pins management passwords
     and `server.key` to owner-read/write, marks scripts executable, deletes
     stale managed files it previously owned, and rejects any entry whose name
     would escape its directory. Central-rendered daemon configs embed the
     central instance's volume paths, so this contract only holds because the
-    gateway containers mount the **same layout** (`/etc/opnl/pki`,
-    `/etc/opnl/ccd`, `/etc/opnl/config`, `/var/log/opnl`) — enforced by the
+    gateway containers mount the **same layout** (`/etc/passage/pki`,
+    `/etc/passage/ccd`, `/etc/passage/config`, `/var/log/passage`) — enforced by the
     compose `node` profile, documented in `docs/configuration.md`. Script
     callbacks (`verify-user-pass`, `client-connect`, ...) on the remote gateway
-    reach the central backend via `OPNL_NODE_INTERNAL_BASE_URL`.
+    reach the central backend via `PASSAGE_NODE_INTERNAL_BASE_URL`.
 - **Multi-remote profiles**: the server setting `profile_multi_remote` (default
   on) makes `.ovpn` generation embed **every** enabled daemon serving the
   requested profile type as a `remote <host> <port> <proto>` line plus
   `remote-random`, so clients load-balance across gateways. Disabling it pins a
   profile to a single endpoint (first match by daemon index). A daemon bound to
   a disabled or unknown node is never advertised. The advertised host resolves
-  as daemon `adminHost` → node `adminHost` → `OPNL_ADMIN_HOST`.
+  as daemon `adminHost` → node `adminHost` → `PASSAGE_ADMIN_HOST`.
 - **Certificate lifetime & auto-rotation**: certificates are issued with a
-  configurable lifetime (`OPNL_PKI_CERT_EXPIRE`, default 730 days) and the CRL
+  configurable lifetime (`PASSAGE_PKI_CERT_EXPIRE`, default 730 days) and the CRL
   is generated for at least that long so a revoked cert cannot outlive the CRL
   window. A daily scheduler (`CertService.applyRotationPolicy`, 03:35 UTC) acts
   on the server settings `cert_auto_rotate` (`off` | `notify` | `auto`,
@@ -314,7 +314,7 @@ above.
   `frontend/src/lib/api.ts`; WebSocket hook for live monitoring events.
 - The setup wizard gates login until setup is complete; a first-run admin can
   be created via the wizard, `make seed-admin`, or demo data via
-  `make seed-demo` / `OPNL_DEMO_MODE=true`.
+  `make seed-demo` / `PASSAGE_DEMO_MODE=true`.
 
 ## 7. Storage
 
@@ -341,7 +341,7 @@ above.
   optional bootstrap token, admin password, DB URL. Never commit real secrets.
 - The bootstrap-only seed endpoints (`/internal/seed-admin`,
   `/internal/seed-demo`) additionally require the `X-Bootstrap-Token` header
-  when `OPNL_BOOTSTRAP_TOKEN` is configured. Unlike `OPNL_INTERNAL_TOKEN` this
+  when `PASSAGE_BOOTSTRAP_TOKEN` is configured. Unlike `PASSAGE_INTERNAL_TOKEN` this
   secret is never exposed to the OpenVPN container, so a compromised gateway
   cannot re-create an admin account.
 - Backups: `make backup` produces an archive via `BackupService`.

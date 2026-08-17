@@ -6,7 +6,7 @@ import { darkTheme } from "@/theme";
 import { StatusPage } from "@/pages/StatusPage";
 
 const status = {
-  brand: "OpenVPN Panel",
+  brand: "PassageVPN",
   version: "0.1.0-SNAPSHOT",
   uptimeSeconds: 3661,
   activeConnections: 1,
@@ -64,7 +64,7 @@ describe("StatusPage", () => {
   it("renders panel info and per-daemon health chips", async () => {
     renderPage();
 
-    expect(await screen.findByText("OpenVPN Panel")).toBeInTheDocument();
+    expect(await screen.findByText("PassageVPN")).toBeInTheDocument();
     expect(screen.getByText("v0.1.0-SNAPSHOT")).toBeInTheDocument();
     expect(screen.getByText("Up 1h 1m")).toBeInTheDocument();
     expect(screen.getByText("UDP:1194")).toBeInTheDocument();

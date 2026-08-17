@@ -19,29 +19,29 @@ RUN apk add --no-cache \
         tini \
         coreutils
 
-# Runtime layout (mirrors OPNL_DATA_DIR inside the container)
-ENV OPNL_CONFIG_DIR=/etc/opnl/config \
-    OPNL_CCD_DIR=/etc/opnl/ccd \
-    OPNL_PKI_DIR=/etc/opnl/pki \
-    OPNL_LOG_DIR=/var/log/opnl
+# Runtime layout (mirrors PASSAGE_DATA_DIR inside the container)
+ENV PASSAGE_CONFIG_DIR=/etc/passage/config \
+    PASSAGE_CCD_DIR=/etc/passage/ccd \
+    PASSAGE_PKI_DIR=/etc/passage/pki \
+    PASSAGE_LOG_DIR=/var/log/passage
 
-RUN mkdir -p "$OPNL_CONFIG_DIR" "$OPNL_CCD_DIR" "$OPNL_PKI_DIR" "$OPNL_LOG_DIR" \
+RUN mkdir -p "$PASSAGE_CONFIG_DIR" "$PASSAGE_CCD_DIR" "$PASSAGE_PKI_DIR" "$PASSAGE_LOG_DIR" \
     && mkdir -p /etc/openvpn/scripts
 
 COPY scripts/ /etc/openvpn/scripts/
 RUN chmod +x /etc/openvpn/scripts/*.sh
 
 COPY dnsmasq.conf /etc/dnsmasq.conf
-COPY entrypoint.sh /usr/local/bin/opnl-entrypoint
-RUN chmod +x /usr/local/bin/opnl-entrypoint
+COPY entrypoint.sh /usr/local/bin/passage-entrypoint
+RUN chmod +x /usr/local/bin/passage-entrypoint
 
 EXPOSE 1194/udp 1194/tcp 7505
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
-    CMD bash -c 'set -- "$OPNL_CONFIG_DIR"/daemon-*.conf; \
-      if [ "$1" = "$OPNL_CONFIG_DIR/daemon-*.conf" ]; then exit 0; fi; \
-      for conf in "$OPNL_CONFIG_DIR"/daemon-*.conf; do \
+    CMD bash -c 'set -- "$PASSAGE_CONFIG_DIR"/daemon-*.conf; \
+      if [ "$1" = "$PASSAGE_CONFIG_DIR/daemon-*.conf" ]; then exit 0; fi; \
+      for conf in "$PASSAGE_CONFIG_DIR"/daemon-*.conf; do \
         name="$(basename "$conf" .conf)"; \
-        pidfile="$OPNL_LOG_DIR/$name.pid"; \
+        pidfile="$PASSAGE_LOG_DIR/$name.pid"; \
         if [ ! -f "$pidfile" ] || ! kill -0 "$(cat "$pidfile")" 2>/dev/null \
           || ! grep -qa "$name" "/proc/$(cat "$pidfile")/cmdline" 2>/dev/null; then \
           echo "daemon $name not running"; exit 1; \
@@ -49,4 +49,4 @@ HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
       done; \
       exit 0'
 
-ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/opnl-entrypoint"]
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/passage-entrypoint"]

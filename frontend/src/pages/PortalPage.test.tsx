@@ -51,8 +51,8 @@ function renderPage() {
 describe("PortalPage", () => {
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem("opnl.access", "access");
-    localStorage.setItem("opnl.refresh", "refresh");
+    localStorage.setItem("passage.access", "access");
+    localStorage.setItem("passage.refresh", "refresh");
     vi.stubGlobal("URL", {
       ...URL,
       createObjectURL: vi.fn().mockReturnValue("blob:stub"),

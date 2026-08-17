@@ -74,7 +74,7 @@ describe("AccountPage", () => {
     mfaEnabled = false;
     mfaRequired = false;
     localStorage.clear();
-    localStorage.setItem("opnl.access", "test-token");
+    localStorage.setItem("passage.access", "test-token");
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation((url: string) => {

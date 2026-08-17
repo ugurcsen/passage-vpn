@@ -18,7 +18,7 @@ docs are in **English**.
 ## Repo Layout
 
 ```
-opnl_vpn/
+passage_vpn/
 ├── AGENTS.md              # this file
 ├── TODO.md                # phased roadmap (keep in sync)
 ├── README.md
@@ -26,7 +26,7 @@ opnl_vpn/
 ├── install.sh             # single-command installer
 ├── docker-compose.yml     # openvpn + backend + frontend + db
 ├── .env.example           # configuration template
-├── backend/               # Gradle project, package com.opnl.vpn
+├── backend/               # Gradle project, package com.passagevpn
 ├── frontend/              # Vite + React + MUI
 ├── openvpn/               # container image + server.conf template + scripts/
 ├── scripts/               # host helper scripts
@@ -79,7 +79,7 @@ npm run test
 
 ### Backend
 
-- Package root: `com.opnl.vpn`. Subpackages: `config`, `security`, `auth`, `user`,
+- Package root: `com.passagevpn`. Subpackages: `config`, `security`, `auth`, `user`,
   `pki`, `profile`, `access`, `network`, `ccd`, `monitor`, `node`, `audit`,
   `backup`, `api`, `internal`, `common`.
 - Entities in JPA; prefer JPQL/Criteria over native SQL so PostgreSQL migration stays trivial.
@@ -147,15 +147,15 @@ Full reference in `docs/configuration.md`; template in `.env.example`. Key ones:
 
 | Variable | Purpose |
 |---|---|
-| `OPNL_DB_URL` / `OPNL_DB_USER` / `OPNL_DB_PASSWORD` | JDBC connection (SQLite file URL by default) |
-| `OPNL_JWT_SECRET` | JWT signing secret (min 32 bytes) |
-| `OPNL_OPENVPN_MGMT_HOST` / `OPNL_OPENVPN_MGMT_PORT` | Management interface endpoint |
-| `OPNL_OPENVPN_MGMT_PASSWORD` | Management interface password (mandatory; backend refuses to start without it) |
-| `OPNL_INTERNAL_TOKEN` | Shared token guarding `/internal/**` (mandatory; placeholder rejected) |
-| `OPNL_OPENVPN_ADMIN_HOST` | VPN server admin hostname/IP (pushed to clients) |
-| `OPNL_DATA_DIR` | shared volume: PKI, CCD, configs, db |
-| `OPNL_BRAND_NAME` | default product name |
-| `OPNL_ADMIN_PASSWORD` | bootstrap admin password (wizard/seed) |
+| `PASSAGE_DB_URL` / `PASSAGE_DB_USER` / `PASSAGE_DB_PASSWORD` | JDBC connection (SQLite file URL by default) |
+| `PASSAGE_JWT_SECRET` | JWT signing secret (min 32 bytes) |
+| `PASSAGE_OPENVPN_MGMT_HOST` / `PASSAGE_OPENVPN_MGMT_PORT` | Management interface endpoint |
+| `PASSAGE_OPENVPN_MGMT_PASSWORD` | Management interface password (mandatory; backend refuses to start without it) |
+| `PASSAGE_INTERNAL_TOKEN` | Shared token guarding `/internal/**` (mandatory; placeholder rejected) |
+| `PASSAGE_OPENVPN_ADMIN_HOST` | VPN server admin hostname/IP (pushed to clients) |
+| `PASSAGE_DATA_DIR` | shared volume: PKI, CCD, configs, db |
+| `PASSAGE_BRAND_NAME` | default product name |
+| `PASSAGE_ADMIN_PASSWORD` | bootstrap admin password (wizard/seed) |
 
 ## Definition of Done
 

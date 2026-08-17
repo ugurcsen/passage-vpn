@@ -167,7 +167,7 @@ export function ApiTokensPage() {
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Tokens let scripts and CI jobs call the admin API without an interactive login. Send them as
         the <code>X-API-Token</code> header (or a <code>Bearer</code> value starting with{" "}
-        <code>opnl_</code>). The plaintext token is shown exactly once when created.
+        <code>passage_</code>). The plaintext token is shown exactly once when created.
       </Typography>
 
       <Paper sx={{ height: 480 }}>

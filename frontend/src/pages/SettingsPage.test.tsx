@@ -237,7 +237,7 @@ describe("SettingsPage", () => {
   });
 
   it("keeps custom settings out of the defaults section and shows them in the advanced section", async () => {
-    vi.stubGlobal("fetch", makeFetch({ brand: "OpenVPN Panel", max_conn: 5 }));
+    vi.stubGlobal("fetch", makeFetch({ brand: "PassageVPN", max_conn: 5 }));
     renderPage();
 
     expect(await screen.findByText("No server defaults configured yet.")).toBeInTheDocument();
@@ -245,7 +245,7 @@ describe("SettingsPage", () => {
 
     await userEvent.setup().click(screen.getByLabelText("Toggle advanced settings"));
     expect(screen.getByText("brand")).toBeInTheDocument();
-    expect(screen.getByText('"OpenVPN Panel"')).toBeInTheDocument();
+    expect(screen.getByText('"PassageVPN"')).toBeInTheDocument();
     expect(screen.getByText("5")).toBeInTheDocument();
   });
 

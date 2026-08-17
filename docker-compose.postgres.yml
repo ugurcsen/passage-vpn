@@ -1,21 +1,21 @@
 # PostgreSQL deployment override.
 # Usage: docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
-# Requires OPNL_PROFILE=postgres (see install.sh --profile=postgres).
+# Requires PASSAGE_PROFILE=postgres (see install.sh --profile=postgres).
 services:
   db:
     image: postgres:16-alpine
-    container_name: opnl-db
+    container_name: passage-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: opnl
-      POSTGRES_USER: ${OPNL_DB_USER:-opnl}
-      POSTGRES_PASSWORD: ${OPNL_DB_PASSWORD:-opnl}
+      POSTGRES_DB: passage
+      POSTGRES_USER: ${PASSAGE_DB_USER:-passage}
+      POSTGRES_PASSWORD: ${PASSAGE_DB_PASSWORD:-passage}
     volumes:
-      - opnl-postgres:/var/lib/postgresql/data
+      - passage-postgres:/var/lib/postgresql/data
     networks:
-      - opnl-net
+      - passage-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${OPNL_DB_USER:-opnl}"]
+      test: ["CMD-SHELL", "pg_isready -U ${PASSAGE_DB_USER:-passage}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -25,15 +25,15 @@ services:
       db:
         condition: service_healthy
     environment:
-      OPNL_PROFILE: postgres
-      OPNL_DB_URL: jdbc:postgresql://db:5432/opnl
-      OPNL_DB_USER: ${OPNL_DB_USER:-opnl}
-      OPNL_DB_PASSWORD: ${OPNL_DB_PASSWORD:-opnl}
+      PASSAGE_PROFILE: postgres
+      PASSAGE_DB_URL: jdbc:postgresql://db:5432/passage
+      PASSAGE_DB_USER: ${PASSAGE_DB_USER:-passage}
+      PASSAGE_DB_PASSWORD: ${PASSAGE_DB_PASSWORD:-passage}
     volumes:
-      - opnl-data:/var/lib/opnl
-      - opnl-pki:/etc/opnl/pki
-      - opnl-ccd:/etc/opnl/ccd
-      - opnl-config:/etc/opnl/config
+      - passage-data:/var/lib/passage
+      - passage-pki:/etc/passage/pki
+      - passage-ccd:/etc/passage/ccd
+      - passage-config:/etc/passage/config
 
 volumes:
-  opnl-postgres:
+  passage-postgres:
