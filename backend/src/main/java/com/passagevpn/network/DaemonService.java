@@ -216,7 +216,10 @@ public class DaemonService {
     return saved;
   }
 
-  /** Deletes a non-primary daemon, stops its process via the management interface and removes its config file. */
+  /**
+   * Deletes a non-primary daemon, stops its process via the management interface and removes its
+   * config file.
+   */
   @Transactional
   public void delete(String id) {
     Daemon daemon = require(id);
