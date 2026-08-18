@@ -8,6 +8,46 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.19 — 2026-08-18
+
+Nineteenth **beta** milestone (SemVer pre-release): collapsible sidebar
+navigation groups. The flat 20-item sidebar menu is now organized into
+logical collapsible groups (Overview, User Management, VPN, Portal,
+Monitoring, System), reducing visual clutter and improving navigation
+usability. Groups expand/collapse with animated transitions, and the
+active route's group opens automatically. Includes everything from
+`v0.1.0-beta.18` plus the changes below.
+
+### Sidebar navigation redesign
+- Restructured flat `NAV_ITEMS` array into `NAV_GROUPS` with nested
+  `NavItem[]` — 6 logical groups replace the previous 20-item flat list.
+- Added collapsible group headers with `ExpandMoreIcon` rotation animation
+  (`MUI Collapse` + `transition: transform 0.2s`).
+- Active route's group auto-expands on page load via
+  `defaultExpanded()` callback.
+- Group visibility respects existing role-based access control — groups
+  with no visible items for the current role are hidden entirely.
+- Group-level `roles` filter (e.g. "VPN" group ADMIN-only) applied before
+  item-level filtering.
+
+### Group structure
+| Group | Items | Roles |
+|---|---|---|
+| Overview | Dashboard | ADMIN |
+| User Management | Users, Groups | ADMIN, GROUP_ADMIN |
+| VPN | Certificates, Access Rules, DNS Overrides, Connection Profiles, VPN Daemons, VPN Nodes | ADMIN |
+| Portal | My Profiles, My Account | all |
+| Monitoring | Live Status, Connection Logs | ADMIN, GROUP_ADMIN |
+| System | Settings, Branding, Config Report, Backups, Maintenance, Audit Log, API Tokens | ADMIN |
+
+### Tests
+- Updated `AppLayout.test.tsx` with `expandGroup()` helper that clicks
+  group headers to expand collapsed sections before asserting item
+  visibility.
+- All 175 frontend tests green; lint 0 errors.
+
+---
+
 ## v0.1.0-beta.18 — 2026-08-18
 
 Eighteenth **beta** milestone (SemVer pre-release): spotless formatting fix

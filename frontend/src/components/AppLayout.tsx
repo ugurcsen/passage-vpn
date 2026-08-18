@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   AppBar,
   Box,
+  Collapse,
   CssBaseline,
   Drawer,
   IconButton,
@@ -19,6 +20,7 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
 import GroupIcon from "@mui/icons-material/Group";
@@ -53,27 +55,73 @@ interface NavItem {
   roles?: Role[];
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", path: "/", icon: <DashboardIcon />, roles: ["ADMIN"] },
-  { label: "Users", path: "/users", icon: <PeopleIcon />, roles: ["ADMIN", "GROUP_ADMIN"] },
-  { label: "Groups", path: "/groups", icon: <GroupIcon />, roles: ["ADMIN", "GROUP_ADMIN"] },
-  { label: "Certificates", path: "/certs", icon: <VpnKeyIcon />, roles: ["ADMIN"] },
-  { label: "Access Rules", path: "/rules", icon: <SecurityIcon />, roles: ["ADMIN"] },
-  { label: "DNS Overrides", path: "/dns", icon: <LanguageIcon />, roles: ["ADMIN"] },
-  { label: "Connection Profiles", path: "/profiles", icon: <DownloadIcon />, roles: ["ADMIN"] },
-  { label: "VPN Daemons", path: "/daemons", icon: <DnsIcon />, roles: ["ADMIN"] },
-  { label: "VPN Nodes", path: "/nodes", icon: <HubIcon />, roles: ["ADMIN"] },
-  { label: "My Profiles", path: "/portal", icon: <PersonIcon /> },
-  { label: "My Account", path: "/portal/account", icon: <SecurityIcon /> },
-  { label: "Live Status", path: "/status", icon: <MonitorHeartIcon />, roles: ["ADMIN"] },
-  { label: "Connection Logs", path: "/connection-logs", icon: <HistoryIcon />, roles: ["ADMIN", "GROUP_ADMIN"] },
-  { label: "Settings", path: "/settings", icon: <SettingsIcon />, roles: ["ADMIN"] },
-  { label: "Branding", path: "/branding", icon: <PaletteIcon />, roles: ["ADMIN"] },
-  { label: "Config Report", path: "/config-report", icon: <FactCheckIcon />, roles: ["ADMIN"] },
-  { label: "Backups", path: "/backups", icon: <BackupIcon />, roles: ["ADMIN"] },
-  { label: "Maintenance", path: "/maintenance", icon: <BuildIcon />, roles: ["ADMIN"] },
-  { label: "Audit Log", path: "/audit-logs", icon: <HistoryIcon />, roles: ["ADMIN"] },
-  { label: "API Tokens", path: "/api-tokens", icon: <KeyIcon />, roles: ["ADMIN"] },
+interface NavGroup {
+  label: string;
+  icon: ReactNode;
+  roles?: Role[];
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Overview",
+    icon: <DashboardIcon />,
+    roles: ["ADMIN"],
+    items: [{ label: "Dashboard", path: "/", icon: <DashboardIcon /> }],
+  },
+  {
+    label: "User Management",
+    icon: <PeopleIcon />,
+    roles: ["ADMIN", "GROUP_ADMIN"],
+    items: [
+      { label: "Users", path: "/users", icon: <PeopleIcon />, roles: ["ADMIN", "GROUP_ADMIN"] },
+      { label: "Groups", path: "/groups", icon: <GroupIcon />, roles: ["ADMIN", "GROUP_ADMIN"] },
+    ],
+  },
+  {
+    label: "VPN",
+    icon: <VpnKeyIcon />,
+    roles: ["ADMIN"],
+    items: [
+      { label: "Certificates", path: "/certs", icon: <VpnKeyIcon /> },
+      { label: "Access Rules", path: "/rules", icon: <SecurityIcon /> },
+      { label: "DNS Overrides", path: "/dns", icon: <LanguageIcon /> },
+      { label: "Connection Profiles", path: "/profiles", icon: <DownloadIcon /> },
+      { label: "VPN Daemons", path: "/daemons", icon: <DnsIcon /> },
+      { label: "VPN Nodes", path: "/nodes", icon: <HubIcon /> },
+    ],
+  },
+  {
+    label: "Portal",
+    icon: <PersonIcon />,
+    items: [
+      { label: "My Profiles", path: "/portal", icon: <PersonIcon /> },
+      { label: "My Account", path: "/portal/account", icon: <SecurityIcon /> },
+    ],
+  },
+  {
+    label: "Monitoring",
+    icon: <MonitorHeartIcon />,
+    roles: ["ADMIN", "GROUP_ADMIN"],
+    items: [
+      { label: "Live Status", path: "/status", icon: <MonitorHeartIcon />, roles: ["ADMIN"] },
+      { label: "Connection Logs", path: "/connection-logs", icon: <HistoryIcon />, roles: ["ADMIN", "GROUP_ADMIN"] },
+    ],
+  },
+  {
+    label: "System",
+    icon: <SettingsIcon />,
+    roles: ["ADMIN"],
+    items: [
+      { label: "Settings", path: "/settings", icon: <SettingsIcon /> },
+      { label: "Branding", path: "/branding", icon: <PaletteIcon /> },
+      { label: "Config Report", path: "/config-report", icon: <FactCheckIcon /> },
+      { label: "Backups", path: "/backups", icon: <BackupIcon /> },
+      { label: "Maintenance", path: "/maintenance", icon: <BuildIcon /> },
+      { label: "Audit Log", path: "/audit-logs", icon: <HistoryIcon /> },
+      { label: "API Tokens", path: "/api-tokens", icon: <KeyIcon /> },
+    ],
+  },
 ];
 
 interface AppLayoutProps {
@@ -90,6 +138,26 @@ export function AppLayout({ darkMode, onToggleDarkMode }: AppLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Determine which groups should be expanded by default (active route's group open)
+  const defaultExpanded = (): Record<string, boolean> => {
+    const map: Record<string, boolean> = {};
+    for (const group of NAV_GROUPS) {
+      if (!canAccess(group.roles, user?.role ?? "USER")) continue;
+      map[group.label] = group.items.some((item) => location.pathname === item.path);
+    }
+    return map;
+  };
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(defaultExpanded);
+
+  const toggleGroup = (label: string) => {
+    setExpanded((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
+
+  // All nav items flattened for AppBar title lookup
+  const allItems = NAV_GROUPS.flatMap((g) => g.items);
+  const activeItemLabel = allItems.find((i) => i.path === location.pathname)?.label;
+
   const drawer = (
     <Box>
       <Toolbar sx={{ px: 2 }}>
@@ -97,20 +165,43 @@ export function AppLayout({ darkMode, onToggleDarkMode }: AppLayoutProps) {
           {brand.name}
         </Typography>
       </Toolbar>
-      <List dense>
-        {NAV_ITEMS.filter((item) => canAccess(item.roles, user?.role ?? "USER")).map((item) => (
-          <ListItemButton
-            key={item.path}
-            selected={location.pathname === item.path}
-            onClick={() => {
-              navigate(item.path);
-              setMobileOpen(false);
-            }}
-          >
-            <ListItemIcon>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.label} />
-          </ListItemButton>
-        ))}
+      <List dense disablePadding>
+        {NAV_GROUPS.filter((group) => canAccess(group.roles, user?.role ?? "USER")).map((group) => {
+          const visibleItems = group.items.filter((item) => canAccess(item.roles, user?.role ?? "USER"));
+          if (visibleItems.length === 0) return null;
+          const isExpanded = expanded[group.label] ?? false;
+
+          return (
+            <Box key={group.label}>
+              <ListItemButton onClick={() => toggleGroup(group.label)} sx={{ px: 2 }}>
+                <ListItemIcon sx={{ minWidth: 40 }}>{group.icon}</ListItemIcon>
+                <ListItemText primary={group.label} />
+                <ExpandMoreIcon
+                  fontSize="small"
+                  sx={{ transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "none" }}
+                />
+              </ListItemButton>
+              <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                <List dense disablePadding>
+                  {visibleItems.map((item) => (
+                    <ListItemButton
+                      key={item.path}
+                      selected={location.pathname === item.path}
+                      onClick={() => {
+                        navigate(item.path);
+                        setMobileOpen(false);
+                      }}
+                      sx={{ pl: 6 }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+                      <ListItemText primary={item.label} />
+                    </ListItemButton>
+                  ))}
+                </List>
+              </Collapse>
+            </Box>
+          );
+        })}
       </List>
     </Box>
   );
@@ -129,7 +220,7 @@ export function AppLayout({ darkMode, onToggleDarkMode }: AppLayoutProps) {
             <MenuIcon />
           </IconButton>
           <Typography variant="body1" noWrap sx={{ flexGrow: 1 }}>
-            {NAV_ITEMS.find((i) => i.path === location.pathname)?.label ?? brand.name}
+            {activeItemLabel ?? brand.name}
           </Typography>
           <Tooltip title="Toggle theme">
             <IconButton color="inherit" onClick={onToggleDarkMode}>
