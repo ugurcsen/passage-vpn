@@ -16,17 +16,6 @@ const status = {
   ],
 };
 
-const connections = [
-  {
-    username: "alice",
-    commonName: "alice",
-    virtualIp: "10.8.0.2",
-    remoteIp: "203.0.113.5",
-    daemonName: "daemon-0",
-    connectedAt: "2026-08-11T00:00:00Z",
-  },
-];
-
 function json(body: unknown) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -50,9 +39,7 @@ describe("StatusPage", () => {
     localStorage.clear();
     vi.stubGlobal(
       "fetch",
-      vi.fn((url: string) =>
-        url.includes("/connections") ? Promise.resolve(json(connections)) : Promise.resolve(json(status)),
-      ),
+      vi.fn(() => Promise.resolve(json(status))),
     );
   });
 
@@ -77,12 +64,11 @@ describe("StatusPage", () => {
     expect(screen.getByText("Down")).toBeInTheDocument();
   });
 
-  it("lists active connections", async () => {
+  it("shows no active connections when WebSocket is not connected", async () => {
     renderPage();
 
-    expect((await screen.findAllByText("alice")).length).toBeGreaterThan(0);
-    expect(screen.getByText("203.0.113.5")).toBeInTheDocument();
-    expect(screen.getByText("10.8.0.2")).toBeInTheDocument();
+    await screen.findByText("PassageVPN");
+    expect(screen.getByText("No active connections right now.")).toBeInTheDocument();
   });
 
   it("shows the DCO data-channel state per daemon", async () => {
@@ -106,36 +92,4 @@ describe("StatusPage", () => {
     expect(screen.getByText("Userspace")).toBeInTheDocument();
   });
 
-  it("renders recent sessions and falls back when the daemon name is empty", async () => {
-    const logs = [
-      {
-        username: "carol",
-        commonName: "carol",
-        virtualIp: "10.8.0.9",
-        remoteIp: "198.51.100.7",
-        daemonName: "",
-        connectedAt: "2026-08-11T01:00:00Z",
-        disconnectedAt: "2026-08-11T02:00:00Z",
-        durationSeconds: 3600,
-        bytesIn: 0,
-        bytesOut: 0,
-      },
-    ];
-    vi.stubGlobal(
-      "fetch",
-      vi.fn((url: string) =>
-        url.includes("/connection-logs")
-          ? Promise.resolve(json(logs))
-          : url.includes("/connections")
-            ? Promise.resolve(json([]))
-            : Promise.resolve(json(status)),
-      ),
-    );
-    renderPage();
-
-    const rows = await screen.findAllByText("carol");
-    const row = rows[0].closest("tr")!;
-    // Daemon cell (index 3) falls back to "—" for an empty daemonName.
-    expect(row.querySelectorAll("td")[3].textContent).toBe("—");
-  });
 });

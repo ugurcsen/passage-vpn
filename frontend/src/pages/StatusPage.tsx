@@ -18,10 +18,8 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import {
   api,
   endpoints,
-  type ConnectionLog,
   type OpenVpnNode,
   type ServerStatus,
-  type VpnConnection,
 } from "@/lib/api";
 import { useLiveStatus } from "@/hooks/useLiveStatus";
 
@@ -51,50 +49,23 @@ function formatRate(bytesPerSec: number | null | undefined) {
   return `${(bytesPerSec / 1024 ** 2).toFixed(2)} MB/s`;
 }
 
-function formatDuration(totalSeconds: number) {
-  if (!Number.isFinite(totalSeconds)) return "—";
-  const seconds = Math.max(0, Math.floor(totalSeconds));
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  if (hours > 0) return `${hours}h ${minutes % 60}m`;
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-  return `${seconds}s`;
-}
-
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString();
-}
-
 function StatusChip({ ok, label }: { ok: boolean; label: string }) {
   return <Chip size="small" color={ok ? "success" : "error"} label={label} />;
 }
 
-/** Live status: daemon health (with DCO), active connections with traffic and recent sessions. */
+/** Live status: daemon health (with DCO), active connections with traffic. */
 export function StatusPage() {
   const statusQuery = useQuery<ServerStatus>({
     queryKey: ["admin-status"],
     queryFn: () => api<ServerStatus>(endpoints.status),
-    refetchInterval: 10_000,
-  });
-
-  const connectionsQuery = useQuery<VpnConnection[]>({
-    queryKey: ["admin-connections"],
-    queryFn: () => api<VpnConnection[]>(endpoints.connections),
-    refetchInterval: 10_000,
-  });
-
-  const logsQuery = useQuery<ConnectionLog[]>({
-    queryKey: ["admin-connection-logs"],
-    queryFn: () => api<ConnectionLog[]>(endpoints.connectionLogs),
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
   });
 
   const { snapshot, error: liveError } = useLiveStatus();
 
   const { data, isLoading, error, refetch, isFetching } = statusQuery;
   const daemons = snapshot?.daemons ?? data?.daemons ?? [];
-  const connections = snapshot?.connections ?? connectionsQuery.data ?? [];
-  const loadingConnections = connectionsQuery.isLoading && !snapshot;
+  const connections = snapshot?.connections ?? [];
 
   const { data: nodes } = useQuery<OpenVpnNode[]>({
     queryKey: ["admin-nodes"],
@@ -106,8 +77,6 @@ export function StatusPage() {
 
   const refreshAll = () => {
     void refetch();
-    void connectionsQuery.refetch();
-    void logsQuery.refetch();
   };
 
   return (
@@ -201,9 +170,7 @@ export function StatusPage() {
         <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
           Active connections
         </Typography>
-        {loadingConnections ? (
-          <Skeleton height={120} />
-        ) : connections.length ? (
+        {connections.length ? (
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -235,50 +202,6 @@ export function StatusPage() {
         ) : (
           <Typography variant="body2" color="text.secondary">
             No active connections right now.
-          </Typography>
-        )}
-      </Paper>
-
-      <Paper sx={{ p: 3, overflowX: "auto" }}>
-        <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
-          Recent sessions
-        </Typography>
-        {logsQuery.isLoading ? (
-          <Skeleton height={120} />
-        ) : logsQuery.data?.length ? (
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>User</TableCell>
-                <TableCell>Common name</TableCell>
-                <TableCell>VPN IP</TableCell>
-                <TableCell>Daemon</TableCell>
-                <TableCell>Connected</TableCell>
-                <TableCell>Disconnected</TableCell>
-                <TableCell>Duration</TableCell>
-                <TableCell>Download</TableCell>
-                <TableCell>Upload</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {logsQuery.data.map((log) => (
-                <TableRow key={`${log.commonName}-${log.connectedAt}`}>
-                  <TableCell>{log.username || "—"}</TableCell>
-                  <TableCell>{log.commonName}</TableCell>
-                  <TableCell>{log.virtualIp ?? "—"}</TableCell>
-                  <TableCell>{log.daemonName?.trim() || "—"}</TableCell>
-                  <TableCell>{formatDateTime(log.connectedAt)}</TableCell>
-                  <TableCell>{log.disconnectedAt ? formatDateTime(log.disconnectedAt) : "Active"}</TableCell>
-                  <TableCell>{formatDuration(log.durationSeconds)}</TableCell>
-                  <TableCell>{formatBytes(log.bytesIn)}</TableCell>
-                  <TableCell>{formatBytes(log.bytesOut)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <Typography variant="body2" color="text.secondary">
-            No recorded sessions yet.
           </Typography>
         )}
       </Paper>
