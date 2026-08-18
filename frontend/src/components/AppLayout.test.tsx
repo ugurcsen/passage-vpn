@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
@@ -90,10 +90,10 @@ describe("AppLayout navigation by role", () => {
     present("My Profiles");
     present("My Account");
 
-    // Expand remaining groups
-    expandGroup("Overview");
+    // Dashboard is standalone (not inside a group)
     present("Dashboard");
 
+    // Expand remaining groups
     expandGroup("User Management");
     present("Users");
     present("Groups");

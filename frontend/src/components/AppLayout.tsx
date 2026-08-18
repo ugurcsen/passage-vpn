@@ -62,13 +62,11 @@ interface NavGroup {
   items: NavItem[];
 }
 
+const NAV_STANDALONE: NavItem[] = [
+  { label: "Dashboard", path: "/", icon: <DashboardIcon />, roles: ["ADMIN"] },
+];
+
 const NAV_GROUPS: NavGroup[] = [
-  {
-    label: "Overview",
-    icon: <DashboardIcon />,
-    roles: ["ADMIN"],
-    items: [{ label: "Dashboard", path: "/", icon: <DashboardIcon /> }],
-  },
   {
     label: "User Management",
     icon: <PeopleIcon />,
@@ -155,7 +153,7 @@ export function AppLayout({ darkMode, onToggleDarkMode }: AppLayoutProps) {
   };
 
   // All nav items flattened for AppBar title lookup
-  const allItems = NAV_GROUPS.flatMap((g) => g.items);
+  const allItems = [...NAV_STANDALONE, ...NAV_GROUPS.flatMap((g) => g.items)];
   const activeItemLabel = allItems.find((i) => i.path === location.pathname)?.label;
 
   const drawer = (
@@ -166,6 +164,20 @@ export function AppLayout({ darkMode, onToggleDarkMode }: AppLayoutProps) {
         </Typography>
       </Toolbar>
       <List dense disablePadding>
+        {NAV_STANDALONE.filter((item) => canAccess(item.roles, user?.role ?? "USER")).map((item) => (
+          <ListItemButton
+            key={item.path}
+            selected={location.pathname === item.path}
+            onClick={() => {
+              navigate(item.path);
+              setMobileOpen(false);
+            }}
+            sx={{ px: 2 }}
+          >
+            <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
+            <ListItemText primary={item.label} />
+          </ListItemButton>
+        ))}
         {NAV_GROUPS.filter((group) => canAccess(group.roles, user?.role ?? "USER")).map((group) => {
           const visibleItems = group.items.filter((item) => canAccess(item.roles, user?.role ?? "USER"));
           if (visibleItems.length === 0) return null;
