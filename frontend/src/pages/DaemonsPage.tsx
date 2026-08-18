@@ -35,7 +35,7 @@ interface DaemonForm {
   subnetMask: string;
   dnsServers: string;
   domain: string;
-  extraRoutes: string;
+  extraRoutes: string[];
   fullTunnel: boolean;
   clientCertNotRequired: boolean;
   authUserPass: boolean;
@@ -55,7 +55,7 @@ const EMPTY_FORM: DaemonForm = {
   subnetMask: "255.255.255.0",
   dnsServers: "1.1.1.1, 8.8.8.8",
   domain: "",
-  extraRoutes: "",
+  extraRoutes: [],
   fullTunnel: true,
   clientCertNotRequired: false,
   authUserPass: true,
@@ -86,6 +86,13 @@ function splitList(value: string): string[] {
     .filter(Boolean);
 }
 
+const IPV4_CIDR = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/;
+const IPV6_CIDR = /^[0-9a-fA-F:.]+\/\d{1,3}$/;
+
+function isValidCidr(value: string): boolean {
+  return IPV4_CIDR.test(value) || IPV6_CIDR.test(value);
+}
+
 export function DaemonsPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -93,6 +100,8 @@ export function DaemonsPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<DaemonForm>(EMPTY_FORM);
   const [confirm, setConfirm] = useState<{ title: string; text: string; action: () => void } | null>(null);
+  const [newRoute, setNewRoute] = useState("");
+  const [routeError, setRouteError] = useState<string | null>(null);
 
   const { data: daemons, isLoading } = useQuery<Daemon[]>({
     queryKey: ["admin-daemons"],
@@ -109,6 +118,26 @@ export function DaemonsPage() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin-daemons"] });
 
+  const addRoute = () => {
+    const trimmed = newRoute.trim();
+    if (!trimmed) return;
+    if (!isValidCidr(trimmed)) {
+      setRouteError("Invalid CIDR format (e.g. 192.168.0.0/24 or fd00::/64)");
+      return;
+    }
+    if (form.extraRoutes.includes(trimmed)) {
+      setRouteError("Route already exists");
+      return;
+    }
+    setForm({ ...form, extraRoutes: [...form.extraRoutes, trimmed] });
+    setNewRoute("");
+    setRouteError(null);
+  };
+
+  const removeRoute = (route: string) => {
+    setForm({ ...form, extraRoutes: form.extraRoutes.filter((r) => r !== route) });
+  };
+
   const save = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -120,7 +149,7 @@ export function DaemonsPage() {
         subnetMask: form.subnetMask,
         dnsServers: splitList(form.dnsServers),
         domain: form.domain || null,
-        extraRoutes: splitList(form.extraRoutes),
+        extraRoutes: form.extraRoutes,
         fullTunnel: form.fullTunnel,
         clientCertNotRequired: form.clientCertNotRequired,
         authUserPass: form.authUserPass,
@@ -165,6 +194,8 @@ export function DaemonsPage() {
   const openCreate = () => {
     setEditing(null);
     setForm({ ...EMPTY_FORM, daemonIndex: String((daemons ?? []).length) });
+    setNewRoute("");
+    setRouteError(null);
     setDialogOpen(true);
   };
 
@@ -179,7 +210,7 @@ export function DaemonsPage() {
       subnetMask: row.subnetMask,
       dnsServers: row.dnsServers.join(", "),
       domain: row.domain ?? "",
-      extraRoutes: row.extraRoutes.join(", "),
+      extraRoutes: [...row.extraRoutes],
       fullTunnel: row.fullTunnel,
       clientCertNotRequired: row.clientCertNotRequired,
       authUserPass: row.authUserPass,
@@ -189,6 +220,8 @@ export function DaemonsPage() {
       ipv6Subnet: row.ipv6Subnet ?? "fd00:1::/64",
       enabled: row.enabled,
     });
+    setNewRoute("");
+    setRouteError(null);
     setDialogOpen(true);
   };
 
@@ -447,13 +480,50 @@ export function DaemonsPage() {
                 onChange={(e) => setForm({ ...form, domain: e.target.value })}
                 sx={{ flex: 1 }}
               />
-              <TextField
-                label="Extra routes (comma separated)"
-                value={form.extraRoutes}
-                onChange={(e) => setForm({ ...form, extraRoutes: e.target.value })}
-                placeholder="192.168.0.0/24"
-                sx={{ flex: 1 }}
-              />
+            </Stack>
+            <Stack spacing={1}>
+              <Typography variant="body2" color="text.secondary">
+                Extra routes (split tunnel only)
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  size="small"
+                  value={newRoute}
+                  onChange={(e) => {
+                    setNewRoute(e.target.value);
+                    setRouteError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addRoute();
+                    }
+                  }}
+                  placeholder="192.168.0.0/24 or fd00::/64"
+                  error={!!routeError}
+                  helperText={routeError}
+                  sx={{ flex: 1 }}
+                />
+                <Button variant="outlined" onClick={addRoute}>
+                  Add
+                </Button>
+              </Stack>
+              {form.extraRoutes.length > 0 && (
+                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 0.5 }}>
+                  {form.extraRoutes.map((route) => (
+                    <Chip
+                      key={route}
+                      label={route}
+                      color={route.includes(":") ? "info" : "default"}
+                      onDelete={() => removeRoute(route)}
+                      size="small"
+                    />
+                  ))}
+                </Stack>
+              )}
+              <Typography variant="caption" color="text.secondary">
+                IPv4: 192.168.0.0/24 — IPv6: fd00::/8
+              </Typography>
             </Stack>
             <FormControlLabel
               control={

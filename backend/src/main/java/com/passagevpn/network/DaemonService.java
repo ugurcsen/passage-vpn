@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,9 @@ public class DaemonService {
   private static final String NETWORK_SETTING_KEY = "network";
   private static final int DEFAULT_UDP_PORT = 1194;
   private static final int DEFAULT_TCP_PORT = 1195;
+  private static final Pattern IPV4_CIDR =
+      Pattern.compile("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/\\d{1,2}$");
+  private static final Pattern IPV6_CIDR = Pattern.compile("^[0-9a-fA-F:.]+/\\d{1,3}$");
 
   private final DaemonRepository repository;
   private final ServerSettingRepository settingRepository;
@@ -147,6 +151,9 @@ public class DaemonService {
     int port = resolvePort(request, null);
     validateUnique(request, port, null);
     validateNode(request.nodeId());
+    if (request.extraRoutes() != null) {
+      validateExtraRoutes(request.extraRoutes());
+    }
     Daemon daemon =
         Daemon.builder()
             .id(UUID.randomUUID().toString())
@@ -187,6 +194,9 @@ public class DaemonService {
     int port = resolvePort(request, id);
     validateUnique(request, port, id);
     validateNode(request.nodeId());
+    if (request.extraRoutes() != null) {
+      validateExtraRoutes(request.extraRoutes());
+    }
     daemon.setDaemonIndex(request.daemonIndex());
     daemon.setName(blankToNull(request.name()));
     daemon.setPort(port);
@@ -492,6 +502,18 @@ public class DaemonService {
                     "daemon_ipv6_subnet_taken",
                     "IPv6 subnet " + request.ipv6Subnet() + " is already in use");
               });
+    }
+  }
+
+  private void validateExtraRoutes(List<String> routes) {
+    for (String route : routes) {
+      if (!IPV4_CIDR.matcher(route).matches() && !IPV6_CIDR.matcher(route).matches()) {
+        throw ApiException.badRequest(
+            "invalid_route",
+            "Invalid route: "
+                + route
+                + ". Expected CIDR format (e.g. 192.168.0.0/24 or fd00::/64)");
+      }
     }
   }
 

@@ -8,6 +8,53 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.20 — 2026-08-19
+
+Twentieth **beta** milestone (SemVer pre-release): IPv6 extra routes support
+and a manageable chip-based route UI. The `extraRoutes` field in daemon
+configuration now correctly renders IPv6 CIDRs via `push "route-ipv6"` (previously
+only IPv4 `push "route"` was generated, silently dropping IPv6 entries). The
+comma-separated text field has been replaced with a per-route chip UI in both the
+Daemons and Settings pages — each route is visualized as a chip with a delete
+button, IPv4/IPv6 routes are color-differentiated, and client-side CIDR
+validation prevents invalid entries before they reach the backend. Backend
+validation now rejects malformed routes with a clear error message. Includes
+everything from `v0.1.0-beta.19` plus the changes below.
+
+### IPv6 extra routes
+- `ServerConfigGenerator.renderRoutePushes()` now detects IPv6 CIDRs (contains
+  `:`) and emits `push "route-ipv6 <route>"` instead of the IPv4
+  `push "route <route>"`. Mixed IPv4+IPv6 route lists are fully supported.
+- Split-tunnel mode only; full-tunnel mode continues to use
+  `redirect-gateway def1 bypass-dhcp` for IPv4 and `redirect-gateway ipv6`
+  for IPv6, ignoring `extraRoutes` entirely.
+
+### Route validation (backend)
+- `DaemonService.validateExtraRoutes()` validates each entry against IPv4 CIDR
+  (`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}$`) and IPv6 CIDR
+  (`^[0-9a-fA-F:.]+/\d{1,3}$`) patterns. Malformed routes are rejected with
+  `400 invalid_route` before persisting. Validation is called from both
+  `create()` and `update()`.
+
+### Chip-based route UI (frontend)
+- Daemons page: replaced the single comma-separated `TextField` with a
+  chip-based route manager — each route renders as a `Chip` (IPv4 default color,
+  IPv6 `info` color) with a delete button; an inline text input + "Add" button
+  adds new routes with client-side CIDR validation and duplicate detection;
+  Enter key submits.
+- Settings page: same chip-based pattern applied to the legacy network config
+  dialog for consistency. The underlying wire format (`List<String>` / comma
+  string) is unchanged.
+- Helper text updated: `IPv4: 192.168.0.0/24 — IPv6: fd00::/64`.
+
+### Tests
+- `splitTunnelPushesIpv6Routes` — single IPv6 CIDR renders `push "route-ipv6"`.
+- `splitTunnelPushesMixedIpv4AndIpv6Routes` — mixed list renders both directive
+  types correctly.
+- All 175 frontend tests green; backend tests green; lint 0 errors.
+
+---
+
 ## v0.1.0-beta.19 — 2026-08-18
 
 Nineteenth **beta** milestone (SemVer pre-release): collapsible sidebar

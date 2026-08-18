@@ -215,7 +215,11 @@ public class ServerConfigGenerator {
     // Split tunnel: only push explicitly configured routes.
     StringBuilder sb = new StringBuilder();
     for (String route : config.extraRoutes()) {
-      sb.append("push \"route ").append(route).append("\"\n");
+      if (route.contains(":")) {
+        sb.append("push \"route-ipv6 ").append(route).append("\"\n");
+      } else {
+        sb.append("push \"route ").append(route).append("\"\n");
+      }
     }
     return sb.toString();
   }

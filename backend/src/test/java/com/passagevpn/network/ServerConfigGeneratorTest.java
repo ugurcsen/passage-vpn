@@ -74,6 +74,58 @@ class ServerConfigGeneratorTest {
   }
 
   @Test
+  void splitTunnelPushesIpv6Routes() {
+    ServerConfig split =
+        new ServerConfig(
+            1,
+            1195,
+            ServerConfig.Protocol.udp,
+            "10.9.0.0",
+            "255.255.255.0",
+            java.util.List.of("9.9.9.9"),
+            null,
+            java.util.List.of("2001:db8::/32"),
+            false,
+            false,
+            true,
+            "vpn.example.com",
+            false,
+            null);
+    String conf =
+        generator.render(
+            split, "/pki", "/ccd", "/scripts", "/logs", "nat", "/config/daemon-0.mgmt-pass");
+    assertThat(conf).doesNotContain("redirect-gateway");
+    assertThat(conf).contains("push \"route-ipv6 2001:db8::/32\"");
+    assertThat(conf).doesNotContain("push \"route 2001:db8::/32\"");
+  }
+
+  @Test
+  void splitTunnelPushesMixedIpv4AndIpv6Routes() {
+    ServerConfig split =
+        new ServerConfig(
+            1,
+            1195,
+            ServerConfig.Protocol.udp,
+            "10.9.0.0",
+            "255.255.255.0",
+            java.util.List.of(),
+            null,
+            java.util.List.of("192.168.0.0/24", "fd00::/64", "10.0.0.0/8"),
+            false,
+            false,
+            true,
+            "vpn.example.com",
+            false,
+            null);
+    String conf =
+        generator.render(
+            split, "/pki", "/ccd", "/scripts", "/logs", "nat", "/config/daemon-0.mgmt-pass");
+    assertThat(conf).contains("push \"route 192.168.0.0/24\"");
+    assertThat(conf).contains("push \"route-ipv6 fd00::/64\"");
+    assertThat(conf).contains("push \"route 10.0.0.0/8\"");
+  }
+
+  @Test
   void dnsmasqServerIpComputesTunAddress() {
     assertThat(ServerConfigGenerator.dnsmasqServerIp("10.8.0.0")).isEqualTo("10.8.0.1");
     assertThat(ServerConfigGenerator.dnsmasqServerIp("10.9.0.0")).isEqualTo("10.9.0.1");

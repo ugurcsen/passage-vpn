@@ -4,6 +4,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -70,6 +71,8 @@ export function SettingsPage() {
   const [advanced, setAdvanced] = useState<AdvancedDialog | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [confirm, setConfirm] = useState<{ title: string; text: string; action: () => void } | null>(null);
+  const [newRoute, setNewRoute] = useState("");
+  const [routeError, setRouteError] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery<ServerSettings>({
     queryKey: ["admin-settings"],
@@ -77,6 +80,39 @@ export function SettingsPage() {
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin-settings"] });
+
+  const IPV4_CIDR = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/;
+  const IPV6_CIDR = /^[0-9a-fA-F:.]+\/\d{1,3}$/;
+
+  const parseRoutes = (value: string): string[] =>
+    value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  const addRoute = () => {
+    if (!dialog?.config) return;
+    const trimmed = newRoute.trim();
+    if (!trimmed) return;
+    if (!IPV4_CIDR.test(trimmed) && !IPV6_CIDR.test(trimmed)) {
+      setRouteError("Invalid CIDR format (e.g. 192.168.0.0/24 or fd00::/64)");
+      return;
+    }
+    const current = parseRoutes(dialog.config.extraRoutes);
+    if (current.includes(trimmed)) {
+      setRouteError("Route already exists");
+      return;
+    }
+    updateConfig({ extraRoutes: [...current, trimmed].join(", ") });
+    setNewRoute("");
+    setRouteError(null);
+  };
+
+  const removeRoute = (route: string) => {
+    if (!dialog?.config) return;
+    const current = parseRoutes(dialog.config.extraRoutes).filter((r) => r !== route);
+    updateConfig({ extraRoutes: current.join(", ") });
+  };
 
   const save = useMutation({
     mutationFn: ({ key, value }: { key: string; value: unknown }) =>
@@ -394,7 +430,7 @@ export function SettingsPage() {
           ))}
       </Paper>
 
-      <Dialog open={!!dialog} onClose={() => setDialog(null)} maxWidth="sm" fullWidth>
+      <Dialog open={!!dialog} onClose={() => { setDialog(null); setNewRoute(""); setRouteError(null); }} maxWidth="sm" fullWidth>
         <DialogTitle>
           {dialog?.isNew ? "Add default setting" : dialog && dialogSetting ? `Edit ${dialogSetting.label}` : "Add default setting"}
         </DialogTitle>
@@ -496,12 +532,50 @@ export function SettingsPage() {
                   onChange={(e) => updateConfig({ domain: e.target.value })}
                   helperText="DNS search domain pushed to clients (optional)"
                 />
-                <TextField
-                  label="Extra routes"
-                  value={dialog?.config?.extraRoutes ?? ""}
-                  onChange={(e) => updateConfig({ extraRoutes: e.target.value })}
-                  helperText="Comma separated CIDR networks to route (optional)"
-                />
+                <Stack spacing={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    Extra routes (split tunnel only)
+                  </Typography>
+                  <Stack direction="row" spacing={1}>
+                    <TextField
+                      size="small"
+                      value={newRoute}
+                      onChange={(e) => {
+                        setNewRoute(e.target.value);
+                        setRouteError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addRoute();
+                        }
+                      }}
+                      placeholder="192.168.0.0/24 or fd00::/64"
+                      error={!!routeError}
+                      helperText={routeError}
+                      sx={{ flex: 1 }}
+                    />
+                    <Button variant="outlined" onClick={addRoute}>
+                      Add
+                    </Button>
+                  </Stack>
+                  {parseRoutes(dialog?.config?.extraRoutes ?? "").length > 0 && (
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 0.5 }}>
+                      {parseRoutes(dialog?.config?.extraRoutes ?? "").map((route) => (
+                        <Chip
+                          key={route}
+                          label={route}
+                          color={route.includes(":") ? "info" : "default"}
+                          onDelete={() => removeRoute(route)}
+                          size="small"
+                        />
+                      ))}
+                    </Stack>
+                  )}
+                  <Typography variant="caption" color="text.secondary">
+                    IPv4: 192.168.0.0/24 — IPv6: fd00::/8
+                  </Typography>
+                </Stack>
                 <TextField
                   label="Admin host"
                   value={dialog?.config?.adminHost ?? ""}
@@ -593,7 +667,7 @@ export function SettingsPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialog(null)}>Cancel</Button>
+          <Button onClick={() => { setDialog(null); setNewRoute(""); setRouteError(null); }}>Cancel</Button>
           <Button variant="contained" disabled={!dialogValid || save.isPending} onClick={submitDialog}>
             Save
           </Button>
