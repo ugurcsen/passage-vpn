@@ -8,6 +8,20 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.22 — 2026-08-19
+
+Twenty-second **beta** milestone (SemVer pre-release): CI smoke-test fix. The
+backend container never publishes port 8080 to the host (the frontend proxies
+to `backend:8080`), so the host-side health probe in CI failed with connection
+refused. The smoke test now probes `/actuator/health` from inside the
+container, matching the container healthcheck.
+
+### CI fixes
+- **Smoke test**: probe `/actuator/health` via `docker compose exec` instead of
+  curling `localhost:8080` on the runner host.
+
+---
+
 ## v0.1.0-beta.21 — 2026-08-19
 
 Twenty-first **beta** milestone (SemVer pre-release): complete refactoring
