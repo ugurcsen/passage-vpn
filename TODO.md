@@ -435,7 +435,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] First-run wizard UI (frontend) — admin → VPN server → PKI → complete; login gated on `COMPLETE`
 - [x] PostgreSQL profile validation — `db/migration-postgresql` set (V1–V17 minus V13), `application-postgres.yml`, `MigrationParityTest`
 - [x] Seed data + demo mode
-- [ ] E2E test pass (backend unit+integration, frontend unit)
+- [x] E2E test pass (backend unit+integration, frontend unit)
 - [x] README + docs finalization
 - [x] CI workflow (backend test + spotless, frontend lint + build + test, docker image build job)
 - [x] Coverage gates — backend JaCoCo instruction ≥ 80% (measured 88.9%), frontend vitest thresholds 90/80/90 (measured 95.1/85.6/95.1), enforced via `jacocoTestCoverageVerification` + `npm run test:coverage` in CI
@@ -457,10 +457,10 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Phase G — Documentation & cross-cutting (architecture, API docs, env-var audit)
 
 ## Cross-cutting
-- [ ] Environment-variable-driven configuration everywhere
-- [ ] No secrets in code; `.env` only
-- [ ] English-only UI strings and comments
-- [ ] Code quality: lint + format (Spotless, ESLint), unit tests per module
+- [x] Environment-variable-driven configuration everywhere
+- [x] No secrets in code; `.env` only
+- [x] English-only UI strings and comments
+- [x] Code quality: lint + format (Spotless, ESLint), unit tests per module
 
 ## Optimization (resource consumption)
 - [x] Monitor loop: idle gating (30s cadence with no WS subscribers) + delta broadcasts (skip unchanged snapshots) — `MonitorService`
