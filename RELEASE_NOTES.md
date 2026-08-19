@@ -8,6 +8,41 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.23 — 2026-08-19
+
+Twenty-third **beta** milestone (SemVer pre-release): PostgreSQL profile
+footgun eliminated. A PostgreSQL install could be started with a plain
+`docker compose up` (without `docker-compose.postgres.yml`), running the
+`postgres` Spring profile against the SQLite URL pinned by the base compose
+file — the backend then crash-looped with a cryptic Flyway error
+("Driver org.postgresql.Driver claims to not accept jdbcUrl, jdbc:sqlite:...").
+This release turns that failure into an actionable message, makes the compose
+commands profile-aware, and documents the correct upgrade commands.
+
+### Fail-fast database profile check
+- **`DatabaseProfileCheck`**: startup now fails before Flyway with a clear,
+  actionable error when the datasource URL and driver disagree — e.g. the
+  `postgres` profile against a `jdbc:sqlite:` URL — pointing at the correct
+  startup command (`docker compose -f docker-compose.yml -f
+  docker-compose.postgres.yml up`) or `PASSAGE_PROFILE=sqlite`. Runs as a
+  `BeanFactoryPostProcessor` so it always fires before Flyway is instantiated.
+- Unit tests cover both mismatch directions plus the valid SQLite/PostgreSQL
+  combinations.
+
+### Profile-aware compose commands
+- **Makefile**: `make up`, `down`, `logs`, `ps`, `build`, `restart`, `reset`
+  now automatically append `-f docker-compose.postgres.yml` when `.env`
+  declares `PASSAGE_PROFILE=postgres` (same behavior as
+  `install.sh --profile=postgres`), so a plain `docker compose up` can no
+  longer silently start the postgres profile against the SQLite URL.
+
+### Documentation
+- **installation.md**: upgrade instructions for PostgreSQL installs now show
+  the override-file `docker compose pull` / `up -d` commands and note that
+  the Makefile handles the override automatically on a full checkout.
+
+---
+
 ## v0.1.0-beta.22 — 2026-08-19
 
 Twenty-second **beta** milestone (SemVer pre-release): CI smoke-test fix. The
