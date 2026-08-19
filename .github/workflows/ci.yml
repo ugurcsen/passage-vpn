@@ -84,7 +84,9 @@ jobs:
           echo "Backend is healthy."
       - name: Verify /actuator/health endpoint
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health)
+          # The backend port is not published to the host (frontend proxies to backend:8080),
+          # so probe the endpoint from inside the container, like the healthcheck does.
+          STATUS=$(docker compose exec -T backend curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health || echo failed)
           if [ "$STATUS" -ne 200 ]; then
             echo "ERROR: /actuator/health returned HTTP $STATUS (expected 200)"
             docker compose logs backend
