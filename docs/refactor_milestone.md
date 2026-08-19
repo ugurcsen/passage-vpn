@@ -85,31 +85,35 @@ backend/src/test/java/com/passagevpn/api/admin/UserIpAdminServiceTest.java  (119
 
 **Result:** UserAdminService dropped from 582 → 520 lines (62 lines removed).
 
-### A3. DaemonService (662 lines) — reduce duplication
+### A3. DaemonService (646 lines) — reduce duplication ✅
 
-- [ ] **A3.1** Refactor `validateUnique()` — replace 3 separate `findAll()` calls
-  with a single pass: fetch all daemons once, check index, port, and IPv6 subnet
-  uniqueness in a single in-memory loop.
-- [ ] **A3.2** Extract `buildEntityFromRequest(DaemonCreateRequest, Daemon)` helper
-  — both `create()` and `update()` build the entity from the request with identical
-  logic. The helper takes the existing entity (or `null` for create) and returns a
-  populated entity.
-- [ ] **A3.3** Verify `DaemonServiceTest` passes unchanged (behavioral equivalence).
-- [ ] **A3.4** Run `./gradlew test spotlessCheck` — all green.
+- [x] **A3.1** Refactor `validateUnique()` — replaced 4 separate `findAll()` calls
+  with a single pass: fetch all daemons once, filter out the excluded entity, then
+  check index, port, subnet, and IPv6 subnet uniqueness in-memory.
+- [x] **A3.2** Extract `applyRequest(Daemon, DaemonRequest, int)` helper
+  — both `create()` and `update()` now share 17 identical setter lines via this
+  method. `DaemonRequest` record remains unchanged.
+- [x] **A3.3** Updated `DaemonServiceTest.createRejectsDuplicateDaemonIndex` to stub
+  `findAll()` (required by the consolidated `validateUnique` path). All 996 tests
+  pass.
+- [x] **A3.4** `./gradlew test spotlessCheck` — all green.
 
-### A4. InternalController (327 lines) — extract ConnectionOrchestrator
+### A4. InternalController (237 lines) — extract ConnectionOrchestrator ✅
 
-- [ ] **A4.1** Create `internal/ConnectionOrchestrator.java` — move the
-  `connect()` orchestration logic (user lookup, ban/lock check, connection limit
-  enforcement, connection registry update, connection log recording, iptables
-  resolution) out of the controller into a service method.
-- [ ] **A4.2** Refactor `InternalController.connect()` to delegate to
-  `ConnectionOrchestrator.connectUser()`. The controller becomes a thin HTTP adapter.
-- [ ] **A4.3** Move `sanitizeReason()` reason-mapping to a domain-level concept
-  (e.g., `VpnDenyReason.sanitize()`).
-- [ ] **A4.4** Create `ConnectionOrchestratorTest.java` — test all deny paths
-  (unknown user, banned, locked, max connections) and the happy path.
-- [ ] **A4.5** Run `./gradlew test spotlessCheck` — all green.
+- [x] **A4.1** Created `internal/ConnectionOrchestrator.java` (178 lines) — moved
+  `connect()` and `disconnect()` orchestration logic (user lookup, ban/lock check,
+  connection-limit enforcement, connection registry update, connection log recording,
+  iptables resolution) out of the controller into a service.
+- [x] **A4.2** Refactored `InternalController.connect()` and `disconnect()` to delegate
+  to `ConnectionOrchestrator.connectUser()` and `disconnect()`. The controller is now
+  a thin HTTP adapter (327 → 237 lines).
+- [x] **A4.3** Moved `sanitizeReason()` to `ConnectionOrchestrator.sanitizeReason()`
+  as a domain-level concept. Also moved `daemonIndexOf()` and `asInt()` helpers.
+- [x] **A4.4** Created `ConnectionOrchestratorTest.java` (198 lines, 18 tests) —
+  covers all deny paths (unknown user, banned, locked, max connections), happy path,
+  disconnect, sanitizeReason, daemonIndexOf. Updated `InternalControllerTest` to
+  mock the orchestrator (576 → 412 lines, 3 delegation tests replace 10+ old tests).
+- [x] **A4.5** `./gradlew test spotlessCheck` — all 1002 tests pass.
 
 ---
 

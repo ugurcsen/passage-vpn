@@ -1,16 +1,10 @@
 package com.passagevpn.internal;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.passagevpn.access.AccessRuleService;
-import com.passagevpn.access.RuleEngine.IptablesResult;
 import com.passagevpn.auth.AuthService;
 import com.passagevpn.common.ApiException;
-import com.passagevpn.monitor.ConnectionLogService;
 import com.passagevpn.network.ConnectionRegistry;
-import com.passagevpn.network.DaemonService;
 import com.passagevpn.security.SeedGuard;
-import com.passagevpn.setting.SettingKeys;
-import com.passagevpn.setting.SettingsService;
 import com.passagevpn.setup.SetupService;
 import com.passagevpn.system.DemoSeedService;
 import com.passagevpn.user.User;
@@ -18,7 +12,6 @@ import com.passagevpn.user.UserRepository;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -44,11 +37,8 @@ public class InternalController {
   private final PasswordEncoder passwordEncoder;
   private final SetupService setupService;
   private final AuthService authService;
-  private final AccessRuleService ruleService;
+  private final ConnectionOrchestrator orchestrator;
   private final ConnectionRegistry connectionRegistry;
-  private final SettingsService settingsService;
-  private final ConnectionLogService connectionLogService;
-  private final DaemonService daemonService;
   private final DemoSeedService demoSeedService;
   private final SeedGuard seedGuard;
 
@@ -57,22 +47,16 @@ public class InternalController {
       PasswordEncoder passwordEncoder,
       SetupService setupService,
       AuthService authService,
-      AccessRuleService ruleService,
+      ConnectionOrchestrator orchestrator,
       ConnectionRegistry connectionRegistry,
-      SettingsService settingsService,
-      ConnectionLogService connectionLogService,
-      DaemonService daemonService,
       DemoSeedService demoSeedService,
       SeedGuard seedGuard) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.setupService = setupService;
     this.authService = authService;
-    this.ruleService = ruleService;
+    this.orchestrator = orchestrator;
     this.connectionRegistry = connectionRegistry;
-    this.settingsService = settingsService;
-    this.connectionLogService = connectionLogService;
-    this.daemonService = daemonService;
     this.demoSeedService = demoSeedService;
     this.seedGuard = seedGuard;
   }
@@ -133,7 +117,10 @@ public class InternalController {
     AuthService.VpnVerification result =
         authService.verifyVpnLogin(
             request.username(), request.password(), request.otp(), request.remoteIp());
-    return new VerifyResult(result.allowed(), sanitizeReason(result.reason()), result.pendingId());
+    return new VerifyResult(
+        result.allowed(),
+        ConnectionOrchestrator.sanitizeReason(result.reason()),
+        result.pendingId());
   }
 
   /**
@@ -149,7 +136,8 @@ public class InternalController {
     AuthService.VpnVerification result =
         authService.verifyVpnOtp(
             request.username(), request.otp(), request.remoteIp(), request.pendingId());
-    return new VerifyResult(result.allowed(), sanitizeReason(result.reason()), null);
+    return new VerifyResult(
+        result.allowed(), ConnectionOrchestrator.sanitizeReason(result.reason()), null);
   }
 
   /**
@@ -158,45 +146,23 @@ public class InternalController {
    */
   @PostMapping("/connect")
   public ConnectResult connect(@RequestBody ConnectRequest request) {
-    User user =
-        request.commonName() == null || request.commonName().isBlank()
-            ? userRepository.findByUsername(request.username()).orElse(null)
-            : userRepository.findByUsername(request.commonName()).orElse(null);
-    if (user == null) {
-      return ConnectResult.deny("unknown_user");
-    }
-    if (user.isBanned() || user.isLocked(Instant.now())) {
-      return ConnectResult.deny(user.isBanned() ? "user_banned" : "user_locked");
-    }
-    int maxConnections = maxConnections(user);
-    if (maxConnections > 0
-        && connectionRegistry.countByUsername(user.getUsername()) >= maxConnections) {
-      return ConnectResult.deny("max_connections");
-    }
-    connectionRegistry.register(
-        user.getUsername(),
-        user.getUsername(),
-        request.virtualIp(),
-        request.virtualIp6(),
-        request.remoteIp(),
-        request.daemonName(),
-        request.nodeId());
-    connectionLogService.sessionStarted(
-        user.getUsername(),
-        user.getUsername(),
-        request.virtualIp(),
-        request.remoteIp(),
-        request.daemonName(),
-        request.nodeId());
-    IptablesResult result =
-        ruleService.iptablesFor(
-            user.getUsername(),
+    ConnectionOrchestrator.ConnectResult result =
+        orchestrator.connect(
+            request.commonName(),
+            request.username(),
             request.virtualIp(),
             request.virtualIp6(),
-            user.getId(),
-            daemonService.ipv6Enabled(daemonIndexOf(request.daemonName())));
+            request.remoteIp(),
+            request.daemonName(),
+            request.nodeId());
     return new ConnectResult(
-        true, null, List.of(), result.apply(), result.remove(), result.apply6(), result.remove6());
+        result.allowed(),
+        result.reason(),
+        result.pushes(),
+        result.iptablesApply(),
+        result.iptablesRemove(),
+        result.iptablesApply6(),
+        result.iptablesRemove6());
   }
 
   /**
@@ -204,19 +170,9 @@ public class InternalController {
    */
   @PostMapping("/disconnect")
   public DisconnectResult disconnect(@RequestBody ConnectRequest request) {
-    User user = userRepository.findByUsername(request.commonName()).orElse(null);
-    if (user == null) {
-      return new DisconnectResult(List.of(), List.of());
-    }
-    connectionRegistry.unregister(user.getUsername(), request.nodeId());
-    connectionLogService.sessionEnded(user.getUsername());
-    IptablesResult result =
-        ruleService.iptablesFor(
-            user.getUsername(),
-            request.virtualIp(),
-            request.virtualIp6(),
-            user.getId(),
-            daemonService.ipv6Enabled(daemonIndexOf(request.daemonName())));
+    ConnectionOrchestrator.DisconnectResult result =
+        orchestrator.disconnect(
+            request.commonName(), request.virtualIp(), request.virtualIp6(), request.daemonName());
     return new DisconnectResult(result.remove(), result.remove6());
   }
 
@@ -277,51 +233,5 @@ public class InternalController {
     public VerifyResult(boolean allowed, String reason) {
       this(allowed, reason, null);
     }
-  }
-
-  /**
-   * Normalizes account-state reasons before they leave the restricted network so a failing connect
-   * attempt never leaks whether an account is locked or disabled.
-   */
-  private static String sanitizeReason(String reason) {
-    if (reason == null) {
-      return null;
-    }
-    return switch (reason) {
-      case "account_locked", "account_disabled" -> "invalid_credentials";
-      default -> reason;
-    };
-  }
-
-  private int maxConnections(User user) {
-    Map<String, Object> effective = settingsService.effectiveForUser(user.getId());
-    return asInt(effective.get(SettingKeys.MAX_CONNECTIONS));
-  }
-
-  /** Parses the trailing index of a daemon config name ({@code daemon-0} → 0). */
-  private static int daemonIndexOf(String daemonName) {
-    if (daemonName == null) {
-      return 0;
-    }
-    int idx = daemonName.lastIndexOf('-');
-    try {
-      return idx >= 0 ? Integer.parseInt(daemonName.substring(idx + 1).trim()) : 0;
-    } catch (NumberFormatException e) {
-      return 0;
-    }
-  }
-
-  private static int asInt(Object value) {
-    if (value instanceof Number number) {
-      return number.intValue();
-    }
-    if (value instanceof String s) {
-      try {
-        return Integer.parseInt(s.trim());
-      } catch (NumberFormatException e) {
-        return 0;
-      }
-    }
-    return 0;
   }
 }

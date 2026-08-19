@@ -239,6 +239,7 @@ class DaemonServiceTest {
   @Test
   void createRejectsDuplicateDaemonIndex() {
     when(repository.findByDaemonIndex(0)).thenReturn(Optional.of(primary()));
+    when(repository.findAll()).thenReturn(List.of(primary()));
 
     assertThatThrownBy(
             () ->

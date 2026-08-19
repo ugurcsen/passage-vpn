@@ -155,27 +155,8 @@ public class DaemonService {
       validateExtraRoutes(request.extraRoutes());
     }
     Daemon daemon =
-        Daemon.builder()
-            .id(UUID.randomUUID().toString())
-            .daemonIndex(request.daemonIndex())
-            .name(blankToNull(request.name()))
-            .port(port)
-            .proto(request.proto())
-            .subnet(request.subnet())
-            .subnetMask(request.subnetMask())
-            .dnsServers(request.dnsServers() == null ? List.of() : request.dnsServers())
-            .domain(blankToNull(request.domain()))
-            .extraRoutes(request.extraRoutes() == null ? List.of() : request.extraRoutes())
-            .fullTunnel(request.fullTunnel())
-            .clientCertNotRequired(request.clientCertNotRequired())
-            .authUserPass(request.authUserPass())
-            .adminHost(blankToNull(request.adminHost()))
-            .nodeId(blankToNull(request.nodeId()))
-            .ipv6Enabled(request.ipv6Enabled())
-            .ipv6Subnet(blankToNull(request.ipv6Subnet()))
-            .enabled(request.enabled())
-            .createdAt(Instant.now())
-            .build();
+        Daemon.builder().id(UUID.randomUUID().toString()).createdAt(Instant.now()).build();
+    applyRequest(daemon, request, port);
     Daemon saved = repository.save(daemon);
     writeAll();
     log.info("Created daemon {} '{}'", saved.getDaemonIndex(), saved.getName());
@@ -197,23 +178,7 @@ public class DaemonService {
     if (request.extraRoutes() != null) {
       validateExtraRoutes(request.extraRoutes());
     }
-    daemon.setDaemonIndex(request.daemonIndex());
-    daemon.setName(blankToNull(request.name()));
-    daemon.setPort(port);
-    daemon.setProto(request.proto());
-    daemon.setSubnet(request.subnet());
-    daemon.setSubnetMask(request.subnetMask());
-    daemon.setDnsServers(request.dnsServers() == null ? List.of() : request.dnsServers());
-    daemon.setDomain(blankToNull(request.domain()));
-    daemon.setExtraRoutes(request.extraRoutes() == null ? List.of() : request.extraRoutes());
-    daemon.setFullTunnel(request.fullTunnel());
-    daemon.setClientCertNotRequired(request.clientCertNotRequired());
-    daemon.setAuthUserPass(request.authUserPass());
-    daemon.setAdminHost(blankToNull(request.adminHost()));
-    daemon.setNodeId(blankToNull(request.nodeId()));
-    daemon.setIpv6Enabled(request.ipv6Enabled());
-    daemon.setIpv6Subnet(blankToNull(request.ipv6Subnet()));
-    daemon.setEnabled(request.enabled());
+    applyRequest(daemon, request, port);
     Daemon saved = repository.save(daemon);
     writeAll();
     log.info("Updated daemon {} '{}'", saved.getDaemonIndex(), saved.getName());
@@ -457,6 +422,26 @@ public class DaemonService {
         .orElse(daemons.isEmpty() ? null : daemons.get(0));
   }
 
+  private void applyRequest(Daemon daemon, DaemonRequest request, int port) {
+    daemon.setDaemonIndex(request.daemonIndex());
+    daemon.setName(blankToNull(request.name()));
+    daemon.setPort(port);
+    daemon.setProto(request.proto());
+    daemon.setSubnet(request.subnet());
+    daemon.setSubnetMask(request.subnetMask());
+    daemon.setDnsServers(request.dnsServers() == null ? List.of() : request.dnsServers());
+    daemon.setDomain(blankToNull(request.domain()));
+    daemon.setExtraRoutes(request.extraRoutes() == null ? List.of() : request.extraRoutes());
+    daemon.setFullTunnel(request.fullTunnel());
+    daemon.setClientCertNotRequired(request.clientCertNotRequired());
+    daemon.setAuthUserPass(request.authUserPass());
+    daemon.setAdminHost(blankToNull(request.adminHost()));
+    daemon.setNodeId(blankToNull(request.nodeId()));
+    daemon.setIpv6Enabled(request.ipv6Enabled());
+    daemon.setIpv6Subnet(blankToNull(request.ipv6Subnet()));
+    daemon.setEnabled(request.enabled());
+  }
+
   private Daemon require(String id) {
     return repository
         .findById(id)
@@ -464,17 +449,18 @@ public class DaemonService {
   }
 
   private void validateUnique(DaemonRequest request, int port, String excludedId) {
-    repository
-        .findByDaemonIndex(request.daemonIndex())
-        .filter(d -> !d.getId().equals(excludedId))
+    List<Daemon> existing =
+        repository.findAll().stream().filter(d -> !d.getId().equals(excludedId)).toList();
+    existing.stream()
+        .filter(d -> d.getDaemonIndex() == request.daemonIndex())
+        .findAny()
         .ifPresent(
             d -> {
               throw ApiException.conflict(
                   "daemon_index_taken",
                   "Daemon index " + request.daemonIndex() + " is already in use");
             });
-    repository.findAll().stream()
-        .filter(d -> !d.getId().equals(excludedId))
+    existing.stream()
         .filter(d -> d.getPort() == port)
         .findAny()
         .ifPresent(
@@ -482,8 +468,7 @@ public class DaemonService {
               throw ApiException.conflict(
                   "daemon_port_taken", "Port " + port + " is already in use");
             });
-    repository.findAll().stream()
-        .filter(d -> !d.getId().equals(excludedId))
+    existing.stream()
         .filter(d -> d.getSubnet().equals(request.subnet()))
         .findAny()
         .ifPresent(
@@ -492,8 +477,7 @@ public class DaemonService {
                   "daemon_subnet_taken", "Subnet " + request.subnet() + " is already in use");
             });
     if (request.ipv6Subnet() != null && !request.ipv6Subnet().isBlank()) {
-      repository.findAll().stream()
-          .filter(d -> !d.getId().equals(excludedId))
+      existing.stream()
           .filter(d -> request.ipv6Subnet().equals(d.getIpv6Subnet()))
           .findAny()
           .ifPresent(

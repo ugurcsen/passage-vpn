@@ -2,9 +2,6 @@ package com.passagevpn.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,24 +10,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.passagevpn.access.AccessRuleService;
-import com.passagevpn.access.RuleEngine.IptablesResult;
 import com.passagevpn.auth.AuthService;
 import com.passagevpn.auth.AuthService.VpnVerification;
 import com.passagevpn.common.GlobalExceptionHandler;
-import com.passagevpn.monitor.ConnectionLogService;
 import com.passagevpn.network.ConnectionRegistry;
-import com.passagevpn.network.DaemonService;
 import com.passagevpn.security.SeedGuard;
-import com.passagevpn.setting.SettingsService;
 import com.passagevpn.setup.SetupService;
 import com.passagevpn.system.DemoSeedService;
 import com.passagevpn.user.User;
 import com.passagevpn.user.UserRepository;
-import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -45,25 +34,11 @@ class InternalControllerTest {
   private PasswordEncoder passwordEncoder;
   private SetupService setupService;
   private AuthService authService;
-  private AccessRuleService ruleService;
+  private ConnectionOrchestrator orchestrator;
   private ConnectionRegistry connectionRegistry;
-  private SettingsService settingsService;
-  private ConnectionLogService connectionLogService;
-  private DaemonService daemonService;
   private DemoSeedService demoSeedService;
   private SeedGuard seedGuard;
   private MockMvc mvc;
-
-  private User user(boolean banned, boolean locked) {
-    return User.builder()
-        .id("u1")
-        .username("alice")
-        .role(User.Role.USER)
-        .banned(banned)
-        .lockedUntil(locked ? Instant.now().plusSeconds(600) : null)
-        .createdAt(Instant.now())
-        .build();
-  }
 
   @BeforeEach
   void setUp() {
@@ -71,23 +46,10 @@ class InternalControllerTest {
     passwordEncoder = mock(PasswordEncoder.class);
     setupService = mock(SetupService.class);
     authService = mock(AuthService.class);
-    ruleService = mock(AccessRuleService.class);
+    orchestrator = mock(ConnectionOrchestrator.class);
     connectionRegistry = new ConnectionRegistry();
-    settingsService = mock(SettingsService.class);
-    connectionLogService = mock(ConnectionLogService.class);
-    daemonService = mock(DaemonService.class);
     demoSeedService = mock(DemoSeedService.class);
     seedGuard = mock(SeedGuard.class);
-    when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user(false, false)));
-    when(settingsService.effectiveForUser("u1")).thenReturn(Map.of());
-    when(daemonService.ipv6Enabled(anyInt())).thenReturn(false);
-    when(ruleService.iptablesFor(anyString(), anyString(), any(), anyString(), anyBoolean()))
-        .thenReturn(
-            new IptablesResult(
-                List.of("iptables -N PASSAGE_x"),
-                List.of("iptables -X PASSAGE_x"),
-                List.of(),
-                List.of()));
 
     mvc =
         MockMvcBuilders.standaloneSetup(
@@ -96,11 +58,8 @@ class InternalControllerTest {
                     passwordEncoder,
                     setupService,
                     authService,
-                    ruleService,
+                    orchestrator,
                     connectionRegistry,
-                    settingsService,
-                    connectionLogService,
-                    daemonService,
                     demoSeedService,
                     seedGuard))
             .setControllerAdvice(new GlobalExceptionHandler())
@@ -108,85 +67,47 @@ class InternalControllerTest {
   }
 
   @Test
-  void connectDeniesUnknownUser() throws Exception {
-    when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+  void connectDelegatesToOrchestratorAndReturnsResult() throws Exception {
+    when(orchestrator.connect("alice", null, "10.8.0.9", null, null, "daemon-0", null))
+        .thenReturn(
+            new ConnectionOrchestrator.ConnectResult(
+                true, null, List.of(), List.of("apply"), List.of("remove"), List.of(), List.of()));
     mvc.perform(
             post("/internal/connect")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"commonName\":\"ghost\",\"virtualIp\":\"10.8.0.9\"}"))
+                .content(
+                    "{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\",\"daemonName\":\"daemon-0\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.allowed").value(true))
+        .andExpect(jsonPath("$.iptablesApply[0]").value("apply"))
+        .andExpect(jsonPath("$.iptablesRemove[0]").value("remove"));
+  }
+
+  @Test
+  void connectDelegatesDenyFromOrchestrator() throws Exception {
+    when(orchestrator.connect("ghost", null, null, null, null, null, null))
+        .thenReturn(ConnectionOrchestrator.ConnectResult.deny("unknown_user"));
+    mvc.perform(
+            post("/internal/connect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"commonName\":\"ghost\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.allowed").value(false))
         .andExpect(jsonPath("$.reason").value("unknown_user"));
   }
 
   @Test
-  void connectDeniesBannedUser() throws Exception {
-    when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user(true, false)));
-    mvc.perform(
-            post("/internal/connect")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.allowed").value(false))
-        .andExpect(jsonPath("$.reason").value("user_banned"));
-  }
-
-  @Test
-  void connectDeniesLockedUser() throws Exception {
-    when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user(false, true)));
-    mvc.perform(
-            post("/internal/connect")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.allowed").value(false))
-        .andExpect(jsonPath("$.reason").value("user_locked"));
-  }
-
-  @Test
-  void connectAllowsActiveUserAndReturnsIptables() throws Exception {
-    mvc.perform(
-            post("/internal/connect")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.allowed").value(true))
-        .andExpect(jsonPath("$.iptablesApply[0]").value("iptables -N PASSAGE_x"))
-        .andExpect(jsonPath("$.iptablesRemove[0]").value("iptables -X PASSAGE_x"))
-        .andExpect(jsonPath("$.pushes").isEmpty());
-    verify(ruleService).iptablesFor("alice", "10.8.0.9", null, "u1", false);
-  }
-
-  @Test
-  void connectFallsBackToUsernameWhenCommonNameBlank() throws Exception {
-    when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user(false, false)));
-    mvc.perform(
-            post("/internal/connect")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"commonName\":\"\",\"username\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.allowed").value(true));
-  }
-
-  @Test
-  void disconnectReturnsTeardownForKnownUser() throws Exception {
+  void disconnectDelegatesToOrchestratorAndReturnsResult() throws Exception {
+    when(orchestrator.disconnect("alice", "10.8.0.9", null, "daemon-0"))
+        .thenReturn(new ConnectionOrchestrator.DisconnectResult(List.of("teardown"), List.of()));
     mvc.perform(
             post("/internal/disconnect")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
+                .content(
+                    "{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\",\"daemonName\":\"daemon-0\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.remove[0]").value("iptables -X PASSAGE_x"));
-  }
-
-  @Test
-  void disconnectReturnsEmptyForUnknownUser() throws Exception {
-    when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
-    mvc.perform(
-            post("/internal/disconnect")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"commonName\":\"ghost\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.remove").isEmpty());
+        .andExpect(jsonPath("$.remove[0]").value("teardown"))
+        .andExpect(jsonPath("$.remove6").isEmpty());
   }
 
   @Test
@@ -281,11 +202,8 @@ class InternalControllerTest {
                     passwordEncoder,
                     setupService,
                     authService,
-                    ruleService,
+                    orchestrator,
                     connectionRegistry,
-                    settingsService,
-                    connectionLogService,
-                    daemonService,
                     demoSeedService,
                     new SeedGuard("bootstrap-secret")))
             .setControllerAdvice(new GlobalExceptionHandler())
@@ -373,11 +291,8 @@ class InternalControllerTest {
                     passwordEncoder,
                     setupService,
                     authService,
-                    ruleService,
+                    orchestrator,
                     connectionRegistry,
-                    settingsService,
-                    connectionLogService,
-                    daemonService,
                     demoSeedService,
                     seedGuard))
             .setControllerAdvice(new GlobalExceptionHandler())
@@ -403,11 +318,8 @@ class InternalControllerTest {
                     passwordEncoder,
                     setupService,
                     authService,
-                    ruleService,
+                    orchestrator,
                     connectionRegistry,
-                    settingsService,
-                    connectionLogService,
-                    daemonService,
                     demoSeedService,
                     seedGuard))
             .setControllerAdvice(new GlobalExceptionHandler())
@@ -427,6 +339,10 @@ class InternalControllerTest {
 
   @Test
   void internalTokenFilterAllowsMatchingToken() throws Exception {
+    when(orchestrator.connect(any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(
+            new ConnectionOrchestrator.ConnectResult(
+                true, null, List.of(), List.of(), List.of(), List.of(), List.of()));
     com.passagevpn.config.PassageProperties props =
         mock(com.passagevpn.config.PassageProperties.class);
     when(props.internalToken()).thenReturn("secret");
@@ -438,11 +354,8 @@ class InternalControllerTest {
                     passwordEncoder,
                     setupService,
                     authService,
-                    ruleService,
+                    orchestrator,
                     connectionRegistry,
-                    settingsService,
-                    connectionLogService,
-                    daemonService,
                     demoSeedService,
                     seedGuard))
             .setControllerAdvice(new GlobalExceptionHandler())
@@ -455,83 +368,6 @@ class InternalControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
         .andExpect(status().isOk());
-  }
-
-  @Test
-  void connectDeniesWhenMaxConnectionsReached() throws Exception {
-    when(settingsService.effectiveForUser("u1")).thenReturn(Map.of("max_connections", 1));
-    connectionRegistry.register("alice", "alice", "10.8.0.8", null, "9.9.9.9", "daemon-0");
-    mvc.perform(
-            post("/internal/connect")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.allowed").value(false))
-        .andExpect(jsonPath("$.reason").value("max_connections"));
-  }
-
-  @Test
-  void connectAllowsUnderMaxConnectionsLimit() throws Exception {
-    when(settingsService.effectiveForUser("u1")).thenReturn(Map.of("max_connections", 2));
-    connectionRegistry.register("alice", "alice", "10.8.0.8", null, "9.9.9.9", "daemon-0");
-    mvc.perform(
-            post("/internal/connect")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.allowed").value(true));
-  }
-
-  @Test
-  void connectRegistersActiveSession() throws Exception {
-    mvc.perform(
-            post("/internal/connect")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\",\"remoteIp\":\"1.2.3.4\",\"daemonName\":\"daemon-0\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.allowed").value(true));
-
-    assertThat(connectionRegistry.byVirtualIp("10.8.0.9"))
-        .hasValueSatisfying(
-            s -> {
-              assertThat(s.username()).isEqualTo("alice");
-              assertThat(s.remoteIp()).isEqualTo("1.2.3.4");
-              assertThat(s.daemonName()).isEqualTo("daemon-0");
-            });
-  }
-
-  @Test
-  void connectRecordsSessionHistoryStart() throws Exception {
-    mvc.perform(
-            post("/internal/connect")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\",\"remoteIp\":\"1.2.3.4\",\"daemonName\":\"daemon-0\"}"))
-        .andExpect(status().isOk());
-    verify(connectionLogService)
-        .sessionStarted("alice", "alice", "10.8.0.9", "1.2.3.4", "daemon-0", null);
-  }
-
-  @Test
-  void disconnectFinalizesSessionHistory() throws Exception {
-    mvc.perform(
-            post("/internal/disconnect")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
-        .andExpect(status().isOk());
-    verify(connectionLogService).sessionEnded("alice");
-  }
-
-  @Test
-  void disconnectUnregistersActiveSession() throws Exception {
-    connectionRegistry.register("alice", "alice", "10.8.0.9", null, "1.2.3.4", "daemon-0");
-    mvc.perform(
-            post("/internal/disconnect")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"commonName\":\"alice\",\"virtualIp\":\"10.8.0.9\"}"))
-        .andExpect(status().isOk());
-    assertThat(connectionRegistry.sessions()).isEmpty();
   }
 
   @Test
