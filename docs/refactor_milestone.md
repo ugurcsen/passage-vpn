@@ -282,31 +282,31 @@ within their feature folder.
 
 ### D1. Remove dead dependencies
 
-- [ ] **D1.1** Audit `react-hook-form` and `zod` usage — if confirmed unused,
+- [x] **D1.1** Audit `react-hook-form` and `zod` usage — if confirmed unused,
   remove from `package.json`. The `@hookform/resolvers` package should also be
   removed if `react-hook-form` is gone.
-- [ ] **D1.2** Remove the manual chunk in `vite.config.ts` for `react-hook-form`
+- [x] **D1.2** Remove the manual chunk in `vite.config.ts` for `react-hook-form`
   if the dependency is removed.
-- [ ] **D1.3** Run `npm run build` — verify bundle size decreases.
+- [x] **D1.3** Run `npm run build` — verify bundle size decreases.
 
 ### D2. Replace deprecated react-json-view
 
-- [ ] **D2.1** Replace `react-json-view` with `react18-json-view` (actively
+- [x] **D2.1** Replace `react-json-view` with `react18-json-view` (actively
   maintained fork) or a simpler alternative like a `<pre>` with
   `JSON.stringify(data, null, 2)`.
-- [ ] **D2.2** Update imports in affected files (likely `ConfigReportPage`,
+- [x] **D2.2** Update imports in affected files (likely `ConfigReportPage`,
   `SettingsPage` advanced editor).
-- [ ] **D2.3** Run `npm run test && npm run lint` — all green.
+- [x] **D2.3** Run `npm run test && npm run lint` — all green.
 
 ### D3. Re-enable no-explicit-any
 
-- [ ] **D3.1** Add `"@typescript-eslint/no-explicit-any": "warn"` to the ESLint
+- [x] **D3.1** Add `"@typescript-eslint/no-explicit-any": "warn"` to the ESLint
   config. Start with `warn` to identify current violations without breaking the
   build.
-- [ ] **D3.2** Fix or suppress each `any` occurrence with a proper type. Track
+- [x] **D3.2** Fix or suppress each `any` occurrence with a proper type. Track
   the count down to zero.
-- [ ] **D3.3** Escalate to `"error"` once the codebase is clean.
-- [ ] **D3.4** Run `npm run lint` — no warnings.
+- [x] **D3.3** Escalate to `"error"` once the codebase is clean.
+- [x] **D3.4** Run `npm run lint` — no warnings.
 
 ### D4. Fragile test selectors
 
