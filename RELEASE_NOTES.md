@@ -8,6 +8,47 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.24 — 2026-08-19
+
+Twenty-fourth **beta** milestone (SemVer pre-release): PostgreSQL is no longer
+forced into compose. The backend already supported any `jdbc:postgresql://` URL
+via `PASSAGE_DB_URL`; this release removes the compose-layer coupling so the
+`postgres` profile can run against a **remote/existing PostgreSQL server**
+without the compose-managed `db` container (or the `docker-compose.postgres.yml`
+override file at all).
+
+### Remote PostgreSQL without a db container
+- **docker-compose.yml**: `PASSAGE_DB_URL` is now interpolated
+  (`${PASSAGE_DB_URL:-jdbc:sqlite:/var/lib/passage/passage.db?...}`) instead of
+  being pinned — a plain `docker compose up -d` passes a remote
+  `jdbc:postgresql://...` URL from `.env` straight to the backend. The SQLite
+  default is unchanged. (The previous quoted default also fixed a deployment
+  bug where a quoted literal reached the container.)
+- **.env.example**: the host-relative `PASSAGE_DB_URL=jdbc:sqlite:./data/passage.db?...`
+  line is removed — it leaked a host path into the container (crash:
+  `/app/./data does not exist`). Compose and local runs now each default to
+  their own correct SQLite path; `.env` overrides it only for PostgreSQL.
+- **Remote flow**: `PASSAGE_PROFILE=postgres` + `PASSAGE_DB_URL`/`PASSAGE_DB_USER`/
+  `PASSAGE_DB_PASSWORD` in `.env` → plain `docker compose up -d`, no `db`
+  container, no override file. Flyway applies `db/migration-postgresql` on first
+  boot (use an empty, reachable database).
+- **Makefile / install.sh**: the profile-aware compose logic now checks
+  `PASSAGE_DB_URL` — the override file is appended only when the URL is unset
+  or still targets the local `db` service; a remote URL runs the base compose
+  project as-is. Local compose-managed PostgreSQL keeps its exact previous
+  behavior.
+- **DatabaseProfileCheck**: the fail-fast message now also points remote users
+  at `PASSAGE_DB_URL=jdbc:postgresql://host:5432/passage`; test updated.
+
+### Documentation
+- **configuration.md**: new "PostgreSQL (local or remote)" section with the
+  remote `.env` snippet and requirements (reachability, empty schema, Flyway
+  migration set); `PASSAGE_DB_URL`/`PASSAGE_PROFILE` rows updated.
+- **installation.md**: upgrade instructions split into compose-managed
+  (override file) vs remote (plain `docker compose up -d`).
+
+---
+
 ## v0.1.0-beta.23 — 2026-08-19
 
 Twenty-third **beta** milestone (SemVer pre-release): PostgreSQL profile
