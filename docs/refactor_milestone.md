@@ -266,11 +266,11 @@ within their feature folder.
 
 ### C4. Decompose extracted hooks into feature hooks
 
-- [ ] **C4.1** Create `src/features/users/useUserMutations.ts` — mutation hooks
+- [x] **C4.1** Create `src/features/users/useUserMutations.ts` — mutation hooks
   for user CRUD, ban/unban, password reset, MFA provisioning.
-- [ ] **C4.2** Create `src/features/groups/useGroupMutations.ts` — mutation hooks
+- [x] **C4.2** Create `src/features/groups/useGroupMutations.ts` — mutation hooks
   for group CRUD, member management.
-- [ ] **C4.3** Create `src/features/daemons/useDaemonMutations.ts` — mutation
+- [x] **C4.3** Create `src/features/daemons/useDaemonMutations.ts` — mutation
   hooks for daemon CRUD, toggle enable/disable.
 - [ ] **C4.4** Create `src/features/settings/useSettingsMutations.ts` — mutation
   hooks for settings CRUD.

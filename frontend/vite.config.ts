@@ -35,7 +35,6 @@ export default defineConfig({
           "mui-x-grid": ["@mui/x-data-grid"],
           "mui-x-charts": ["@mui/x-charts"],
           query: ["@tanstack/react-query"],
-          forms: ["react-hook-form", "zod", "@hookform/resolvers"],
         },
       },
     },
