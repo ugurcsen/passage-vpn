@@ -406,11 +406,11 @@ within their feature folder.
 
 These are the remaining items from the original `TODO.md` cross-cutting section:
 
-- [ ] **G3.1** Environment-variable-driven configuration audit — verify all
+- [x] **G3.1** Environment-variable-driven configuration audit — verify all
   secrets are only configurable via `.env` (no hardcoded values in source).
-- [ ] **G3.2** English-only verification — scan for non-English UI strings,
+- [x] **G3.2** English-only verification — scan for non-English UI strings,
   comments, and commit messages.
-- [ ] **G3.3** Final `make test` pass — backend + frontend green, Spotless +
+- [x] **G3.3** Final `make test` pass — backend + frontend green, Spotless +
   ESLint clean.
 
 ---

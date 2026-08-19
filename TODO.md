@@ -448,13 +448,13 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 > Phases A–G covering backend decomposition, security hardening, frontend
 > architecture migration, dependency cleanup, test coverage, CI/CD, and docs.
 
-- [ ] Phase A — Backend god class decomposition (CcdService, UserAdminService, DaemonService, InternalController)
-- [ ] Phase B — Backend security & quality (naming, Argon2id, CORS, rate-limit, docs)
-- [ ] Phase C — Frontend feature-folder migration + page decomposition
-- [ ] Phase D — Frontend dependency cleanup (dead deps, deprecated pkg, no-explicit-any, tests)
-- [ ] Phase E — Backend missing test coverage (config classes, IPv6 edge cases)
-- [ ] Phase F — CI/CD hardening (security scanning, integration smoke, release polish)
-- [ ] Phase G — Documentation & cross-cutting (architecture, API docs, env-var audit)
+- [x] Phase A — Backend god class decomposition (CcdService, UserAdminService, DaemonService, InternalController)
+- [x] Phase B — Backend security & quality (naming, Argon2id, CORS, rate-limit, docs)
+- [x] Phase C — Frontend feature-folder migration + page decomposition
+- [x] Phase D — Frontend dependency cleanup (dead deps, deprecated pkg, no-explicit-any, tests)
+- [x] Phase E — Backend missing test coverage (config classes, IPv6 edge cases)
+- [x] Phase F — CI/CD hardening (security scanning, integration smoke, release polish)
+- [x] Phase G — Documentation & cross-cutting (architecture, API docs, env-var audit)
 
 ## Cross-cutting
 - [ ] Environment-variable-driven configuration everywhere
