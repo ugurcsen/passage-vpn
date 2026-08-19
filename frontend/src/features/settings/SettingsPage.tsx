@@ -10,32 +10,18 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
-  IconButton,
   MenuItem,
-  Paper,
-  Skeleton,
   Stack,
   Switch,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EditIcon from "@mui/icons-material/Edit";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { api, endpoints, type ServerSettings } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   type ServerConfigForm,
   type SettingValueType,
-  displaySetting,
   emptyServerConfigForm,
   formToServerConfig,
   KNOWN_SETTINGS,
@@ -44,24 +30,10 @@ import {
   serializeSetting,
   serverConfigToForm,
 } from "@/features/settings/knownSettings";
-
-const ADVANCED_KEY_PATTERN = /^[a-zA-Z0-9_.-]{1,64}$/;
-
-/** Dialog state for the typed "server defaults" editor. `key` is empty until a setting is chosen. */
-interface DefaultDialog {
-  key: string;
-  value: string;
-  isNew: boolean;
-  /** Structured form state for `serverConfig`-typed settings (e.g. `network`). */
-  config?: ServerConfigForm;
-}
-
-/** Dialog state for the raw JSON advanced editor. */
-interface AdvancedDialog {
-  key: string;
-  value: string;
-  isNew: boolean;
-}
+import { type DefaultDialog, type AdvancedDialog, parseRoutes } from "./types";
+import { ServerDefaultsTable } from "./ServerDefaultsTable";
+import { AdvancedSettingsSection } from "./AdvancedSettingsSection";
+import { AdvancedSettingDialog } from "./AdvancedSettingDialog";
 
 /** Settings page: typed editors for well-known defaults plus a raw JSON section for custom keys. */
 export function SettingsPage() {
@@ -83,12 +55,6 @@ export function SettingsPage() {
 
   const IPV4_CIDR = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/;
   const IPV6_CIDR = /^[0-9a-fA-F:.]+\/\d{1,3}$/;
-
-  const parseRoutes = (value: string): string[] =>
-    value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
 
   const addRoute = () => {
     if (!dialog?.config) return;
@@ -141,7 +107,6 @@ export function SettingsPage() {
 
   const entries = Object.entries(data ?? {});
   const knownEntries = entries.filter(([k]) => knownSetting(k));
-  const customEntries = entries.filter(([k]) => !knownSetting(k));
   const availableDefaults = KNOWN_SETTINGS.filter(
     (s) => s.type !== "serverConfig" && !knownEntries.some(([k]) => k === s.key),
   );
@@ -212,223 +177,25 @@ export function SettingsPage() {
         </Alert>
       )}
 
-      <Paper sx={{ p: 3, mb: 3, overflowX: "auto" }}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          justifyContent="space-between"
-          alignItems={{ xs: "flex-start", sm: "center" }}
-          sx={{ mb: 2 }}
-        >
-          <Box>
-            <Typography variant="h6" fontWeight={600}>
-              Server defaults
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {`${knownEntries.length} configured`}
-            </Typography>
-          </Box>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            disabled={availableDefaults.length === 0}
-            onClick={openAddDefault}
-          >
-            Add default
-          </Button>
-        </Stack>
+      <ServerDefaultsTable
+        data={data}
+        isLoading={isLoading}
+        savePending={save.isPending}
+        onOpenAdd={openAddDefault}
+        onOpenEdit={openEditDefault}
+        onToggleBoolean={toggleKnown}
+        onToggleChoice={toggleChoice}
+        onDelete={(key, title, text) => setConfirm({ title, text, action: () => remove.mutate(key) })}
+      />
 
-        {isLoading ? (
-          <Skeleton height={120} />
-        ) : knownEntries.length === 0 ? (
-          <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: "center" }}>
-            No server defaults configured yet.
-          </Typography>
-        ) : (
-          <Table size="small" sx={{ tableLayout: "fixed", width: "100%" }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ width: "35%" }}>Setting</TableCell>
-                <TableCell sx={{ width: "45%" }}>Value</TableCell>
-                <TableCell align="right" sx={{ width: "20%" }}>
-                  Actions
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {knownEntries.map(([k, v]) => {
-                const setting = knownSetting(k)!;
-                const isBoolean = setting.type === "boolean";
-                return (
-                  <TableRow key={k}>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={600}>
-                        {setting.label}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {setting.description}
-                      </Typography>
-                    </TableCell>
-                    <TableCell sx={{ overflowWrap: "anywhere" }}>
-                      {isBoolean ? (
-                        <Stack direction="row" alignItems="center" spacing={1}>
-                          <Switch
-                            size="small"
-                            checked={v === true || v === "true"}
-                            onChange={(e) => toggleKnown(k, e.target.checked)}
-                            disabled={save.isPending}
-                            inputProps={{ "aria-label": setting.label }}
-                          />
-                          <Typography variant="body2" color="text.secondary">
-                            {v === true || v === "true" ? "On" : "Off"}
-                          </Typography>
-                        </Stack>
-                      ) : setting.type === "choice" ? (
-                        <TextField
-                          select
-                          size="small"
-                          value={v === null || v === undefined ? "" : String(v)}
-                          onChange={(e) => toggleChoice(k, e.target.value)}
-                          disabled={save.isPending}
-                          inputProps={{ "aria-label": setting.label }}
-                          sx={{ minWidth: 140 }}
-                        >
-                          {(setting.options ?? []).map((opt) => (
-                            <MenuItem key={opt} value={opt}>
-                              {opt}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">
-                          {displaySetting(setting.type, v)}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Stack direction="row" justifyContent="flex-end">
-                        {!isBoolean && (
-                          <Tooltip title="Edit value">
-                            <IconButton size="small" aria-label={`Edit ${setting.label}`} onClick={() => openEditDefault(k, v)}>
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        <Tooltip title="Delete setting">
-                          <IconButton
-                            size="small"
-                            aria-label={`Delete ${setting.label}`}
-                            onClick={() =>
-                              setConfirm({
-                                title: "Delete setting",
-                                text: `Delete the "${k}" setting? Accounts will fall back to group and per-user values.`,
-                                action: () => remove.mutate(k),
-                              })
-                            }
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </Paper>
-
-      <Paper sx={{ p: 3, overflowX: "auto" }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-          <Box>
-            <Typography variant="h6" fontWeight={600}>
-              Advanced settings
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {`Custom keys stored as raw JSON (${customEntries.length})`}
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="outlined"
-              startIcon={<AddIcon />}
-              onClick={() => setAdvanced({ key: "", value: "", isNew: true })}
-            >
-              Add custom setting
-            </Button>
-            <IconButton
-              aria-label="Toggle advanced settings"
-              onClick={() => setShowAdvanced((s) => !s)}
-              sx={{ transform: showAdvanced ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}
-            >
-              <ExpandMoreIcon />
-            </IconButton>
-          </Stack>
-        </Stack>
-
-        {showAdvanced &&
-          (customEntries.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: "center" }}>
-              No custom settings stored yet.
-            </Typography>
-          ) : (
-            <Table size="small" sx={{ tableLayout: "fixed", width: "100%" }}>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ width: "30%" }}>Key</TableCell>
-                  <TableCell sx={{ width: "60%" }}>Value (JSON)</TableCell>
-                  <TableCell align="right" sx={{ width: "10%" }}>
-                    Actions
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {customEntries.map(([k, v]) => (
-                  <TableRow key={k}>
-                    <TableCell sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>{k}</TableCell>
-                    <TableCell sx={{ overflowWrap: "anywhere" }}>
-                      <Typography
-                        variant="body2"
-                        component="pre"
-                        sx={{ m: 0, fontFamily: "monospace", whiteSpace: "pre-wrap", fontSize: "0.8rem" }}
-                      >
-                        {JSON.stringify(v, null, 2)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Stack direction="row" justifyContent="flex-end">
-                        <Tooltip title="Edit value">
-                          <IconButton
-                            size="small"
-                            aria-label={`Edit ${k}`}
-                            onClick={() => setAdvanced({ key: k, value: normalizeSetting("json", v), isNew: false })}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete setting">
-                          <IconButton
-                            size="small"
-                            aria-label={`Delete ${k}`}
-                            onClick={() =>
-                              setConfirm({
-                                title: "Delete setting",
-                                text: `Delete the "${k}" setting?`,
-                                action: () => remove.mutate(k),
-                              })
-                            }
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ))}
-      </Paper>
+      <AdvancedSettingsSection
+        data={data}
+        showAdvanced={showAdvanced}
+        onToggleShow={() => setShowAdvanced((s) => !s)}
+        onOpenAdd={() => setAdvanced({ key: "", value: "", isNew: true })}
+        onOpenEdit={(key, value) => setAdvanced({ key, value: normalizeSetting("json", value), isNew: false })}
+        onDelete={(key, title, text) => setConfirm({ title, text, action: () => remove.mutate(key) })}
+      />
 
       <Dialog open={!!dialog} onClose={() => { setDialog(null); setNewRoute(""); setRouteError(null); }} maxWidth="sm" fullWidth>
         <DialogTitle>
@@ -674,40 +441,14 @@ export function SettingsPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={!!advanced} onClose={() => setAdvanced(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>{advanced?.isNew ? "Add custom setting" : advanced?.key ? `Edit ${advanced.key}` : "Add custom setting"}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Key"
-              value={advanced?.key ?? ""}
-              onChange={(e) => setAdvanced((d) => (d ? { ...d, key: e.target.value } : d))}
-              disabled={advanced !== null && !advanced.isNew}
-              helperText="Letters, numbers, dots, dashes and underscores (1-64 chars)"
-              placeholder="e.g. support_email"
-            />
-            <TextField
-              label="Value (JSON)"
-              value={advanced?.value ?? ""}
-              onChange={(e) => setAdvanced((d) => (d ? { ...d, value: e.target.value } : d))}
-              multiline
-              minRows={4}
-              placeholder='e.g. "admin@example.com" or {"limit": 5}'
-              sx={{ fontFamily: "monospace" }}
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAdvanced(null)}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled={!advanced || !ADVANCED_KEY_PATTERN.test(advanced.key.trim()) || save.isPending}
-            onClick={submitAdvanced}
-          >
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <AdvancedSettingDialog
+        open={!!advanced}
+        dialog={advanced ?? { key: "", value: "", isNew: true }}
+        savePending={save.isPending}
+        onChange={(patch) => setAdvanced((d) => d ? { ...d, ...patch } : null)}
+        onClose={() => setAdvanced(null)}
+        onSave={submitAdvanced}
+      />
 
       <ConfirmDialog
         open={!!confirm}
