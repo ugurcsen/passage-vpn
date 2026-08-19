@@ -9,7 +9,7 @@ class IpFailureTrackerTest {
 
   private IpFailureTracker tracker(int maxFailures, int windowSeconds, int blockSeconds) {
     PassageProperties.Auth auth =
-        new PassageProperties.Auth("local", maxFailures, windowSeconds, blockSeconds, 30, 60);
+        new PassageProperties.Auth("local", maxFailures, windowSeconds, blockSeconds, 30, 60, null);
     PassageProperties.OpenVpn openvpn =
         new PassageProperties.OpenVpn(
             "127.0.0.1",

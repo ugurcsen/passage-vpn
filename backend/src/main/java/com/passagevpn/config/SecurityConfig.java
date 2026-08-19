@@ -9,14 +9,18 @@ import com.passagevpn.security.RateLimitFilter;
 import com.passagevpn.token.ApiTokenService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -117,9 +121,23 @@ public class SecurityConfig {
     return http.build();
   }
 
+  /**
+   * Delegating encoder: new passwords use Argon2id (default), existing BCrypt hashes continue to
+   * verify. The id prefix ({@code {argon2id}} or {@code {bcrypt}}) is embedded in each hash,
+   * allowing transparent migration — new registrations and password changes produce Argon2id hashes
+   * while legacy BCrypt hashes remain valid.
+   */
   @Bean
   public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
+    PassageProperties.Auth.Argon2 a2 =
+        passageProperties.auth().argon2() != null
+            ? passageProperties.auth().argon2()
+            : PassageProperties.Auth.Argon2.defaults();
+    Argon2PasswordEncoder argon2 = Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
+    Map<String, PasswordEncoder> encoders = new HashMap<>();
+    encoders.put("argon2id", argon2);
+    encoders.put("bcrypt", new BCryptPasswordEncoder());
+    return new DelegatingPasswordEncoder("argon2id", encoders);
   }
 
   @Bean

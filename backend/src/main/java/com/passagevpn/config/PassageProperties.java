@@ -29,7 +29,16 @@ public record PassageProperties(
       int lockoutWindowSeconds,
       int lockoutDurationSeconds,
       int rateLimitMaxRequests,
-      int rateLimitWindowSeconds) {}
+      int rateLimitWindowSeconds,
+      Argon2 argon2) {
+
+    public record Argon2(
+        int memoryIterations, int memory, int parallelism, int saltLength, int hashLength) {
+      public static Argon2 defaults() {
+        return new Argon2(3, 65536, 4, 16, 32);
+      }
+    }
+  }
 
   public record OpenVpn(
       String mgmtHost,

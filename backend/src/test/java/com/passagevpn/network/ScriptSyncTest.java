@@ -18,7 +18,7 @@ class ScriptSyncTest {
 
   private ScriptSync sync(String scriptsSrcDir, String scriptsDir, String token) {
     PassageProperties.Jwt jwt = new PassageProperties.Jwt("secret-secret-secret", 300, 14);
-    PassageProperties.Auth auth = new PassageProperties.Auth("local", 5, 300, 900, 30, 60);
+    PassageProperties.Auth auth = new PassageProperties.Auth("local", 5, 300, 900, 30, 60, null);
     PassageProperties.OpenVpn openvpn =
         new PassageProperties.OpenVpn(
             "127.0.0.1",

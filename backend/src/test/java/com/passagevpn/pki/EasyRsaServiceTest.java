@@ -48,7 +48,7 @@ class EasyRsaServiceTest {
             "OpenVPN Panel",
             "internal-token",
             new PassageProperties.Jwt("j".repeat(64), 900, 14),
-            new PassageProperties.Auth("local", 5, 300, 300, 20, 60),
+            new PassageProperties.Auth("local", 5, 300, 300, 20, 60, null),
             new PassageProperties.OpenVpn(
                 "127.0.0.1",
                 7505,
@@ -533,7 +533,7 @@ class EasyRsaServiceTest {
             "OpenVPN Panel",
             "internal-token",
             new PassageProperties.Jwt("j".repeat(64), 900, 14),
-            new PassageProperties.Auth("local", 5, 300, 300, 20, 60),
+            new PassageProperties.Auth("local", 5, 300, 300, 20, 60, null),
             new PassageProperties.OpenVpn(
                 "127.0.0.1",
                 7505,

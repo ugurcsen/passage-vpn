@@ -61,6 +61,7 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
     implementation("dev.samstevens.totp:totp:1.7.1")
     implementation("com.bucket4j:bucket4j-core:8.10.1")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.81")
 
     // API documentation
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9")

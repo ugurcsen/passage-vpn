@@ -21,7 +21,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Web session and VPN credential flows: login, MFA, refresh, logout, vpn verify. */
+/**
+ * Web session and VPN credential flows: login, MFA, refresh, logout, vpn verify.
+ *
+ * <p><b>Password hashing migration (B2):</b> The application uses Spring's {@link
+ * org.springframework.security.crypto.password.DelegatingPasswordEncoder} with Argon2id as the
+ * default encoder and BCrypt as a fallback. New passwords are hashed with Argon2id; existing BCrypt
+ * hashes continue to verify via the embedded {@code {bcrypt}} id prefix. Once all legacy hashes
+ * have been rotated (after a password change), BCrypt support can be removed from the encoder map.
+ */
 @Service
 public class AuthService {
 

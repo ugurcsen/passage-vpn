@@ -126,24 +126,21 @@ backend/src/test/java/com/passagevpn/api/admin/UserIpAdminServiceTest.java  (119
 - [x] **B1.2** Verified `SettingsServiceTest` passes.
 - [x] **B1.3** `./gradlew test spotlessCheck` — all green.
 
-### B2. BCrypt → Argon2id password hashing migration
+### B2. BCrypt → Argon2id password hashing migration ✅
 
 AGENTS.md says "Argon2id preferred" but the codebase uses BCrypt. This adds a
 migration-safe dual-hash support.
 
-- [ ] **B2.1** Add `Argon2PasswordEncoder` bean to the security config as the
-  primary `PasswordEncoder`. Add Argon2id tuning parameters to
-  `PassageProperties` (`passage.auth.argon2.memory-iterations`, `.memory`,
-  `.parallelism`, `.salt-length`, `.hash-length`) with secure defaults (64MB,
-  3 iterations, 4 parallelism).
-- [ ] **B2.2** Create a `DelegatingPasswordEncoder`-style wrapper that verifies
-  against Argon2id first, falls back to BCrypt for existing hashes. This provides
-  a transparent migration path: new registrations use Argon2id; existing BCrypt
-  hashes continue to work until the next password change.
-- [ ] **B2.3** Add a comment/migration note in `AuthService` documenting the dual-
-  hash support and the eventual goal of dropping BCrypt verification.
-- [ ] **B2.4** Update tests to cover both hash verification paths.
-- [ ] **B2.5** Run `./gradlew test spotlessCheck`.
+- [x] **B2.1** Added `Argon2PasswordEncoder` as default via Spring's `DelegatingPasswordEncoder`
+  in `SecurityConfig`. Added `Argon2` tuning record to `PassageProperties.Auth`
+  (defaults: 3 iterations, 64MB, 4 parallelism, 16 salt, 32 hash). Added BouncyCastle
+  dependency.
+- [x] **B2.2** `DelegatingPasswordEncoder` uses Argon2id for new hashes, falls back to BCrypt
+  for existing `{bcrypt}` prefixed hashes. Transparent migration path.
+- [x] **B2.3** Added migration Javadoc to `AuthService` documenting dual-hash support.
+- [x] **B2.4** `PasswordEncoderConfigTest` covers Argon2id new-hash, BCrypt legacy verify,
+  and wrong-password rejection paths.
+- [x] **B2.5** `./gradlew test spotlessCheck` — all 1005 tests pass.
 
 ### B3. CORS origin tightening
 
