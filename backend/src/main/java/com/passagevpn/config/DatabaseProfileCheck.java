@@ -9,11 +9,11 @@ import org.springframework.stereotype.Component;
  * Fails startup with an actionable message when the configured datasource URL and driver disagree.
  *
  * <p>The classic footgun: the {@code postgres} Spring profile is active (driver {@code
- * org.postgresql.Driver}) while {@code PASSAGE_DB_URL} still points at the SQLite file pinned by
- * {@code docker-compose.yml} — e.g. {@code PASSAGE_PROFILE=postgres} in {@code .env} with a plain
- * {@code docker compose up}. Without this check the failure surfaces as a cryptic Flyway/Hikari
- * error ("Driver org.postgresql.Driver claims to not accept jdbcUrl, jdbc:sqlite:..."). Runs as a
- * {@link BeanFactoryPostProcessor} so it fires before Flyway is ever instantiated.
+ * org.postgresql.Driver}) while {@code PASSAGE_DB_URL} still resolves to the SQLite file — e.g.
+ * {@code PASSAGE_PROFILE=postgres} in {@code .env} without pointing the URL at a PostgreSQL server.
+ * Without this check the failure surfaces as a cryptic Flyway/Hikari error ("Driver
+ * org.postgresql.Driver claims to not accept jdbcUrl, jdbc:sqlite:..."). Runs as a {@link
+ * BeanFactoryPostProcessor} so it fires before Flyway is ever instantiated.
  */
 @Component
 public class DatabaseProfileCheck implements BeanFactoryPostProcessor {
@@ -32,12 +32,13 @@ public class DatabaseProfileCheck implements BeanFactoryPostProcessor {
               + url
               + ") but the driver is "
               + driver
-              + " — the 'postgres' Spring profile is active while PASSAGE_DB_URL is pinned to the"
-              + " SQLite path by docker-compose.yml. Start the stack with"
+              + " — the 'postgres' Spring profile is active while the datasource URL is not."
+              + " Either point PASSAGE_DB_URL at a PostgreSQL server in .env, e.g."
+              + " PASSAGE_DB_URL=jdbc:postgresql://host:5432/passage (remote database, no db"
+              + " container, plain 'docker compose up'), or start the compose-managed database via"
               + " 'docker compose -f docker-compose.yml -f docker-compose.postgres.yml up' (or"
-              + " reinstall via install.sh --profile=postgres) so the backend receives"
-              + " PASSAGE_DB_URL=jdbc:postgresql://..., or set PASSAGE_PROFILE=sqlite in .env to"
-              + " keep SQLite.");
+              + " reinstall via install.sh --profile=postgres), or set"
+              + " PASSAGE_PROFILE=sqlite in .env to keep SQLite.");
     }
     if (url.startsWith("jdbc:postgresql:") && !driver.toLowerCase().contains("postgres")) {
       throw new IllegalStateException(

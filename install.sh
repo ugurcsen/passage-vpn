@@ -157,7 +157,7 @@ if [ -z "$PROFILE" ]; then
     echo
     info "Database profile:"
     echo "  1) SQLite (default) — zero config, file-based"
-    echo "  2) PostgreSQL — separate database container"
+    echo "  2) PostgreSQL — managed database container, or remote via PASSAGE_DB_URL in .env"
     ask "Choice" "1"
     case "$REPLY" in
       2|postgres|PostgreSQL) PROFILE=postgres ;;
@@ -292,7 +292,18 @@ patch_stale_network
 # ---------- build & start ----------
 info "Starting services (mode=$MODE, profile=$PROFILE) ..."
 COMPOSE_CMD="docker compose"
-[ "$PROFILE" = "postgres" ] && export PASSAGE_PROFILE=postgres && COMPOSE_CMD="$COMPOSE_CMD -f docker-compose.yml -f docker-compose.postgres.yml"
+if [ "$PROFILE" = "postgres" ]; then
+  export PASSAGE_PROFILE=postgres
+  # Remote PostgreSQL: PASSAGE_DB_URL in .env points at an external server — run a plain
+  # 'docker compose up' (the base compose passes the PASSAGE_* variables through).
+  # Local managed database: empty/default URL targets the compose 'db' service, so the
+  # override file (which also wires up depends_on) is required.
+  DB_URL="$(grep -E '^PASSAGE_DB_URL=' .env 2>/dev/null | head -1 | cut -d= -f2- || true)"
+  case "$DB_URL" in
+    ""|jdbc:postgresql://db:*) COMPOSE_CMD="$COMPOSE_CMD -f docker-compose.yml -f docker-compose.postgres.yml" ;;
+    *) : ;; # remote PostgreSQL: base compose only, no db container
+  esac
+fi
 
 # Helper hints adapt to the environment: a full checkout has the Makefile; the
 # deploy-only release tarball (no Makefile) falls back to docker compose.

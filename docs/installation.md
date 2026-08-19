@@ -88,17 +88,32 @@ Repeat step 3 with the new tag — `docker compose pull` fetches the new images 
 logs) lives in Docker named volumes and is preserved.
 
 For a PostgreSQL install, the `postgres` profile must always run with the
-override file — the base `docker-compose.yml` pins the SQLite URL, so a plain
-`docker compose up -d` would start the backend with the PostgreSQL driver
-against the SQLite path and crash at startup:
+override file — the base `docker-compose.yml` defaults to the SQLite URL, so a
+plain `docker compose up -d` would start the backend with the PostgreSQL driver
+against a SQLite URL and crash at startup (the backend fails fast with an
+actionable message in this case).
+
+Compose-managed PostgreSQL (`db` container):
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.postgres.yml pull
 docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
 ```
 
+Remote PostgreSQL (no `db` container): set `PASSAGE_PROFILE=postgres` plus
+`PASSAGE_DB_URL`/`PASSAGE_DB_USER`/`PASSAGE_DB_PASSWORD` in `.env` pointing at
+the remote server, then use a plain `docker compose up -d` — the base compose
+passes those variables through and the override file is not used at all:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
 On a full checkout (`make up`), the Makefile detects `PASSAGE_PROFILE=postgres`
-in `.env` and appends the override file automatically.
+in `.env` and appends the override file automatically — but only when
+`PASSAGE_DB_URL` is unset or still targets the local `db` service; a remote URL
+runs a plain compose project without a database container.
 
 ## Development: build from source
 

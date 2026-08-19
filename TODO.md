@@ -434,6 +434,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] `install.sh` full installer (preflight, env, build, up, wizard)
 - [x] First-run wizard UI (frontend) — admin → VPN server → PKI → complete; login gated on `COMPLETE`
 - [x] PostgreSQL profile validation — `db/migration-postgresql` set (V1–V17 minus V13), `application-postgres.yml`, `MigrationParityTest`
+- [x] Remote PostgreSQL without a compose `db` container — `PASSAGE_DB_URL` interpolation in `docker-compose.yml`, `.env.example` without host-relative URL, Makefile/install.sh profile heuristic (override file only for the managed `db`), docs (beta.24)
 - [x] Seed data + demo mode
 - [x] E2E test pass (backend unit+integration, frontend unit)
 - [x] README + docs finalization

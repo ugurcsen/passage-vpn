@@ -59,7 +59,7 @@ services:
       - .env
     environment:
       PASSAGE_DATA_DIR: /var/lib/passage
-      PASSAGE_DB_URL: "jdbc:sqlite:/var/lib/passage/passage.db?journal_mode=WAL&busy_timeout=5000&foreign_keys=on"
+      PASSAGE_DB_URL: ${PASSAGE_DB_URL:-jdbc:sqlite:/var/lib/passage/passage.db?journal_mode=WAL&busy_timeout=5000&foreign_keys=on}
       PASSAGE_PKI_DIR: /etc/passage/pki/run
       PASSAGE_CCD_DIR: /etc/passage/ccd
       PASSAGE_CONFIG_DIR: /etc/passage/config

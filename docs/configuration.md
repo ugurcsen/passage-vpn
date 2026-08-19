@@ -19,7 +19,7 @@ through `${VAR:-default}` substitutions for the rest.
 
 | Variable | Default | Values | Description |
 |---|---|---|---|
-| `PASSAGE_PROFILE` | `sqlite` | `sqlite` \| `postgres` \| `agent` | Active Spring profile. `sqlite` is the default portable backend; `postgres` runs against PostgreSQL (`docker-compose.postgres.yml`); `agent` turns the instance into a lightweight node agent that registers/heartbeats to a central backend. |
+| `PASSAGE_PROFILE` | `sqlite` | `sqlite` \| `postgres` \| `agent` | Active Spring profile. `sqlite` is the default portable backend (DB file in the shared volume); `postgres` runs against PostgreSQL — either the compose-managed `db` service (`docker-compose.postgres.yml`) or **any remote PostgreSQL server** via `PASSAGE_DB_URL` (see [PostgreSQL below](#postgresql-local-or-remote)); `agent` turns the instance into a lightweight node agent that registers/heartbeats to a central backend. |
 
 ## Branding
 
@@ -32,7 +32,7 @@ through `${VAR:-default}` substitutions for the rest.
 | Variable | Default | Description |
 |---|---|---|
 | `PASSAGE_DATA_DIR` | `./data` (dev) / `/var/lib/passage` (container) | Top-level runtime data directory. |
-| `PASSAGE_DB_URL` | `jdbc:sqlite:./data/passage.db?journal_mode=WAL&busy_timeout=5000&foreign_keys=on` | JDBC connection URL. The `postgres` profile defaults to `jdbc:postgresql://localhost:5432/passage`. |
+| `PASSAGE_DB_URL` | *(unset in `.env`)* — compose: `jdbc:sqlite:/var/lib/passage/passage.db?…` (container volume); local run: `jdbc:sqlite:./data/passage.db?…`; `postgres` profile: `jdbc:postgresql://localhost:5432/passage` | JDBC connection URL. Left unset by default so docker-compose and local runs each pick their own SQLite path; set it explicitly to override — the common case is a remote PostgreSQL server (below). |
 | `PASSAGE_DB_USER` | *(empty)* / `passage` (postgres) | Database user (PostgreSQL profile). |
 | `PASSAGE_DB_PASSWORD` | *(empty)* / `passage` (postgres) | Database password (PostgreSQL profile). |
 | `PASSAGE_PKI_DIR` | `./data/pki` / `/etc/passage/pki/run` | Easy-RSA PKI directory (CA, certs, keys). Set per-environment in `docker-compose.yml`. |
@@ -44,6 +44,28 @@ through `${VAR:-default}` substitutions for the rest.
 | `PASSAGE_EASY_RSA_BIN` | `easyrsa` | Path to the Easy-RSA binary used by the PKI service. |
 | `PASSAGE_PKI_CERT_EXPIRE` | `730` | Validity of newly issued client/server certificates in days. Shorter lifetimes mean a revocation window limited to the CRL is kept short; the CRL is always generated for at least this long. |
 | `PASSAGE_INTERNAL_TLS_DIR` | `./data/internal-tls` / `/var/lib/passage/internal-tls` | Internal control-plane CA + keystores (agents' mTLS), bootstrapped on first start. Keep inside the data volume. |
+
+## PostgreSQL (local or remote)
+
+The `postgres` Spring profile makes the backend use PostgreSQL. The database itself can be:
+
+- **Compose-managed** (default): `install.sh --profile=postgres` / `make up` starts a `postgres:16` `db` container and the backend connects to `jdbc:postgresql://db:5432/passage` (uses `docker-compose.postgres.yml`, which also wires up `depends_on`).
+- **Remote / existing server**: the override file is not used at all. The backend connects straight to any reachable PostgreSQL. Nothing forces PostgreSQL into compose.
+
+Remote setup — set these in `.env`:
+
+```dotenv
+PASSAGE_PROFILE=postgres
+PASSAGE_DB_URL=jdbc:postgresql://db.example.com:5432/passage
+PASSAGE_DB_USER=passage
+PASSAGE_DB_PASSWORD=<secret>
+```
+
+then start with a plain `docker compose up -d` (or `make up`). Requirements:
+
+- The database must be **reachable from the host/container** and the credentials must allow schema creation — Flyway applies the `db/migration-postgresql` migration set on first boot (`application-postgres.yml`). Use an empty database.
+- Migrations are SQLite-portable but written for the PostgreSQL set (Boolean `TRUE`/`FALSE`); see the comments in `application-postgres.yml`.
+- The backend fails fast with an actionable message if `PASSAGE_PROFILE=postgres` is set while `PASSAGE_DB_URL` still resolves to SQLite (`config/DatabaseProfileCheck`).
 
 ## Security & auth
 

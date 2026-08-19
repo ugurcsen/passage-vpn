@@ -51,6 +51,7 @@ class DatabaseProfileCheckTest {
                     "org.postgresql.Driver"))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("jdbc:sqlite")
+        .hasMessageContaining("jdbc:postgresql://host:5432/passage")
         .hasMessageContaining("docker-compose.postgres.yml")
         .hasMessageContaining("PASSAGE_PROFILE=sqlite");
   }

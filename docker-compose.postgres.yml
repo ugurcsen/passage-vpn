@@ -1,6 +1,10 @@
-# PostgreSQL deployment override.
+# PostgreSQL deployment override — compose-managed database.
 # Usage: docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
 # Requires PASSAGE_PROFILE=postgres (see install.sh --profile=postgres).
+#
+# Remote PostgreSQL: do NOT use this override file at all — set
+# PASSAGE_PROFILE=postgres + PASSAGE_DB_URL/USER/PASSWORD in .env and run a plain
+# 'docker compose up -d' (the base compose passes those variables through).
 services:
   db:
     image: postgres:16-alpine
@@ -26,14 +30,9 @@ services:
         condition: service_healthy
     environment:
       PASSAGE_PROFILE: postgres
-      PASSAGE_DB_URL: jdbc:postgresql://db:5432/passage
+      PASSAGE_DB_URL: ${PASSAGE_DB_URL:-jdbc:postgresql://db:5432/passage}
       PASSAGE_DB_USER: ${PASSAGE_DB_USER:-passage}
       PASSAGE_DB_PASSWORD: ${PASSAGE_DB_PASSWORD:-passage}
-    volumes:
-      - passage-data:/var/lib/passage
-      - passage-pki:/etc/passage/pki
-      - passage-ccd:/etc/passage/ccd
-      - passage-config:/etc/passage/config
 
 volumes:
   passage-postgres:

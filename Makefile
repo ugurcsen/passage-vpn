@@ -9,12 +9,21 @@ BACKEND_DIR  := backend
 FRONTEND_DIR := frontend
 ENV_FILE     := .env
 
-# Append the PostgreSQL override file when .env requests the postgres profile
-# (same behavior as install.sh --profile=postgres). A plain 'docker compose up'
-# would otherwise run the postgres profile against the SQLite URL pinned in
-# docker-compose.yml and crash at startup.
-ifeq ($(shell grep -q '^PASSAGE_PROFILE=postgres' $(ENV_FILE) 2>/dev/null && echo yes),yes)
+# PostgreSQL handling (same logic as install.sh --profile=postgres):
+#  - PASSAGE_PROFILE=postgres with a REMOTE PASSAGE_DB_URL in .env runs a plain compose
+#    project (the base docker-compose.yml passes the PASSAGE_* variables through).
+#  - PASSAGE_PROFILE=postgres with an empty/default URL targets the compose-managed 'db'
+#    service, so the override file (which also wires up depends_on) is required.
+POSTGRES_PROFILE := $(shell grep -q '^PASSAGE_PROFILE=postgres' $(ENV_FILE) 2>/dev/null && echo yes)
+DB_URL           := $(shell grep '^PASSAGE_DB_URL=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2-)
+ifeq ($(POSTGRES_PROFILE),yes)
+ifeq ($(DB_URL),)
 COMPOSE_ARGS := -f docker-compose.yml -f docker-compose.postgres.yml
+else ifneq ($(findstring jdbc:postgresql://db:,$(DB_URL)),)
+COMPOSE_ARGS := -f docker-compose.yml -f docker-compose.postgres.yml
+else
+COMPOSE_ARGS := -f docker-compose.yml
+endif
 else
 COMPOSE_ARGS := -f docker-compose.yml
 endif
