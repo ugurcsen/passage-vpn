@@ -31,7 +31,7 @@ public class SettingsService {
   private final UserSettingRepository userRepository;
   private final GroupSettingRepository groupRepository;
   private final GroupMemberRepository memberRepository;
-  private final GroupRepository groupRepository_;
+  private final GroupRepository groupSettingRepository;
   private final ObjectMapper objectMapper;
 
   /**
@@ -46,13 +46,13 @@ public class SettingsService {
       UserSettingRepository userRepository,
       GroupSettingRepository groupRepository,
       GroupMemberRepository memberRepository,
-      GroupRepository groupRepository_,
+      GroupRepository groupSettingRepository,
       ObjectMapper objectMapper) {
     this.serverRepository = serverRepository;
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
     this.memberRepository = memberRepository;
-    this.groupRepository_ = groupRepository_;
+    this.groupSettingRepository = groupSettingRepository;
     this.objectMapper = objectMapper;
   }
 
@@ -185,7 +185,7 @@ public class SettingsService {
     Map<String, Object> server = serverSettings();
 
     Map<String, Group> groupById =
-        groupRepository_.findAll().stream().collect(Collectors.toMap(Group::getId, g -> g));
+        groupSettingRepository.findAll().stream().collect(Collectors.toMap(Group::getId, g -> g));
     Map<String, List<GroupMember>> memberships =
         memberRepository.findById_UserIdIn(ids).stream()
             .collect(Collectors.groupingBy(m -> m.getId().getUserId()));
@@ -226,7 +226,7 @@ public class SettingsService {
   @Transactional(readOnly = true)
   public List<String> groupChainForUser(String userId) {
     Map<String, Group> groupById =
-        groupRepository_.findAll().stream().collect(Collectors.toMap(Group::getId, g -> g));
+        groupSettingRepository.findAll().stream().collect(Collectors.toMap(Group::getId, g -> g));
     List<String> chain = new ArrayList<>();
     Set<String> visited = new LinkedHashSet<>();
     for (var member : memberRepository.findById_UserId(userId)) {

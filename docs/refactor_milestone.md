@@ -119,14 +119,12 @@ backend/src/test/java/com/passagevpn/api/admin/UserIpAdminServiceTest.java  (119
 
 ## Phase B — Backend: Code Quality & Security Hardening
 
-### B1. SettingsService naming cleanup
+### B1. SettingsService naming cleanup ✅
 
-- [ ] **B1.1** Rename `groupRepository_` → `groupSettingRepository` in
-  `SettingsService.java`. The trailing underscore is a code smell caused by name
-  collision with `groupRepository` (which is actually `GroupSettingRepository`).
-  Rename the field and the constructor parameter for clarity.
-- [ ] **B1.2** Verify `SettingsServiceTest` passes.
-- [ ] **B1.3** Run `./gradlew test spotlessCheck`.
+- [x] **B1.1** Renamed `groupRepository_` → `groupSettingRepository` in
+  `SettingsService.java` (field and constructor parameter).
+- [x] **B1.2** Verified `SettingsServiceTest` passes.
+- [x] **B1.3** `./gradlew test spotlessCheck` — all green.
 
 ### B2. BCrypt → Argon2id password hashing migration
 
