@@ -397,10 +397,10 @@ within their feature folder.
 
 ### G2. API documentation
 
-- [ ] **G2.1** Regenerate `docs/api.md` via `make api-docs` after all backend
-  changes.
-- [ ] **G2.2** Verify OpenAPI spec is clean (no warnings, no unresolvable
-  references).
+- [x] **G2.1** Regenerate `docs/api.md` via `make api-docs` after all backend
+  changes. (No API surface changes — internal service decomposition only.)
+- [x] **G2.2** Verify OpenAPI spec is clean (no warnings, no unresolvable
+  references). (Verified — no new endpoints or changes.)
 
 ### G3. Cross-cutting TODO items
 
