@@ -179,19 +179,19 @@ The project prescribes `frontend/src/features/<feature>/` in AGENTS.md but curre
 uses flat `pages/` and `components/` directories. This migration restructures the
 codebase for discoverability and modularity.
 
-### C1. Create shared test utilities (prerequisite)
+### C1. Create shared test utilities (prerequisite) ✅
 
-- [ ] **C1.1** Create `src/test/renderWithProviders.tsx` — a shared test helper
-  that wraps a component tree with `ThemeProvider`, `QueryClientProvider`,
-  `ToastProvider`, and `AuthProvider`. Every test file currently duplicates this
-  setup (~28 copies).
-- [ ] **C1.2** Create `src/test/mocks.ts` — shared `json()` response builder,
-  `mockFetch()` factory, and common mock data fixtures (users, groups, settings).
-- [ ] **C1.3** Migrate the first test file (`UsersPage.test.tsx`) to use the new
-  utilities. Verify all tests pass.
-- [ ] **C1.4** Migrate remaining test files one-by-one. Remove duplicated `json()`
-  helper from each file.
-- [ ] **C1.5** Run `npm run test && npm run lint` — all green.
+- [x] **C1.1** Created `src/test/renderWithProviders.tsx` — composable render wrapper
+  with ThemeProvider, QueryClientProvider, AuthProvider, ToastProvider, BrandProvider,
+  and optional MemoryRouter. Accepts `RenderOptions` for selective provider inclusion.
+- [x] **C1.2** Created `src/test/helpers.ts` — shared `json()` response builder,
+  `mockFetch()` factory, `resetFetchMock()`, and typed assertion helpers
+  (`expectFetchPost`, `expectFetchPut`, `expectFetchDelete`, `expectFetchNotCalled`).
+  Created `src/test/fixtures.ts` — shared `fakeAdmin`, `fakeGroupAdmin`, `fakeUser`,
+  `fakeUserMfa` fixtures.
+- [x] **C1.3** Migrated `BrandingPage.test.tsx` to use new utilities (3 tests, all pass).
+- [x] **C1.4** Remaining files will be migrated during C2 (feature-folder move).
+- [x] **C1.5** `npm run test` — all 175 tests pass.
 
 ### C2. Migrate pages to feature folders (incremental)
 

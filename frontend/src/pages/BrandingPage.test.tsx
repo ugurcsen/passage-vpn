@@ -1,10 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider } from "@mui/material/styles";
-import { darkTheme } from "@/theme";
-import { ToastProvider } from "@/hooks/useToast";
+import { renderWithProviders } from "@/test/renderWithProviders";
+import { json, resetFetchMock } from "@/test/helpers";
 import { BrandingPage } from "@/pages/BrandingPage";
 
 const brand = {
@@ -14,41 +12,19 @@ const brand = {
   logoUrl: null,
 };
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function renderPage() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <ThemeProvider theme={darkTheme}>
-      <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <BrandingPage />
-        </ToastProvider>
-      </QueryClientProvider>
-    </ThemeProvider>,
-  );
-}
-
 describe("BrandingPage", () => {
   beforeEach(() => {
     localStorage.clear();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(json(brand)),
-    );
+    resetFetchMock();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json(brand)));
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    resetFetchMock();
   });
 
   it("loads and shows the current brand", async () => {
-    renderPage();
+    renderWithProviders(<BrandingPage />);
     const name = (await screen.findByLabelText("Brand name")) as HTMLInputElement;
     expect(name.value).toBe("Acme VPN");
     const color = screen.getByLabelText("Primary color") as HTMLInputElement;
@@ -66,7 +42,7 @@ describe("BrandingPage", () => {
       return Promise.resolve(json(brand));
     });
     vi.stubGlobal("fetch", fetchMock);
-    renderPage();
+    renderWithProviders(<BrandingPage />);
 
     const name = await screen.findByLabelText("Brand name");
     await userEvent.clear(name);
@@ -88,7 +64,7 @@ describe("BrandingPage", () => {
   });
 
   it("blocks saving an invalid hex color", async () => {
-    renderPage();
+    renderWithProviders(<BrandingPage />);
     const color = await screen.findByLabelText("Primary color");
     await userEvent.clear(color);
     await userEvent.type(color, "orange");
