@@ -357,23 +357,23 @@ within their feature folder.
 
 ### F1. CI pipeline improvements
 
-- [ ] **F1.1** Add a security scanning step to CI: `dependency-check` (OWASP) or
+- [x] **F1.1** Add a security scanning step to CI: `dependency-check` (OWASP) or
   `snyk` for backend dependency vulnerabilities. Run on `main` and PRs.
-- [ ] **F1.2** Add a frontend dependency audit step: `npm audit --audit-level=high`
+- [x] **F1.2** Add a frontend dependency audit step: `npm audit --audit-level=high`
   in the CI frontend job.
-- [ ] **F1.3** Add `release.yml` coverage gate — the release workflow currently
+- [x] **F1.3** Add `release.yml` coverage gate — the release workflow currently
   runs `test` but not `jacocoTestCoverageVerification`. Add it to prevent
   releasing with coverage regressions.
-- [ ] **F1.4** Add Docker image vulnerability scanning: `docker scout cves` or
+- [x] **F1.4** Add Docker image vulnerability scanning: `docker scout cves` or
   `trivy` on the built images in the `docker-build` job.
 
 ### F2. Integration test smoke test in CI
 
-- [ ] **F2.1** Create a `docker-compose.ci.yml` that starts backend + openvpn
+- [x] **F2.1** Create a `docker-compose.ci.yml` that starts backend + openvpn
   (no frontend needed for backend smoke).
-- [ ] **F2.2** Add a CI job that runs `docker compose -f docker-compose.ci.yml up`
+- [x] **F2.2** Add a CI job that runs `docker compose -f docker-compose.ci.yml up`
   and hits `/actuator/health` + `/api/setup/state` to verify the stack boots.
-- [ ] **F2.3** Add this job to `ci.yml` after the `docker-build` job.
+- [x] **F2.3** Add this job to `ci.yml` after the `docker-build` job.
 
 ### F3. Release workflow polish
 

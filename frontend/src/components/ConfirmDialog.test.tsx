@@ -48,7 +48,7 @@ describe("ConfirmDialog", () => {
   });
 
   it("uses error color when danger is true", () => {
-    const { container } = renderDialog({ danger: true });
+    renderDialog({ danger: true });
     const confirmBtn = screen.getByRole("button", { name: /confirm/i });
     expect(confirmBtn).toHaveClass("MuiButton-colorError");
   });
