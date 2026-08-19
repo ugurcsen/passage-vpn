@@ -8,6 +8,63 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.21 — 2026-08-19
+
+Twenty-first **beta** milestone (SemVer pre-release): complete refactoring
+milestone, security hardening, and comprehensive test coverage. This release
+marks the completion of all refactoring phases (A–G) with a clean codebase,
+zero lint errors, and production-ready security defaults. Includes everything
+from `v0.1.0-beta.20` plus the changes below.
+
+### Security hardening
+- **Argon2id password hashing**: migrated from BCrypt to Argon2id with backward
+  compatibility — existing BCrypt hashes are verified on login and re-hashed to
+  Argon2id transparently. New registrations and password changes use Argon2id.
+- **CORS configuration**: `PASSAGE_CORS_ORIGINS` env var allows restricting
+  CORS allowed origins (defaults to `*` for development).
+- **Management interface password**: backend refuses to start without a
+  non-placeholder `PASSAGE_OPENVPN_MGMT_PASSWORD`.
+
+### Refactoring (Phases A–G)
+- **Phase A**: Feature-folder architecture — all pages migrated to
+  `frontend/src/features/<feature>/` structure.
+- **Phase B**: Page decomposition — UsersPage, SettingsPage, DaemonsPage,
+  GroupsPage, DashboardPage decomposed into focused sub-components and dialogs.
+- **Phase C**: Shared test utilities — `renderWithProviders`, `json`, and
+  fixture factories extracted to `@/test/renderWithProviders.tsx`.
+- **Phase D**: Extract feature mutation hooks — `useSettingsMutations` and
+  similar hooks extracted for reusable form/mutation logic.
+- **Phase E**: Dead dependency removal, `no-explicit-any` lint rule enabled,
+  fragile querySelector test selectors replaced with data-testid.
+- **Phase F**: CI enhancements — security audit, coverage gate, smoke test,
+  and changelog generation added to GitHub Actions.
+- **Phase G**: Documentation — architecture.md updated with refactored structure,
+  in-memory auth state constraints documented.
+
+### Hook splits (Lint compliance)
+- Split `useToast` → `ToastContext` (Provider) + `useToast` (hook only)
+- Split `useAuth` → `AuthContext` (Provider) + `useAuth` (hook only)
+- Split `useBrand` → `BrandContext` (Provider) + `useBrand` (hooks only)
+- All files now comply with `react-refresh/only-export-components` rule.
+
+### Bug fixes
+- Fixed `CcdSettingsDialog` useEffect missing `toast` dependency.
+
+### Backend
+- Extracted `ConnectionOrchestrator` from `DaemonService` for cleaner
+  connection management.
+- Extracted `Ipv6Util`, `IpPoolAllocator`, and `UserIpAdminService` for
+  better separation of concerns.
+- Renamed `groupRepository_` to `groupSettingRepository` in `SettingsService`.
+
+### Tests (35 files, 197+ frontend, 100+ backend)
+- Added `authVerifyOtpReturnsSetupIncompleteBeforeWizard` test.
+- Added GROUP_ADMIN authorization tests for `allocateStaticIp`, `clearStaticIp`.
+- Added API failure path tests for frontend hooks.
+- All tests passing (`make test` green, zero lint errors).
+
+---
+
 ## v0.1.0-beta.20 — 2026-08-19
 
 Twentieth **beta** milestone (SemVer pre-release): IPv6 extra routes support
