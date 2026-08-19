@@ -1,7 +1,8 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { useBrand, BrandProvider, defaultBrand } from "@/hooks/useBrand";
+import { useBrand } from "@/hooks/useBrand";
+import { BrandProvider, defaultBrand } from "@/hooks/BrandContext";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

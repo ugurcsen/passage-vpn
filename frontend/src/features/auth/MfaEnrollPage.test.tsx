@@ -7,8 +7,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { darkTheme } from "@/theme";
 import { queryClient } from "@/lib/queryClient";
 import { MfaEnrollPage } from "./MfaEnrollPage";
-import { ToastProvider } from "@/hooks/useToast";
-import { AuthProvider } from "@/hooks/useAuth";
+import { ToastProvider } from "@/hooks/ToastContext";
+import { AuthProvider } from "@/hooks/AuthContext";
 
 const QR = "data:image/png;base64,AAAA";
 const SECRET = "JBSWY3DPEHPK3PXP";

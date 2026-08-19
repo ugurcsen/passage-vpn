@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
-import { ToastProvider } from "@/hooks/useToast";
+import { ToastProvider } from "@/hooks/ToastContext";
 import { DashboardPage } from "./DashboardPage";
 
 const dashboard = {

@@ -123,6 +123,19 @@ class InternalControllerTest {
   }
 
   @Test
+  void authVerifyOtpReturnsSetupIncompleteBeforeWizard() throws Exception {
+    when(setupService.complete()).thenReturn(false);
+    mvc.perform(
+            post("/internal/auth/verify-otp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"username\":\"alice\",\"otp\":\"123456\",\"remoteIp\":\"1.2.3.4\",\"pendingId\":\"pending-1\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.allowed").value(false))
+        .andExpect(jsonPath("$.reason").value("setup_incomplete"));
+  }
+
+  @Test
   void authVerifyDelegatesToAuthService() throws Exception {
     when(setupService.complete()).thenReturn(true);
     when(authService.verifyVpnLogin("alice", "pass", null, "1.2.3.4"))

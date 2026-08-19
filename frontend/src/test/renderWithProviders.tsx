@@ -4,9 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, type MemoryRouterProps } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
-import { AuthProvider } from "@/hooks/useAuth";
-import { ToastProvider } from "@/hooks/useToast";
-import { BrandProvider } from "@/hooks/useBrand";
+import { AuthProvider } from "@/hooks/AuthContext";
+import { ToastProvider } from "@/hooks/ToastContext";
+import { BrandProvider } from "@/hooks/BrandContext";
 
 function testQueryClient() {
   return new QueryClient({

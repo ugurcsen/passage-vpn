@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { MemoryRouter } from "react-router-dom";
 import { darkTheme } from "@/theme";
-import { AuthProvider } from "@/hooks/useAuth";
+import { AuthProvider } from "@/hooks/AuthContext";
 import { AppLayout } from "@/components/AppLayout";
 import type { Role } from "@/hooks/useAuth";
 

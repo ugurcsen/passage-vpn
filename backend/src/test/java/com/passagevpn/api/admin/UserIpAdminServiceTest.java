@@ -118,6 +118,40 @@ class UserIpAdminServiceTest {
   }
 
   @Test
+  void groupAdminCannotAllocateStaticIpOnAdminAccount() {
+    User groupAdmin =
+        User.builder()
+            .id("gadmin1")
+            .username("gadmin")
+            .role(User.Role.GROUP_ADMIN)
+            .createdAt(Instant.now())
+            .build();
+    when(userRepository.findById("gadmin1")).thenReturn(Optional.of(groupAdmin));
+    when(userRepository.existsById("gadmin1")).thenReturn(true);
+
+    assertThatThrownBy(() -> service.allocateStaticIp(groupAdmin, "gadmin1"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
+  }
+
+  @Test
+  void groupAdminCannotClearStaticIpOnAdminAccount() {
+    User groupAdmin =
+        User.builder()
+            .id("gadmin1")
+            .username("gadmin")
+            .role(User.Role.GROUP_ADMIN)
+            .createdAt(Instant.now())
+            .build();
+    when(userRepository.findById("gadmin1")).thenReturn(Optional.of(groupAdmin));
+    when(userRepository.existsById("gadmin1")).thenReturn(true);
+
+    assertThatThrownBy(() -> service.clearStaticIp(groupAdmin, "gadmin1"))
+        .isInstanceOf(ApiException.class)
+        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
+  }
+
+  @Test
   void throwsWhenUserNotFound() {
     when(userRepository.existsById("nonexistent")).thenReturn(false);
 

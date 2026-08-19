@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { useToast, ToastProvider } from "@/hooks/useToast";
+import { useToast } from "@/hooks/useToast";
+import { ToastProvider } from "@/hooks/ToastContext";
 
 function wrap() {
   return ({ children }: { children: ReactNode }) => <ToastProvider>{children}</ToastProvider>;

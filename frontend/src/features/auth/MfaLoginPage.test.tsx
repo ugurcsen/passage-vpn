@@ -7,8 +7,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { darkTheme } from "@/theme";
 import { queryClient } from "@/lib/queryClient";
 import { MfaLoginPage } from "./MfaLoginPage";
-import { ToastProvider } from "@/hooks/useToast";
-import { AuthProvider } from "@/hooks/useAuth";
+import { ToastProvider } from "@/hooks/ToastContext";
+import { AuthProvider } from "@/hooks/AuthContext";
 
 const me = {
   id: "u1",

@@ -5,8 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { MemoryRouter } from "react-router-dom";
 import { darkTheme } from "@/theme";
-import { AuthProvider } from "@/hooks/useAuth";
-import { ToastProvider } from "@/hooks/useToast";
+import { AuthProvider } from "@/hooks/AuthContext";
+import { ToastProvider } from "@/hooks/ToastContext";
 import { AccountPage } from "./AccountPage";
 
 let mfaEnabled = false;

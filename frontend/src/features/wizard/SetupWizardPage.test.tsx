@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
-import { ToastProvider } from "@/hooks/useToast";
+import { ToastProvider } from "@/hooks/ToastContext";
 import { SetupWizardPage } from "./SetupWizardPage";
 
 function renderPage() {

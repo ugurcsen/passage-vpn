@@ -64,7 +64,7 @@ export function CcdSettingsDialog({ target, onClose, onSaved }: CcdSettingsDialo
       })
       .catch(() => toast.error("Failed to load per-user settings"))
       .finally(() => setLoading(false));
-  }, [target]);
+  }, [target, toast]);
 
   const saveSettings = async () => {
     if (!target) return;
