@@ -1,22 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Box,
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  IconButton,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { Box, Button, IconButton, Paper, Stack, Tooltip, Typography } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -27,6 +11,9 @@ import { api, endpoints } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/hooks/useAuth";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { GroupFormDialog } from "./GroupFormDialog";
+import { GroupMembersDialog } from "./GroupMembersDialog";
+import { GroupPoolDialog } from "./GroupPoolDialog";
 
 interface GroupRow {
   id: string;
@@ -277,141 +264,63 @@ export function GroupsPage() {
         />
       </Paper>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editing ? `Edit ${editing.name}` : "New group"}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-            <TextField
-              label="Description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              multiline
-              minRows={2}
-            />
-            <TextField
-              select
-              label="Parent group"
-              value={parentId}
-              onChange={(e) => setParentId(e.target.value)}
-              helperText={
-                isAdmin
-                  ? "Child groups inherit settings, overridden by the more specific group."
-                  : "Group admins can only create subgroups under a managed root group."
-              }
-            >
-              <MenuItem value="" disabled={!isAdmin}>
-                None
-              </MenuItem>
-              {(groups ?? [])
-                .filter((g) => g.id !== editing?.id)
-                .map((g) => (
-                  <MenuItem key={g.id} value={g.id}>
-                    {g.name}
-                  </MenuItem>
-                ))}
-            </TextField>
-            <TextField
-              select
-              label="Tunnel mode"
-              value={tunnelMode}
-              onChange={(e) => setTunnelMode(e.target.value as "" | "full" | "split")}
-              disabled={!editing}
-              helperText={
-                editing
-                  ? "Full routes all traffic through the VPN; split routes only the configured networks. Empty inherits the server default."
-                  : "Set tunnel mode after creating the group."
-              }
-            >
-              <MenuItem value="">Inherit default</MenuItem>
-              <MenuItem value="full">Full tunnel</MenuItem>
-              <MenuItem value="split">Split tunnel</MenuItem>
-            </TextField>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled={!name.trim() || (!isAdmin && !parentId)}
-            onClick={() => saveMutation.mutate()}
-          >
-            {editing ? "Save" : "Create"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <GroupFormDialog
+        open={dialogOpen}
+        editing={editing}
+        name={name}
+        description={description}
+        parentId={parentId}
+        tunnelMode={tunnelMode}
+        groups={groups ?? []}
+        isAdmin={isAdmin}
+        onChangeName={setName}
+        onChangeDescription={setDescription}
+        onChangeParentId={setParentId}
+        onChangeTunnelMode={setTunnelMode}
+        onClose={() => setDialogOpen(false)}
+        onSave={() => saveMutation.mutate()}
+      />
 
-      <Dialog open={!!membersFor} onClose={() => setMembersFor(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Members of {membersFor?.name}</DialogTitle>
-        <DialogContent sx={{ maxHeight: 400, overflow: "auto" }}>
-          <Stack>
-            {(users ?? []).map((u) => (
-              <FormControlLabel
-                key={u.id}
-                control={
-                  <Checkbox
-                    checked={selectedUsers.includes(u.id)}
-                    onChange={(e) =>
-                      setSelectedUsers((prev) =>
-                        e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id),
-                      )
-                    }
-                  />
-                }
-                label={u.username}
-              />
-            ))}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setMembersFor(null)}>Cancel</Button>
-          <Button variant="contained" onClick={() => membersMutation.mutate()}>
-            Save members
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <GroupMembersDialog
+        open={!!membersFor}
+        groupName={membersFor?.name}
+        users={users ?? []}
+        selectedUserIds={selectedUsers}
+        saving={membersMutation.isPending}
+        onToggleUser={(userId, checked) =>
+          setSelectedUsers((prev) => (checked ? [...prev, userId] : prev.filter((id) => id !== userId)))
+        }
+        onClose={() => setMembersFor(null)}
+        onSave={() => membersMutation.mutate()}
+      />
 
-      <Dialog open={!!poolFor} onClose={() => setPoolFor(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Static IP pool — {poolFor?.name}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="IP range"
-              value={poolInput}
-              onChange={(e) => setPoolInput(e.target.value)}
-              placeholder="e.g. 10.8.0.100-10.8.0.199"
-              helperText="Single IP range (e.g. 10.8.0.100-10.8.0.199). Empty clears the pool. Members can be auto-allocated from here."
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPoolFor(null)}>Cancel</Button>
-          <Button variant="contained" disabled={poolMutation.isPending} onClick={() => poolMutation.mutate()}>
-            Save pool
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <GroupPoolDialog
+        open={!!poolFor}
+        groupName={poolFor?.name}
+        title="Static IP pool"
+        fieldLabel="IP range"
+        value={poolInput}
+        placeholder="e.g. 10.8.0.100-10.8.0.199"
+        helperText="Single IP range (e.g. 10.8.0.100-10.8.0.199). Empty clears the pool. Members can be auto-allocated from here."
+        saving={poolMutation.isPending}
+        onChange={setPoolInput}
+        onClose={() => setPoolFor(null)}
+        onSave={() => poolMutation.mutate()}
+      />
 
-      <Dialog open={!!poolIpv6For} onClose={() => setPoolIpv6For(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Static IPv6 pool — {poolIpv6For?.name}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="IPv6 range"
-              value={poolIpv6Input}
-              onChange={(e) => setPoolIpv6Input(e.target.value)}
-              placeholder="e.g. fd00:1::100-fd00:1::1ff"
-              helperText="Single IPv6 range (e.g. fd00:1::100-fd00:1::1ff). Empty clears the pool. Members can be auto-allocated from here."
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPoolIpv6For(null)}>Cancel</Button>
-          <Button variant="contained" disabled={poolIpv6Mutation.isPending} onClick={() => poolIpv6Mutation.mutate()}>
-            Save pool
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <GroupPoolDialog
+        open={!!poolIpv6For}
+        groupName={poolIpv6For?.name}
+        title="Static IPv6 pool"
+        fieldLabel="IPv6 range"
+        value={poolIpv6Input}
+        placeholder="e.g. fd00:1::100-fd00:1::1ff"
+        helperText="Single IPv6 range (e.g. fd00:1::100-fd00:1::1ff). Empty clears the pool. Members can be auto-allocated from here."
+        saving={poolIpv6Mutation.isPending}
+        onChange={setPoolIpv6Input}
+        onClose={() => setPoolIpv6For(null)}
+        onSave={() => poolIpv6Mutation.mutate()}
+      />
 
       <ConfirmDialog
         open={!!confirm}
