@@ -7,7 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import { darkTheme } from "@/theme";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ToastProvider } from "@/hooks/useToast";
-import { AccountPage } from "@/pages/AccountPage";
+import { AccountPage } from "./AccountPage";
 
 let mfaEnabled = false;
 let mfaRequired = false;

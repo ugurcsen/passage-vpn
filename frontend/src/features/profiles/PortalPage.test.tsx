@@ -7,7 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import { darkTheme } from "@/theme";
 import { ToastProvider } from "@/hooks/useToast";
 import { AuthProvider } from "@/hooks/useAuth";
-import { PortalPage } from "@/pages/PortalPage";
+import { PortalPage } from "./PortalPage";
 
 const profileTypes = [
   { type: "USER_LOCKED", label: "User locked", locked: false, allowed: true, available: true, daemons: [] },

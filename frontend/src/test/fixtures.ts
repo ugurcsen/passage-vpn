@@ -13,6 +13,9 @@ export const fakeAdmin: CurrentUser = {
   email: "admin@example.com",
   role: "ADMIN",
   mfaEnabled: false,
+  banned: false,
+  mustChangePassword: false,
+  groups: [],
 };
 
 export const fakeGroupAdmin: CurrentUser = {
@@ -22,6 +25,9 @@ export const fakeGroupAdmin: CurrentUser = {
   email: "ga@example.com",
   role: "GROUP_ADMIN",
   mfaEnabled: false,
+  banned: false,
+  mustChangePassword: false,
+  groups: [],
 };
 
 export const fakeUser: CurrentUser = {
@@ -31,6 +37,9 @@ export const fakeUser: CurrentUser = {
   email: "alice@example.com",
   role: "USER",
   mfaEnabled: false,
+  banned: false,
+  mustChangePassword: false,
+  groups: [],
 };
 
 export const fakeUserMfa: CurrentUser = {

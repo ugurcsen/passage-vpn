@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
-import { ConnectionLogsPage } from "@/pages/ConnectionLogsPage";
+import { ConnectionLogsPage } from "./ConnectionLogsPage";
 import type { ConnectionLog } from "@/lib/api";
 
 const logs: ConnectionLog[] = [

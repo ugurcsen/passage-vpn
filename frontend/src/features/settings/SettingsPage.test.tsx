@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
 import { ToastProvider } from "@/hooks/useToast";
-import { SettingsPage } from "@/pages/SettingsPage";
+import { SettingsPage } from "./SettingsPage";
 import type { ServerSettings } from "@/lib/api";
 
 function json(body: unknown) {

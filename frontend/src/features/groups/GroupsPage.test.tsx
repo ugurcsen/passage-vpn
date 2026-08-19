@@ -6,7 +6,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ToastProvider } from "@/hooks/useToast";
-import { GroupsPage } from "@/pages/GroupsPage";
+import { GroupsPage } from "./GroupsPage";
 
 const groups = [
   { id: "g1", name: "devs", description: "Engineering", parentId: null, memberCount: 1 },

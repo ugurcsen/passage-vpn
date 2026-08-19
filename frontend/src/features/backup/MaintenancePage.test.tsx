@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
 import { ToastProvider } from "@/hooks/useToast";
-import { MaintenancePage } from "@/pages/MaintenancePage";
+import { MaintenancePage } from "./MaintenancePage";
 
 const preflightResult = {
   passed: true,

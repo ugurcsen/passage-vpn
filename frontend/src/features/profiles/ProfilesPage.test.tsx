@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
 import { ToastProvider } from "@/hooks/useToast";
-import { ProfilesPage } from "@/pages/ProfilesPage";
+import { ProfilesPage } from "./ProfilesPage";
 
 const users = [{ id: "u1", username: "alice" }];
 

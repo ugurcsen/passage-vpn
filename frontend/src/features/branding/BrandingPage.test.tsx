@@ -3,7 +3,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { json, resetFetchMock } from "@/test/helpers";
-import { BrandingPage } from "@/pages/BrandingPage";
+import { BrandingPage } from "./BrandingPage";
 
 const brand = {
   name: "Acme VPN",

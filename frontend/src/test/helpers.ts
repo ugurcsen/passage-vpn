@@ -21,8 +21,6 @@ export function json(body: unknown, status = 200): Response {
 // Fetch mock helpers
 // ---------------------------------------------------------------------------
 
-type FetchFn = typeof fetch;
-
 /**
  * Stub `window.fetch` with a mock implementation that delegates to `handler`.
  * Automatically unstubs in afterEach (call `resetFetchMock()` in afterEach).

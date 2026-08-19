@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
 import { ToastProvider } from "@/hooks/useToast";
-import { AccessRulesPage } from "@/pages/AccessRulesPage";
+import { AccessRulesPage } from "./AccessRulesPage";
 
 const rules = [
   {

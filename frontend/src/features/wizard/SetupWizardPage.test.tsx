@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
 import { ToastProvider } from "@/hooks/useToast";
-import { SetupWizardPage } from "@/pages/SetupWizardPage";
+import { SetupWizardPage } from "./SetupWizardPage";
 
 function renderPage() {
   return render(

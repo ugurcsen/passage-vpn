@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
-import { StatusPage } from "@/pages/StatusPage";
+import { StatusPage } from "./StatusPage";
 
 const status = {
   brand: "PassageVPN",

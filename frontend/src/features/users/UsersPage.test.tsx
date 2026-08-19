@@ -6,7 +6,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ToastProvider } from "@/hooks/useToast";
-import { UsersPage } from "@/pages/UsersPage";
+import { UsersPage } from "./UsersPage";
 
 const users = [
   {

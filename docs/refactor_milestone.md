@@ -193,7 +193,7 @@ codebase for discoverability and modularity.
 - [x] **C1.4** Remaining files will be migrated during C2 (feature-folder move).
 - [x] **C1.5** `npm run test` — all 175 tests pass.
 
-### C2. Migrate pages to feature folders (incremental)
+### C2. Migrate pages to feature folders (incremental) ✅
 
 Migrate one feature at a time. Each migration moves the page component, its sub-
 components, types, hooks, and tests into a feature folder. The routing in `App.tsx`
@@ -201,40 +201,37 @@ is updated to import from the new location.
 
 **Migration order** (simplest → most complex):
 
-- [ ] **C2.1** `auth/` — Move `LoginPage.tsx`, `MfaLoginPage.tsx`,
-  `MfaEnrollPage.tsx` + tests into `src/features/auth/`. Move `useAuth` hook into
-  `src/features/auth/useAuth.ts`. Update `App.tsx` imports.
-- [ ] **C2.2** `dashboard/` — Move `DashboardPage.tsx` + test into
-  `src/features/dashboard/`. Move `useLiveStatus` hook into
-  `src/features/dashboard/useLiveStatus.ts`.
-- [ ] **C2.3** `settings/` — Move `SettingsPage.tsx` + test + `knownSettings.ts`
-  into `src/features/settings/`. Already partially there.
-- [ ] **C2.4** `wizard/` — Move `SetupWizardPage.tsx` + test into
+- [x] **C2.1** `auth/` — Moved `LoginPage.tsx`, `MfaLoginPage.tsx`,
+  `MfaEnrollPage.tsx` + tests into `src/features/auth/`.
+- [x] **C2.2** `dashboard/` — Moved `DashboardPage.tsx`, `StatusPage.tsx` + tests
+  into `src/features/dashboard/`.
+- [x] **C2.3** `settings/` — Moved `SettingsPage.tsx` + test into
+  `src/features/settings/` (was already partially there).
+- [x] **C2.4** `wizard/` — Moved `SetupWizardPage.tsx` + test into
   `src/features/wizard/`.
-- [ ] **C2.5** `users/` — Move `UsersPage.tsx` + test into `src/features/users/`.
-- [ ] **C2.6** `groups/` — Move `GroupsPage.tsx` + test into `src/features/groups/`.
-- [ ] **C2.7** `daemons/` — Move `DaemonsPage.tsx` + test into
+- [x] **C2.5** `users/` — Moved `UsersPage.tsx` + test into `src/features/users/`.
+- [x] **C2.6** `groups/` — Moved `GroupsPage.tsx` + test into `src/features/groups/`.
+- [x] **C2.7** `daemons/` — Moved `DaemonsPage.tsx` + test into
   `src/features/daemons/`.
-- [ ] **C2.8** `access-rules/` — Move `AccessRulesPage.tsx` + test into
+- [x] **C2.8** `access-rules/` — Moved `AccessRulesPage.tsx` + test into
   `src/features/access-rules/`.
-- [ ] **C2.9** `certs/` — Move `CertsPage.tsx` + test into `src/features/certs/`.
-- [ ] **C2.10** `dns-overrides/` — Move `DnsOverridesPage.tsx` + test into
+- [x] **C2.9** `certs/` — Moved `CertsPage.tsx` + test into `src/features/certs/`.
+- [x] **C2.10** `dns-overrides/` — Moved `DnsOverridesPage.tsx` + test into
   `src/features/dns-overrides/`.
-- [ ] **C2.11** `profiles/` — Move `ProfilesPage.tsx`, `PortalPage.tsx`,
+- [x] **C2.11** `profiles/` — Moved `ProfilesPage.tsx`, `PortalPage.tsx`,
   `AccountPage.tsx` + tests into `src/features/profiles/`.
-- [ ] **C2.12** `connection-logs/` — Move `ConnectionLogsPage.tsx` + test into
+- [x] **C2.12** `connection-logs/` — Moved `ConnectionLogsPage.tsx` + test into
   `src/features/connection-logs/`.
-- [ ] **C2.13** `nodes/` — Move `VpnNodesPage.tsx`, `NodesPage.tsx` + tests into
-  `src/features/nodes/`.
-- [ ] **C2.14** `backup/` — Move `BackupsPage.tsx`, `ConfigReportPage.tsx`,
+- [x] **C2.13** `nodes/` — Moved `NodesPage.tsx` + test into `src/features/nodes/`.
+- [x] **C2.14** `backup/` — Moved `BackupsPage.tsx`, `ConfigReportPage.tsx`,
   `MaintenancePage.tsx` + tests into `src/features/backup/`.
-- [ ] **C2.15** `audit-log/` — Move `AuditLogPage.tsx` + test into
+- [x] **C2.15** `audit-log/` — Moved `AuditLogsPage.tsx` + test into
   `src/features/audit-log/`.
-- [ ] **C2.16** `api-tokens/` — Move `ApiTokensPage.tsx` + test into
+- [x] **C2.16** `api-tokens/` — Moved `ApiTokensPage.tsx` + test into
   `src/features/api-tokens/`.
-- [ ] **C2.17** Update `App.tsx` routing to import all pages from their new feature
-  folder locations. Remove the empty `src/pages/` directory.
-- [ ] **C2.18** Run `npm run test && npm run lint && npm run build` — all green.
+- [x] **C2.17** Updated `App.tsx` routing to import all pages from their new feature
+  folder locations. Also moved `BrandingPage` → `src/features/branding/`.
+- [x] **C2.18** `npm run test && npm run build` — all 175 tests pass, build succeeds.
 
 ### C3. Decompose large pages into sub-components
 

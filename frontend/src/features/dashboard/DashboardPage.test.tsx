@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme } from "@/theme";
 import { ToastProvider } from "@/hooks/useToast";
-import { DashboardPage } from "@/pages/DashboardPage";
+import { DashboardPage } from "./DashboardPage";
 
 const dashboard = {
   users: 12,
