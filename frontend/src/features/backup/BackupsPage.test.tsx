@@ -93,6 +93,23 @@ describe("BackupsPage", () => {
     expect(await screen.findByText(/must be restarted/i)).toBeInTheDocument();
   });
 
+  it("renders an error alert when the fetch fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ message: "boom" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      ),
+    );
+    renderPage();
+
+    expect(await screen.findByText("boom")).toBeInTheDocument();
+  });
+
   it("imports an archive and offers to restore it", async () => {
     const imported = {
       name: "imported-20260813-110000.zip",

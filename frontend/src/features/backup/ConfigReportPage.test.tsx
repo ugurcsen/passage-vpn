@@ -68,4 +68,21 @@ describe("ConfigReportPage", () => {
     await screen.findByText(/0\.1\.0-alpha\.4/);
     expect(screen.getByText(/"max_connections": 3/)).toBeInTheDocument();
   });
+
+  it("renders an error alert when the fetch fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ message: "boom" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      ),
+    );
+    renderPage();
+
+    expect(await screen.findByText("boom")).toBeInTheDocument();
+  });
 });

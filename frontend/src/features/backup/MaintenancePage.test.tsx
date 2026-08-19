@@ -112,6 +112,68 @@ describe("MaintenancePage", () => {
     expect(await screen.findByText(/Backend is restarting/i)).toBeInTheDocument();
   });
 
+  it("shows a toast error when preflight fails", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/system/preflight") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ message: "Preflight failed" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.resolve(json({}));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+
+    await userEvent.click(screen.getByRole("button", { name: "Run preflight" }));
+
+    expect(await screen.findByText("Preflight failed")).toBeInTheDocument();
+  });
+
+  it("shows a toast error when restart fails", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/system/restart-backend") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ message: "Restart failed" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.resolve(json({}));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+
+    await userEvent.click(screen.getByRole("button", { name: "Restart backend" }));
+    await userEvent.click(screen.getByRole("button", { name: "Restart" }));
+
+    expect(await screen.findByText("Restart failed")).toBeInTheDocument();
+  });
+
+  it("shows a toast error when reload fails", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/system/reload-daemons") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ message: "Reload failed" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.resolve(json({}));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+
+    await userEvent.click(screen.getByRole("button", { name: "Reload daemons" }));
+    await userEvent.click(screen.getByRole("button", { name: "Reload" }));
+
+    expect(await screen.findByText("Reload failed")).toBeInTheDocument();
+  });
+
   it("reloads daemons and reports unreachable ones", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).includes("/system/reload-daemons") && init?.method === "POST") {

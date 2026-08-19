@@ -272,9 +272,9 @@ within their feature folder.
   for group CRUD, member management.
 - [x] **C4.3** Create `src/features/daemons/useDaemonMutations.ts` — mutation
   hooks for daemon CRUD, toggle enable/disable.
-- [ ] **C4.4** Create `src/features/settings/useSettingsMutations.ts` — mutation
+- [x] **C4.4** Create `src/features/settings/useSettingsMutations.ts` — mutation
   hooks for settings CRUD.
-- [ ] **C4.5** Run `npm run test && npm run lint` — all green.
+- [x] **C4.5** Run `npm run test && npm run lint` — all green.
 
 ---
 
