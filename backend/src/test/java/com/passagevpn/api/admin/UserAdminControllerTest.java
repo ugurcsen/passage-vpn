@@ -25,6 +25,7 @@ import org.springframework.security.core.Authentication;
 class UserAdminControllerTest {
 
   private UserAdminService userAdminService;
+  private UserIpAdminService userIpAdminService;
   private UserRepository userRepository;
   private Authentication authentication;
   private UserAdminController controller;
@@ -32,11 +33,12 @@ class UserAdminControllerTest {
   @BeforeEach
   void setUp() {
     userAdminService = mock(UserAdminService.class);
+    userIpAdminService = mock(UserIpAdminService.class);
     userRepository = mock(UserRepository.class);
     authentication = mock(Authentication.class);
     when(authentication.getPrincipal()).thenReturn("admin1");
     when(userRepository.findById("admin1")).thenReturn(Optional.of(admin()));
-    controller = new UserAdminController(userAdminService, userRepository);
+    controller = new UserAdminController(userAdminService, userIpAdminService, userRepository);
   }
 
   private User admin() {
@@ -245,66 +247,66 @@ class UserAdminControllerTest {
 
   @Test
   void setStaticIpDelegatesToService() {
-    when(userAdminService.setStaticIp(any(), eq("u1"), eq("10.8.0.100"))).thenReturn(dto());
+    when(userIpAdminService.setStaticIp(any(), eq("u1"), eq("10.8.0.100"))).thenReturn(dto());
 
     UserDto result =
         controller.setStaticIp(
             authentication, "u1", new UserAdminController.StaticIpRequest("10.8.0.100"));
 
     assertThat(result.username()).isEqualTo("alice");
-    verify(userAdminService).setStaticIp(any(), eq("u1"), eq("10.8.0.100"));
+    verify(userIpAdminService).setStaticIp(any(), eq("u1"), eq("10.8.0.100"));
   }
 
   @Test
   void allocateStaticIpDelegatesToService() {
-    when(userAdminService.allocateStaticIp(any(), eq("u1"))).thenReturn(dto());
+    when(userIpAdminService.allocateStaticIp(any(), eq("u1"))).thenReturn(dto());
 
     UserDto result = controller.allocateStaticIp(authentication, "u1");
 
     assertThat(result.username()).isEqualTo("alice");
-    verify(userAdminService).allocateStaticIp(any(), eq("u1"));
+    verify(userIpAdminService).allocateStaticIp(any(), eq("u1"));
   }
 
   @Test
   void clearStaticIpDelegatesToService() {
-    when(userAdminService.clearStaticIp(any(), eq("u1"))).thenReturn(dto());
+    when(userIpAdminService.clearStaticIp(any(), eq("u1"))).thenReturn(dto());
 
     UserDto result = controller.clearStaticIp(authentication, "u1");
 
     assertThat(result.username()).isEqualTo("alice");
-    verify(userAdminService).clearStaticIp(any(), eq("u1"));
+    verify(userIpAdminService).clearStaticIp(any(), eq("u1"));
   }
 
   @Test
   void setStaticIpv6DelegatesToService() {
-    when(userAdminService.setStaticIpv6(any(), eq("u1"), eq("fd00:1::10"))).thenReturn(dto());
+    when(userIpAdminService.setStaticIpv6(any(), eq("u1"), eq("fd00:1::10"))).thenReturn(dto());
 
     UserDto result =
         controller.setStaticIpv6(
             authentication, "u1", new UserAdminController.StaticIpv6Request("fd00:1::10"));
 
     assertThat(result.username()).isEqualTo("alice");
-    verify(userAdminService).setStaticIpv6(any(), eq("u1"), eq("fd00:1::10"));
+    verify(userIpAdminService).setStaticIpv6(any(), eq("u1"), eq("fd00:1::10"));
   }
 
   @Test
   void allocateStaticIpv6DelegatesToService() {
-    when(userAdminService.allocateStaticIpv6(any(), eq("u1"))).thenReturn(dto());
+    when(userIpAdminService.allocateStaticIpv6(any(), eq("u1"))).thenReturn(dto());
 
     UserDto result = controller.allocateStaticIpv6(authentication, "u1");
 
     assertThat(result.username()).isEqualTo("alice");
-    verify(userAdminService).allocateStaticIpv6(any(), eq("u1"));
+    verify(userIpAdminService).allocateStaticIpv6(any(), eq("u1"));
   }
 
   @Test
   void clearStaticIpv6DelegatesToService() {
-    when(userAdminService.clearStaticIpv6(any(), eq("u1"))).thenReturn(dto());
+    when(userIpAdminService.clearStaticIpv6(any(), eq("u1"))).thenReturn(dto());
 
     UserDto result = controller.clearStaticIpv6(authentication, "u1");
 
     assertThat(result.username()).isEqualTo("alice");
-    verify(userAdminService).clearStaticIpv6(any(), eq("u1"));
+    verify(userIpAdminService).clearStaticIpv6(any(), eq("u1"));
   }
 
   @Test

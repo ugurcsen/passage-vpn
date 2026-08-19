@@ -355,68 +355,6 @@ public class UserAdminService {
     return getUser(actor, id);
   }
 
-  @Transactional
-  public UserDto setStaticIp(User actor, String id, String staticIp) {
-    User user = requireUser(id);
-    assertCanManageUser(actor, user);
-    ccdService.setStaticIp(id, staticIp);
-    auditLogService.record(
-        "USER_STATIC_IP_SET", AuditLogService.CAT_USER, id, "user", Map.of("staticIp", staticIp));
-    return getUser(actor, id);
-  }
-
-  /** Allocates the next free static IP from the user's group pool. */
-  @Transactional
-  public UserDto allocateStaticIp(User actor, String id) {
-    User user = requireUser(id);
-    assertCanManageUser(actor, user);
-    ccdService.allocateFromGroupPool(id);
-    auditLogService.record("USER_STATIC_IP_ALLOCATE", AuditLogService.CAT_USER, id, "user", null);
-    return getUser(actor, id);
-  }
-
-  @Transactional
-  public UserDto clearStaticIp(User actor, String id) {
-    User user = requireUser(id);
-    assertCanManageUser(actor, user);
-    ccdService.clearStaticIp(id);
-    auditLogService.record("USER_STATIC_IP_CLEAR", AuditLogService.CAT_USER, id, "user", null);
-    return getUser(actor, id);
-  }
-
-  @Transactional
-  public UserDto setStaticIpv6(User actor, String id, String staticIpv6) {
-    User user = requireUser(id);
-    assertCanManageUser(actor, user);
-    ccdService.setStaticIpv6(id, staticIpv6);
-    auditLogService.record(
-        "USER_STATIC_IPV6_SET",
-        AuditLogService.CAT_USER,
-        id,
-        "user",
-        Map.of("staticIpv6", staticIpv6));
-    return getUser(actor, id);
-  }
-
-  /** Allocates the next free static IPv6 from the user's group pool. */
-  @Transactional
-  public UserDto allocateStaticIpv6(User actor, String id) {
-    User user = requireUser(id);
-    assertCanManageUser(actor, user);
-    ccdService.allocateIpv6FromGroupPool(id);
-    auditLogService.record("USER_STATIC_IPV6_ALLOCATE", AuditLogService.CAT_USER, id, "user", null);
-    return getUser(actor, id);
-  }
-
-  @Transactional
-  public UserDto clearStaticIpv6(User actor, String id) {
-    User user = requireUser(id);
-    assertCanManageUser(actor, user);
-    ccdService.clearStaticIpv6(id);
-    auditLogService.record("USER_STATIC_IPV6_CLEAR", AuditLogService.CAT_USER, id, "user", null);
-    return getUser(actor, id);
-  }
-
   public record MfaSetup(String secret, String otpAuthUrl, String qrDataUrl) {}
 
   /** Generates a fresh TOTP secret; user must then confirm with {@link #enableMfa}. */

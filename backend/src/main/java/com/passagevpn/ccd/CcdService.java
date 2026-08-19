@@ -1,6 +1,7 @@
 package com.passagevpn.ccd;
 
 import com.passagevpn.common.ApiException;
+import com.passagevpn.common.Ipv6Util;
 import com.passagevpn.config.PassageProperties;
 import com.passagevpn.network.ServerConfigGenerator;
 import com.passagevpn.network.ServerSettingRepository;
@@ -11,7 +12,6 @@ import com.passagevpn.user.UserRepository;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.Inet4Address;
-import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -108,8 +108,10 @@ public class CcdService {
       throw ApiException.badRequest(
           "no_ip_pool", "No static IP pool configured for the user's groups");
     }
-    PoolRange range = parsePool(pool);
-    String candidate = findFreeIp(range, user);
+    IpPoolAllocator<Long> allocator = ipv4Allocator();
+    IpPoolAllocator.PoolRange<Long> range = allocator.parse(pool);
+    Set<String> used = usedStaticIps(user);
+    String candidate = allocator.findFree(range, used);
     if (candidate == null) {
       throw ApiException.conflict("pool_exhausted", "Static IP pool exhausted for " + pool);
     }
@@ -135,7 +137,11 @@ public class CcdService {
     if (pool == null || pool.isBlank()) {
       return;
     }
-    parsePool(pool);
+    try {
+      ipv4Allocator().parse(pool);
+    } catch (IllegalArgumentException e) {
+      throw ApiException.badRequest("invalid_ip_pool", e.getMessage());
+    }
   }
 
   /**
@@ -196,8 +202,10 @@ public class CcdService {
       throw ApiException.badRequest(
           "no_ipv6_pool", "No static IPv6 pool configured for the user's groups");
     }
-    Ipv6PoolRange range = parseIpv6Pool(pool);
-    String candidate = findFreeIpv6(range, user);
+    IpPoolAllocator<BigInteger> allocator = ipv6Allocator();
+    IpPoolAllocator.PoolRange<BigInteger> range = allocator.parse(pool);
+    Set<String> used = usedStaticIpv6s(user);
+    String candidate = allocator.findFree(range, used);
     if (candidate == null) {
       throw ApiException.conflict("pool_exhausted", "Static IPv6 pool exhausted for " + pool);
     }
@@ -223,7 +231,11 @@ public class CcdService {
     if (pool == null || pool.isBlank()) {
       return;
     }
-    parseIpv6Pool(pool);
+    try {
+      ipv6Allocator().parse(pool);
+    } catch (IllegalArgumentException e) {
+      throw ApiException.badRequest("invalid_ipv6_pool", e.getMessage());
+    }
   }
 
   /** Regenerates all CCD files and removes files for users that no longer have one. */
@@ -321,33 +333,6 @@ public class CcdService {
         | (octets[3] & 0xff);
   }
 
-  private record PoolRange(long start, long end) {}
-
-  /** Parses a pool of the form "start-end", both IPv4 addresses (start <= end). */
-  private PoolRange parsePool(String pool) {
-    String[] parts = pool.trim().split("-");
-    if (parts.length != 2) {
-      throw ApiException.badRequest(
-          "invalid_ip_pool", "IP pool must be of the form 10.8.0.100-10.8.0.199");
-    }
-    long start = toLong(parts[0].trim());
-    long end = toLong(parts[1].trim());
-    if (start > end) {
-      throw ApiException.badRequest(
-          "invalid_ip_pool", "IP pool start must not be greater than its end");
-    }
-    long[] bounds = subnetHostBounds();
-    if (bounds == null) {
-      throw ApiException.badRequest(
-          "invalid_ip_pool", "Cannot validate pool against the VPN subnet");
-    }
-    if (start < bounds[0] || end > bounds[1] || start == bounds[0] || end == bounds[1]) {
-      throw ApiException.badRequest(
-          "invalid_ip_pool", "IP pool must be host addresses inside the VPN subnet");
-    }
-    return new PoolRange(start, end);
-  }
-
   /** Resolves the server VPN subnet's [network, broadcast] addresses as longs, or null. */
   private long[] subnetHostBounds() {
     try {
@@ -360,57 +345,26 @@ public class CcdService {
     }
   }
 
-  private long toLong(String ip) {
-    long value;
-    try {
-      InetAddress address = InetAddress.getByName(ip);
-      if (!(address instanceof Inet4Address)) {
-        throw ApiException.badRequest("invalid_ip_pool", "Only IPv4 pool addresses are supported");
-      }
-      value = toInt(address.getAddress()) & 0xffff_ffffL;
-    } catch (ApiException e) {
-      throw e;
-    } catch (Exception e) {
-      throw ApiException.badRequest("invalid_ip_pool", "Invalid pool address: " + ip);
+  private IpPoolAllocator<Long> ipv4Allocator() {
+    long[] bounds = subnetHostBounds();
+    if (bounds == null) {
+      throw ApiException.badRequest(
+          "invalid_ip_pool", "Cannot validate pool against the VPN subnet");
     }
-    if (value == 0 || value == 0xffff_ffffL) {
-      throw ApiException.badRequest("invalid_ip_pool", "Invalid pool address: " + ip);
-    }
-    return value;
+    return IpPoolAllocator.ipv4(bounds[0], bounds[1]);
   }
 
-  /** First free address in the range not assigned to another user (and not the user's own). */
-  private String findFreeIp(PoolRange range, User self) {
-    Set<String> used =
-        userRepository.findAll().stream()
-            .map(User::getStaticIp)
-            .filter(ip -> ip != null && !ip.isBlank())
-            .filter(ip -> !(self.getStaticIp() != null && self.getStaticIp().equals(ip)))
-            .collect(Collectors.toSet());
-    long guard = range.end - range.start + 1;
-    if (guard > 65536) {
-      throw ApiException.badRequest("invalid_ip_pool", "IP pool range is too large");
+  private IpPoolAllocator<BigInteger> ipv6Allocator() {
+    if (!ipv6Enabled()) {
+      throw ApiException.badRequest("ipv6_disabled", "IPv6 is not enabled on the VPN server");
     }
-    for (long candidate = range.start; candidate <= range.end; candidate++) {
-      String ip = formatIp(candidate);
-      if (!used.contains(ip)) {
-        return ip;
-      }
-    }
-    return null;
+    int prefix = ipv6Prefix();
+    BigInteger network = subnetNetwork(prefix);
+    BigInteger hostMask = BigInteger.ONE.shiftLeft(128 - prefix).subtract(BigInteger.ONE);
+    // Exclude network address AND server tun address (network+1) as pool boundaries
+    BigInteger networkPlusOne = network.add(BigInteger.ONE);
+    return IpPoolAllocator.ipv6(networkPlusOne, network.or(hostMask));
   }
-
-  private String formatIp(long value) {
-    return ((value >> 24) & 0xff)
-        + "."
-        + ((value >> 16) & 0xff)
-        + "."
-        + ((value >> 8) & 0xff)
-        + "."
-        + (value & 0xff);
-  }
-
-  private record Ipv6PoolRange(BigInteger start, BigInteger end) {}
 
   /** True when the server network config has dual-stack enabled with a usable IPv6 subnet. */
   private boolean ipv6Enabled() {
@@ -459,16 +413,15 @@ public class CcdService {
     if (!ipv6Enabled()) {
       throw ApiException.badRequest("ipv6_disabled", "IPv6 is not enabled on the VPN server");
     }
-    Inet6Address address;
+    BigInteger addr;
     try {
-      address = (Inet6Address) InetAddress.getByName(ip);
-    } catch (Exception e) {
+      addr = Ipv6Util.parseIpv6(ip);
+    } catch (IllegalArgumentException e) {
       throw ApiException.badRequest("invalid_static_ipv6", "Not a valid IPv6 address: " + ip);
     }
     int prefix = ipv6Prefix();
-    BigInteger addr = toUnsigned(address.getAddress());
     BigInteger network = subnetNetwork(prefix);
-    BigInteger mask = prefixMask(prefix);
+    BigInteger mask = Ipv6Util.prefixMask(prefix);
     if (!addr.and(mask).equals(network)) {
       throw ApiException.badRequest(
           "invalid_static_ipv6",
@@ -483,151 +436,31 @@ public class CcdService {
     }
   }
 
-  /** Parses an IPv6 pool of the form "start-end"; both ends inside the VPN subnet. */
-  private Ipv6PoolRange parseIpv6Pool(String pool) {
-    String[] parts = pool.trim().split("-");
-    if (parts.length != 2) {
-      throw ApiException.badRequest(
-          "invalid_ipv6_pool", "IPv6 pool must be of the form fd00:1::10-fd00:1::ff");
-    }
-    if (!ipv6Enabled()) {
-      throw ApiException.badRequest("ipv6_disabled", "IPv6 is not enabled on the VPN server");
-    }
-    BigInteger start = ipv6ToUnsigned(parts[0].trim());
-    BigInteger end = ipv6ToUnsigned(parts[1].trim());
-    if (start.compareTo(end) > 0) {
-      throw ApiException.badRequest(
-          "invalid_ipv6_pool", "IPv6 pool start must not be greater than its end");
-    }
-    int prefix = ipv6Prefix();
-    BigInteger network = subnetNetwork(prefix);
-    BigInteger hostMask = BigInteger.ONE.shiftLeft(128 - prefix).subtract(BigInteger.ONE);
-    BigInteger subnetEnd = network.or(hostMask);
-    if (start.compareTo(network.add(BigInteger.ONE)) <= 0 || end.compareTo(subnetEnd) >= 0) {
-      throw ApiException.badRequest(
-          "invalid_ipv6_pool", "IPv6 pool must be host addresses inside the VPN subnet");
-    }
-    return new Ipv6PoolRange(start, end);
-  }
-
   /** The network address (as unsigned BigInteger) of the server's configured IPv6 subnet. */
   private BigInteger subnetNetwork(int prefix) {
     try {
-      InetAddress subnet = InetAddress.getByName(ipv6SubnetBase());
-      return toUnsigned(maskToNetwork(subnet.getAddress(), prefix));
-    } catch (Exception e) {
+      return Ipv6Util.subnetNetwork(ipv6SubnetBase(), prefix);
+    } catch (IllegalArgumentException e) {
       throw ApiException.badRequest("invalid_ipv6_subnet", "IPv6 subnet must be a CIDR");
     }
   }
 
-  private BigInteger ipv6ToUnsigned(String ip) {
-    try {
-      InetAddress address = InetAddress.getByName(ip);
-      if (!(address instanceof Inet6Address)) {
-        throw ApiException.badRequest("invalid_ipv6_pool", "Not an IPv6 address: " + ip);
-      }
-      return toUnsigned(address.getAddress());
-    } catch (ApiException e) {
-      throw e;
-    } catch (Exception e) {
-      throw ApiException.badRequest("invalid_ipv6_pool", "Invalid IPv6 pool address: " + ip);
-    }
+  /** Collects all non-blank static IPv4 IPs assigned to other users. */
+  private Set<String> usedStaticIps(User self) {
+    return userRepository.findAll().stream()
+        .map(User::getStaticIp)
+        .filter(ip -> ip != null && !ip.isBlank())
+        .filter(ip -> !(self.getStaticIp() != null && self.getStaticIp().equals(ip)))
+        .collect(Collectors.toSet());
   }
 
-  /** First free IPv6 in the range not assigned to another user (and not the user's own). */
-  private String findFreeIpv6(Ipv6PoolRange range, User self) {
-    Set<String> used =
-        userRepository.findAll().stream()
-            .map(User::getStaticIpv6)
-            .filter(ip -> ip != null && !ip.isBlank())
-            .filter(ip -> !(self.getStaticIpv6() != null && self.getStaticIpv6().equals(ip)))
-            .collect(Collectors.toSet());
-    BigInteger size = range.end().subtract(range.start()).add(BigInteger.ONE);
-    if (size.compareTo(BigInteger.valueOf(65536)) > 0) {
-      throw ApiException.badRequest("invalid_ipv6_pool", "IPv6 pool range is too large");
-    }
-    for (BigInteger candidate = range.start();
-        candidate.compareTo(range.end()) <= 0;
-        candidate = candidate.add(BigInteger.ONE)) {
-      String ip = formatIpv6(candidate);
-      if (!used.contains(ip)) {
-        return ip;
-      }
-    }
-    return null;
-  }
-
-  private static String formatIpv6(BigInteger value) {
-    byte[] bytes = value.toByteArray();
-    byte[] result = new byte[16];
-    if (bytes.length >= 16) {
-      System.arraycopy(bytes, bytes.length - 16, result, 0, 16);
-    } else {
-      System.arraycopy(bytes, 0, result, 16 - bytes.length, bytes.length);
-    }
-    return canonicalIpv6(result);
-  }
-
-  /** RFC 5952 canonical form of a 16-byte IPv6 address (longest zero run compressed). */
-  private static String canonicalIpv6(byte[] address) {
-    int[] groups = new int[8];
-    for (int i = 0; i < 8; i++) {
-      groups[i] = ((address[i * 2] & 0xFF) << 8) | (address[i * 2 + 1] & 0xFF);
-    }
-    int bestStart = -1;
-    int bestLen = 1;
-    for (int i = 0; i < 8; ) {
-      if (groups[i] == 0) {
-        int j = i;
-        while (j < 8 && groups[j] == 0) {
-          j++;
-        }
-        if (j - i >= 2 && j - i > bestLen) {
-          bestStart = i;
-          bestLen = j - i;
-        }
-        i = j;
-      } else {
-        i++;
-      }
-    }
-    StringBuilder sb = new StringBuilder();
-    for (int i = 0; i < 8; i++) {
-      if (i == bestStart) {
-        sb.append("::");
-        i += bestLen - 1;
-        continue;
-      }
-      if (sb.length() > 0 && sb.charAt(sb.length() - 1) != ':') {
-        sb.append(':');
-      }
-      sb.append(Integer.toHexString(groups[i]));
-    }
-    return sb.length() == 0 ? "::" : sb.toString();
-  }
-
-  private static BigInteger toUnsigned(byte[] bytes) {
-    return new BigInteger(1, bytes);
-  }
-
-  private static byte[] maskToNetwork(byte[] addressBytes, int prefix) {
-    byte[] out = addressBytes.clone();
-    int skip = out.length - 16;
-    int fullBytes = prefix / 8;
-    int remBits = prefix % 8;
-    for (int i = fullBytes + skip; i < 16 + skip; i++) {
-      out[i] = 0;
-    }
-    if (remBits != 0) {
-      out[fullBytes + skip] &= (byte) (0xFF << (8 - remBits));
-    }
-    return out;
-  }
-
-  private static BigInteger prefixMask(int prefix) {
-    BigInteger full = BigInteger.ONE.shiftLeft(128).subtract(BigInteger.ONE);
-    BigInteger host = BigInteger.ONE.shiftLeft(128 - prefix).subtract(BigInteger.ONE);
-    return full.xor(host);
+  /** Collects all non-blank static IPv6 addresses assigned to other users. */
+  private Set<String> usedStaticIpv6s(User self) {
+    return userRepository.findAll().stream()
+        .map(User::getStaticIpv6)
+        .filter(ip -> ip != null && !ip.isBlank())
+        .filter(ip -> !(self.getStaticIpv6() != null && self.getStaticIpv6().equals(ip)))
+        .collect(Collectors.toSet());
   }
 
   private void appendDns(List<String> lines, Map<String, Object> effective) {

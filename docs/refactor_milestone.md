@@ -1,0 +1,481 @@
+# Refactor Milestone — PassageVPN
+
+Refactoring and improvement plan for the PassageVPN project. The goal is to bring the
+codebase to production-grade maturity: decompose god classes, unify frontend architecture,
+eliminate dead code, harden security edges, and raise the CI/CD baseline.
+
+> **Version context:** This plan starts from `v0.1.0-beta.20` (196 backend source files,
+> 24 frontend pages, 22 Flyway migrations, 110+ API endpoints).
+
+Legend: `[ ]` = pending, `[~]` = in progress, `[x]` = done.
+
+---
+
+## Working Protocol
+
+Every task follows the same flow:
+
+1. Flip the item to `[~]` while working.
+2. Implement code + unit tests (backend and frontend where applicable).
+3. Run verification:
+   - `cd backend && ./gradlew test spotlessCheck`
+   - `cd frontend && npm run lint && npm run test`
+4. Flip the item to `[x]` when verified.
+5. Update `RELEASE_NOTES.md` when a sub-milestone ships.
+
+---
+
+## Phase A — Backend: God Class Decomposition
+
+The largest services have accumulated too many responsibilities. Extract focused
+collaborators so each service stays transactional and single-purpose.
+
+### A1. CcdService (709 lines) — extract Ipv6Util + IpPoolAllocator
+
+- [x] **A1.1** Create `common/Ipv6Util.java` — extract all BigInteger arithmetic:
+  `canonicalIpv6()`, `subnetNetwork()`, `prefixMask()`, `maskToNetwork()`,
+  `toUnsigned()`, `ipv6ToUnsigned()`, `formatIpv6()`. These ~150 lines have no
+  dependency on Spring or any other service.
+- [x] **A1.2** Create `ccd/IpPoolAllocator.java` — a generic pool allocator that
+  abstracts the duplicated IPv4/IPv6 pool logic. Both `parsePool()`/`parseIpv6Pool()`,
+  `findFreeIp()`/`findFreeIpv6()`, `validate()`/`validateIpv6()` are structurally
+  identical; the strategy pattern with `InetAddress` formatting methods eliminates
+  the duplication.
+- [x] **A1.3** Create `Ipv6UtilTest.java` — test canonical formatting (RFC 5952),
+  prefix mask calculation, boundary prefixes, loopback/mapped addresses, invalid
+  input rejection.
+- [x] **A1.4** Create `IpPoolAllocatorTest.java` — test free-IP allocation,
+  conflict detection, pool exhaustion, IPv4 and IPv6 variants.
+- [x] **A1.5** Refactor `CcdService` to use the new utility classes. Verify
+  `CcdServiceTest` passes without modification (behavioral equivalence).
+- [x] **A1.6** Run `./gradlew test spotlessCheck` — all green.
+
+**Files created:**
+```
+backend/src/main/java/com/passagevpn/common/Ipv6Util.java          (104 lines)
+backend/src/main/java/com/passagevpn/ccd/IpPoolAllocator.java       (161 lines)
+backend/src/test/java/com/passagevpn/common/Ipv6UtilTest.java       (~120 lines, 30 tests)
+backend/src/test/java/com/passagevpn/ccd/IpPoolAllocatorTest.java   (168 lines, 23 tests)
+```
+
+**Result:** CcdService dropped from 615 → 516 lines (~100 lines removed).
+
+### A2. UserAdminService (582 lines, 12 dependencies) — extract UserIpAdminService
+
+- [x] **A2.1** Create `api/admin/UserIpAdminService.java` — move the 6 static IP
+  methods (`setStaticIp`, `allocateStaticIp`, `clearStaticIp`, `setStaticIpv6`,
+  `allocateStaticIpv6`, `clearStaticIpv6`) plus their audit-logging wrappers out
+  of `UserAdminService`. This service takes `CcdService`, `AuditLogService`, and
+  `UserRepository` as dependencies. Delegates DTO construction back to
+  `UserAdminService.getUser()` so group membership, MFA, and settings resolve
+  consistently from one code path.
+- [x] **A2.2** Update `UserAdminController` — rewire the static IP endpoints to
+  call `UserIpAdminService` instead of `UserAdminService`.
+- [x] **A2.3** Create `UserIpAdminServiceTest.java` — test allocate, set, clear,
+  conflict, and audit-log interactions for both IPv4 and IPv6.
+- [x] **A2.4** Remove the 6 static IP methods from `UserAdminService`. Verify it
+  drops to ~520 lines with 12 constructor parameters.
+- [x] **A2.5** Run `./gradlew test spotlessCheck` — all green.
+
+**Files created:**
+```
+backend/src/main/java/com/passagevpn/api/admin/UserIpAdminService.java  (127 lines)
+backend/src/test/java/com/passagevpn/api/admin/UserIpAdminServiceTest.java  (119 lines, 8 tests)
+```
+
+**Result:** UserAdminService dropped from 582 → 520 lines (62 lines removed).
+
+### A3. DaemonService (662 lines) — reduce duplication
+
+- [ ] **A3.1** Refactor `validateUnique()` — replace 3 separate `findAll()` calls
+  with a single pass: fetch all daemons once, check index, port, and IPv6 subnet
+  uniqueness in a single in-memory loop.
+- [ ] **A3.2** Extract `buildEntityFromRequest(DaemonCreateRequest, Daemon)` helper
+  — both `create()` and `update()` build the entity from the request with identical
+  logic. The helper takes the existing entity (or `null` for create) and returns a
+  populated entity.
+- [ ] **A3.3** Verify `DaemonServiceTest` passes unchanged (behavioral equivalence).
+- [ ] **A3.4** Run `./gradlew test spotlessCheck` — all green.
+
+### A4. InternalController (327 lines) — extract ConnectionOrchestrator
+
+- [ ] **A4.1** Create `internal/ConnectionOrchestrator.java` — move the
+  `connect()` orchestration logic (user lookup, ban/lock check, connection limit
+  enforcement, connection registry update, connection log recording, iptables
+  resolution) out of the controller into a service method.
+- [ ] **A4.2** Refactor `InternalController.connect()` to delegate to
+  `ConnectionOrchestrator.connectUser()`. The controller becomes a thin HTTP adapter.
+- [ ] **A4.3** Move `sanitizeReason()` reason-mapping to a domain-level concept
+  (e.g., `VpnDenyReason.sanitize()`).
+- [ ] **A4.4** Create `ConnectionOrchestratorTest.java` — test all deny paths
+  (unknown user, banned, locked, max connections) and the happy path.
+- [ ] **A4.5** Run `./gradlew test spotlessCheck` — all green.
+
+---
+
+## Phase B — Backend: Code Quality & Security Hardening
+
+### B1. SettingsService naming cleanup
+
+- [ ] **B1.1** Rename `groupRepository_` → `groupSettingRepository` in
+  `SettingsService.java`. The trailing underscore is a code smell caused by name
+  collision with `groupRepository` (which is actually `GroupSettingRepository`).
+  Rename the field and the constructor parameter for clarity.
+- [ ] **B1.2** Verify `SettingsServiceTest` passes.
+- [ ] **B1.3** Run `./gradlew test spotlessCheck`.
+
+### B2. BCrypt → Argon2id password hashing migration
+
+AGENTS.md says "Argon2id preferred" but the codebase uses BCrypt. This adds a
+migration-safe dual-hash support.
+
+- [ ] **B2.1** Add `Argon2PasswordEncoder` bean to the security config as the
+  primary `PasswordEncoder`. Add Argon2id tuning parameters to
+  `PassageProperties` (`passage.auth.argon2.memory-iterations`, `.memory`,
+  `.parallelism`, `.salt-length`, `.hash-length`) with secure defaults (64MB,
+  3 iterations, 4 parallelism).
+- [ ] **B2.2** Create a `DelegatingPasswordEncoder`-style wrapper that verifies
+  against Argon2id first, falls back to BCrypt for existing hashes. This provides
+  a transparent migration path: new registrations use Argon2id; existing BCrypt
+  hashes continue to work until the next password change.
+- [ ] **B2.3** Add a comment/migration note in `AuthService` documenting the dual-
+  hash support and the eventual goal of dropping BCrypt verification.
+- [ ] **B2.4** Update tests to cover both hash verification paths.
+- [ ] **B2.5** Run `./gradlew test spotlessCheck`.
+
+### B3. CORS origin tightening
+
+- [ ] **B3.1** Add `passage.cors.allowed-origins` property to
+  `PassageProperties` (defaults to `*` for local dev).
+- [ ] **B3.2** Update the CORS configuration to use the property instead of
+  hardcoded `"*"`.
+- [ ] **B3.3** Document in `.env.example` and `docs/configuration.md`:
+  `PASSAGE_CORS_ORIGINS=https://vpn.example.com`.
+- [ ] **B3.4** Run `./gradlew test spotlessCheck`.
+
+### B4. AuthService in-memory state documentation
+
+- [ ] **B4.1** Add Javadoc to `redeemedChallenges` and `pendingVpnAuths` fields
+  documenting the single-instance constraint and the reason (performance, no Redis
+  dependency).
+- [ ] **B4.2** Add a startup log warning in `AuthService` or a
+  `@PostConstruct` method: "In-memory auth state is not shared across instances.
+  Clustering is not supported."
+- [ ] **B4.3** Run `./gradlew test spotlessCheck`.
+
+### B5. RateLimitFilter IP resolution
+
+- [ ] **B5.1** Replace the manual `X-Forwarded-For` parsing in
+  `RateLimitFilter.clientIp()` with Spring's `RequestContextHolder` to get the
+  resolved remote address (already processed by Tomcat's `RemoteIpValve`).
+- [ ] **B5.2** Verify `RateLimitFilterTest` passes.
+- [ ] **B5.3** Run `./gradlew test spotlessCheck`.
+
+### B6. Manage password at-rest documentation
+
+- [ ] **B6.1** Add a `TODO` comment and architecture note in `OpenVpnNode` entity
+  documenting that `mgmtPassword` is stored in plaintext (necessary for the
+  management client to authenticate) and that at-rest encryption is a future
+  improvement.
+- [ ] **B6.2** Document in `docs/architecture.md` the threat model: management
+  passwords are stored in the SQLite/Postgres database, which should be protected
+  at the filesystem/infrastructure level.
+
+---
+
+## Phase C — Frontend: Feature-Folder Architecture
+
+The project prescribes `frontend/src/features/<feature>/` in AGENTS.md but currently
+uses flat `pages/` and `components/` directories. This migration restructures the
+codebase for discoverability and modularity.
+
+### C1. Create shared test utilities (prerequisite)
+
+- [ ] **C1.1** Create `src/test/renderWithProviders.tsx` — a shared test helper
+  that wraps a component tree with `ThemeProvider`, `QueryClientProvider`,
+  `ToastProvider`, and `AuthProvider`. Every test file currently duplicates this
+  setup (~28 copies).
+- [ ] **C1.2** Create `src/test/mocks.ts` — shared `json()` response builder,
+  `mockFetch()` factory, and common mock data fixtures (users, groups, settings).
+- [ ] **C1.3** Migrate the first test file (`UsersPage.test.tsx`) to use the new
+  utilities. Verify all tests pass.
+- [ ] **C1.4** Migrate remaining test files one-by-one. Remove duplicated `json()`
+  helper from each file.
+- [ ] **C1.5** Run `npm run test && npm run lint` — all green.
+
+### C2. Migrate pages to feature folders (incremental)
+
+Migrate one feature at a time. Each migration moves the page component, its sub-
+components, types, hooks, and tests into a feature folder. The routing in `App.tsx`
+is updated to import from the new location.
+
+**Migration order** (simplest → most complex):
+
+- [ ] **C2.1** `auth/` — Move `LoginPage.tsx`, `MfaLoginPage.tsx`,
+  `MfaEnrollPage.tsx` + tests into `src/features/auth/`. Move `useAuth` hook into
+  `src/features/auth/useAuth.ts`. Update `App.tsx` imports.
+- [ ] **C2.2** `dashboard/` — Move `DashboardPage.tsx` + test into
+  `src/features/dashboard/`. Move `useLiveStatus` hook into
+  `src/features/dashboard/useLiveStatus.ts`.
+- [ ] **C2.3** `settings/` — Move `SettingsPage.tsx` + test + `knownSettings.ts`
+  into `src/features/settings/`. Already partially there.
+- [ ] **C2.4** `wizard/` — Move `SetupWizardPage.tsx` + test into
+  `src/features/wizard/`.
+- [ ] **C2.5** `users/` — Move `UsersPage.tsx` + test into `src/features/users/`.
+- [ ] **C2.6** `groups/` — Move `GroupsPage.tsx` + test into `src/features/groups/`.
+- [ ] **C2.7** `daemons/` — Move `DaemonsPage.tsx` + test into
+  `src/features/daemons/`.
+- [ ] **C2.8** `access-rules/` — Move `AccessRulesPage.tsx` + test into
+  `src/features/access-rules/`.
+- [ ] **C2.9** `certs/` — Move `CertsPage.tsx` + test into `src/features/certs/`.
+- [ ] **C2.10** `dns-overrides/` — Move `DnsOverridesPage.tsx` + test into
+  `src/features/dns-overrides/`.
+- [ ] **C2.11** `profiles/` — Move `ProfilesPage.tsx`, `PortalPage.tsx`,
+  `AccountPage.tsx` + tests into `src/features/profiles/`.
+- [ ] **C2.12** `connection-logs/` — Move `ConnectionLogsPage.tsx` + test into
+  `src/features/connection-logs/`.
+- [ ] **C2.13** `nodes/` — Move `VpnNodesPage.tsx`, `NodesPage.tsx` + tests into
+  `src/features/nodes/`.
+- [ ] **C2.14** `backup/` — Move `BackupsPage.tsx`, `ConfigReportPage.tsx`,
+  `MaintenancePage.tsx` + tests into `src/features/backup/`.
+- [ ] **C2.15** `audit-log/` — Move `AuditLogPage.tsx` + test into
+  `src/features/audit-log/`.
+- [ ] **C2.16** `api-tokens/` — Move `ApiTokensPage.tsx` + test into
+  `src/features/api-tokens/`.
+- [ ] **C2.17** Update `App.tsx` routing to import all pages from their new feature
+  folder locations. Remove the empty `src/pages/` directory.
+- [ ] **C2.18** Run `npm run test && npm run lint && npm run build` — all green.
+
+### C3. Decompose large pages into sub-components
+
+After feature-folder migration, break the largest pages into focused sub-components
+within their feature folder.
+
+- [ ] **C3.1** `UsersPage` (1199 lines) — extract:
+  - `UserCreateDialog.tsx` — create user form
+  - `PasswordResetDialog.tsx` — password reset form
+  - `MfaSetupDialog.tsx` — MFA provisioning flow (QR, verify, enable)
+  - `UserColumns.tsx` — DataGrid column definitions
+  - `useUserMutations.ts` — mutation hooks (create, update, delete, ban, reset
+    password, MFA)
+- [ ] **C3.2** `SettingsPage` (726 lines) — extract:
+  - `NetworkConfigDialog.tsx` — network settings form
+  - `AdvancedSettingsDialog.tsx` — raw JSON editor
+  - `KnownSettingsGrid.tsx` — typed settings table
+  - `useSettingsMutations.ts` — mutation hooks
+- [ ] **C3.3** `DaemonsPage` (610 lines) — extract:
+  - `DaemonCreateDialog.tsx` — daemon create/edit form
+  - `RouteChipList.tsx` — reusable chip-based route editor (shared with SettingsPage)
+  - `DaemonColumns.tsx` — DataGrid column definitions
+- [ ] **C3.4** `DashboardPage` (525 lines) — extract:
+  - `StatCards.tsx` — stat card row
+  - `TrafficChart.tsx` — MUI X Charts traffic visualization
+  - `RecentConnections.tsx` — recent connections table
+- [ ] **C3.5** `GroupsPage` (430 lines) — extract:
+  - `GroupCreateDialog.tsx`
+  - `MemberEditor.tsx` — chip-based member picker
+  - `GroupColumns.tsx`
+- [ ] **C3.6** Run `npm run test && npm run lint && npm run build` — all green.
+
+### C4. Decompose extracted hooks into feature hooks
+
+- [ ] **C4.1** Create `src/features/users/useUserMutations.ts` — mutation hooks
+  for user CRUD, ban/unban, password reset, MFA provisioning.
+- [ ] **C4.2** Create `src/features/groups/useGroupMutations.ts` — mutation hooks
+  for group CRUD, member management.
+- [ ] **C4.3** Create `src/features/daemons/useDaemonMutations.ts` — mutation
+  hooks for daemon CRUD, toggle enable/disable.
+- [ ] **C4.4** Create `src/features/settings/useSettingsMutations.ts` — mutation
+  hooks for settings CRUD.
+- [ ] **C4.5** Run `npm run test && npm run lint` — all green.
+
+---
+
+## Phase D — Frontend: Dependency & Quality Cleanup
+
+### D1. Remove dead dependencies
+
+- [ ] **D1.1** Audit `react-hook-form` and `zod` usage — if confirmed unused,
+  remove from `package.json`. The `@hookform/resolvers` package should also be
+  removed if `react-hook-form` is gone.
+- [ ] **D1.2** Remove the manual chunk in `vite.config.ts` for `react-hook-form`
+  if the dependency is removed.
+- [ ] **D1.3** Run `npm run build` — verify bundle size decreases.
+
+### D2. Replace deprecated react-json-view
+
+- [ ] **D2.1** Replace `react-json-view` with `react18-json-view` (actively
+  maintained fork) or a simpler alternative like a `<pre>` with
+  `JSON.stringify(data, null, 2)`.
+- [ ] **D2.2** Update imports in affected files (likely `ConfigReportPage`,
+  `SettingsPage` advanced editor).
+- [ ] **D2.3** Run `npm run test && npm run lint` — all green.
+
+### D3. Re-enable no-explicit-any
+
+- [ ] **D3.1** Add `"@typescript-eslint/no-explicit-any": "warn"` to the ESLint
+  config. Start with `warn` to identify current violations without breaking the
+  build.
+- [ ] **D3.2** Fix or suppress each `any` occurrence with a proper type. Track
+  the count down to zero.
+- [ ] **D3.3** Escalate to `"error"` once the codebase is clean.
+- [ ] **D3.4** Run `npm run lint` — no warnings.
+
+### D4. Fragile test selectors
+
+- [ ] **D4.1** Audit all `querySelector("input[type='checkbox']")` patterns in
+  test files. Replace with MUI's accessible `role="checkbox"` selectors
+  (`screen.getByRole("checkbox", { name: /label/ })`) where possible.
+- [ ] **D4.2** Run `npm run test` — all green.
+
+### D5. Missing test coverage
+
+- [ ] **D5.1** Add test for `ConfirmDialog` component.
+- [ ] **D5.2** Add test for `useBrand` hook.
+- [ ] **D5.3** Add test for `useToast` hook.
+- [ ] **D5.4** Add test for `roles.ts` utility.
+- [ ] **D5.5** Add API failure path tests for pages with light coverage:
+  `ConfigReportPage`, `StatusPage`, `BackupsPage`, `MaintenancePage`.
+- [ ] **D5.6** Run `npm run test:coverage` — verify thresholds met.
+
+---
+
+## Phase E — Backend: Test Coverage & Missing Tests
+
+### E1. Untested utility/config classes
+
+- [ ] **E1.1** Add `SecurityConfigTest.java` — verify the security filter chain
+  configuration (public endpoints, protected endpoints, CORS config).
+- [ ] **E1.2** Add `PassagePropertiesTest.java` — verify property binding and
+  validation (JWT secret min length, default values).
+- [ ] **E1.3** Add `AgentPropertiesTest.java` and `InternalPropertiesTest.java`
+  — verify property binding.
+- [ ] **E1.4** Add `PostAuthHookServiceTest.java` — test script execution,
+  timeout, stderr capture, and hook failure behavior.
+- [ ] **E1.5** Add `AuthFailureRecorderTest.java` — test auth failure recording.
+- [ ] **E1.6** Run `./gradlew test jacocoTestCoverageVerification spotlessCheck`.
+
+### E2. IPv6 edge case tests for CcdService
+
+- [ ] **E2.1** Add IPv6 canonical formatting tests to `CcdServiceTest` (or the
+  new `Ipv6UtilTest`): loopback `::1`, IPv4-mapped `::ffff:192.168.1.1`, link-
+  local `fe80::1`, ULA `fd00::1`, full expansion vs zero compression.
+- [ ] **E2.2** Add IPv6 pool allocation edge cases: `/128` single-host pool,
+  pool exhaustion, boundary allocation (last IP in range).
+- [ ] **E2.3** Run `./gradlew test spotlessCheck`.
+
+---
+
+## Phase F — CI/CD & DevOps Hardening
+
+### F1. CI pipeline improvements
+
+- [ ] **F1.1** Add a security scanning step to CI: `dependency-check` (OWASP) or
+  `snyk` for backend dependency vulnerabilities. Run on `main` and PRs.
+- [ ] **F1.2** Add a frontend dependency audit step: `npm audit --audit-level=high`
+  in the CI frontend job.
+- [ ] **F1.3** Add `release.yml` coverage gate — the release workflow currently
+  runs `test` but not `jacocoTestCoverageVerification`. Add it to prevent
+  releasing with coverage regressions.
+- [ ] **F1.4** Add Docker image vulnerability scanning: `docker scout cves` or
+  `trivy` on the built images in the `docker-build` job.
+
+### F2. Integration test smoke test in CI
+
+- [ ] **F2.1** Create a `docker-compose.ci.yml` that starts backend + openvpn
+  (no frontend needed for backend smoke).
+- [ ] **F2.2** Add a CI job that runs `docker compose -f docker-compose.ci.yml up`
+  and hits `/actuator/health` + `/api/setup/state` to verify the stack boots.
+- [ ] **F2.3** Add this job to `ci.yml` after the `docker-build` job.
+
+### F3. Release workflow polish
+
+- [ ] **F3.1** Add `release.yml` step to generate `CHANGELOG.md` from commit
+  messages between the previous tag and the new tag.
+- [ ] **F3.2** Add GitHub Release body with auto-generated notes from the tag
+  range.
+
+---
+
+## Phase G — Documentation & Cross-Cutting
+
+### G1. Architecture documentation
+
+- [ ] **G1.1** Update `docs/architecture.md` with the new feature-folder
+  structure diagram for the frontend.
+- [ ] **G1.2** Document the backend service decomposition (extracted utility
+  classes, connection orchestrator) in `docs/architecture.md`.
+- [ ] **G1.3** Document the BCrypt→Argon2id migration path in
+  `docs/architecture.md` and `docs/configuration.md`.
+
+### G2. API documentation
+
+- [ ] **G2.1** Regenerate `docs/api.md` via `make api-docs` after all backend
+  changes.
+- [ ] **G2.2** Verify OpenAPI spec is clean (no warnings, no unresolvable
+  references).
+
+### G3. Cross-cutting TODO items
+
+These are the remaining items from the original `TODO.md` cross-cutting section:
+
+- [ ] **G3.1** Environment-variable-driven configuration audit — verify all
+  secrets are only configurable via `.env` (no hardcoded values in source).
+- [ ] **G3.2** English-only verification — scan for non-English UI strings,
+  comments, and commit messages.
+- [ ] **G3.3** Final `make test` pass — backend + frontend green, Spotless +
+  ESLint clean.
+
+---
+
+## Execution Order & Milestones
+
+The recommended execution order groups related work into shippable milestones:
+
+### R1 — Backend decomposition (Phase A + B1-B2)
+Ship: service decomposition, naming cleanup, Argon2id support.
+Backend only, no API changes, all tests pass.
+
+### R2 — Backend security hardening (Phase B3-B6)
+Ship: CORS tightening, rate-limit fix, documentation.
+No breaking changes, configuration additions only.
+
+### R3 — Frontend architecture (Phase C1-C2)
+Ship: feature-folder migration, shared test utilities.
+No functional changes, imports updated, all tests pass.
+
+### R4 — Frontend decomposition (Phase C3-C4)
+Ship: page decomposition, extracted hooks.
+No functional changes, all tests pass.
+
+### R5 — Frontend cleanup (Phase D)
+Ship: dead dependency removal, deprecated package replacement, lint fixes,
+missing tests.
+Bundle size decrease expected.
+
+### R6 — Backend test coverage (Phase E)
+Ship: missing tests, IPv6 edge cases.
+Coverage gate improvement.
+
+### R7 — CI/CD hardening + docs (Phase F + G)
+Ship: security scanning, integration smoke test, documentation updates.
+DevOps and documentation only, no source code changes.
+
+---
+
+## Metrics to Track
+
+| Metric | Current (beta.20) | Target (post-refactor) |
+|---|---|---|
+| Backend source lines | 18,866 | ~17,000 (after extractions) |
+| Backend test lines | 18,706 | ~20,000 (new tests) |
+| Backend JaCoCo instruction | 88.9% | ≥ 90% |
+| Frontend source lines | 10,526 | ~9,500 (after decomposition) |
+| Frontend test lines | 5,461 | ~7,000 (shared utils + new tests) |
+| Frontend bundle size | TBD | Measure before/after |
+| Largest backend file | 709 (CcdService) | < 400 |
+| Largest frontend file | 1,199 (UsersPage) | < 400 |
+| Frontend pages in features/ | 0 of 24 | 24 of 24 |
+| Dead dependencies | 2 (react-hook-form, zod) | 0 |
+| Deprecated dependencies | 1 (react-json-view) | 0 |
+| CI security scanning | None | OWASP dep-check + npm audit |

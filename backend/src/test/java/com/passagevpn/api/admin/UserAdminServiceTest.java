@@ -514,9 +514,6 @@ class UserAdminServiceTest {
     assertThatThrownBy(() -> service.resetPassword(groupAdmin(), "gadmin1", "pwned123!"))
         .isInstanceOf(ApiException.class)
         .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
-    assertThatThrownBy(() -> service.setStaticIp(groupAdmin(), "gadmin1", "10.8.0.200"))
-        .isInstanceOf(ApiException.class)
-        .satisfies(e -> assertThat(((ApiException) e).getCode()).isEqualTo("forbidden"));
   }
 
   @Test
@@ -784,25 +781,6 @@ class UserAdminServiceTest {
 
     assertThat(bob.isBanned()).isFalse();
     verify(userRepository).save(bob);
-  }
-
-  @Test
-  void staticIpOperationsDelegateToCcdService() {
-    when(userRepository.findById("u2")).thenReturn(Optional.of(bob()));
-
-    service.setStaticIp(admin(), "u2", "10.8.0.100");
-    service.allocateStaticIp(admin(), "u2");
-    service.clearStaticIp(admin(), "u2");
-    service.setStaticIpv6(admin(), "u2", "fd00:1::10");
-    service.allocateStaticIpv6(admin(), "u2");
-    service.clearStaticIpv6(admin(), "u2");
-
-    verify(ccdService).setStaticIp("u2", "10.8.0.100");
-    verify(ccdService).allocateFromGroupPool("u2");
-    verify(ccdService).clearStaticIp("u2");
-    verify(ccdService).setStaticIpv6("u2", "fd00:1::10");
-    verify(ccdService).allocateIpv6FromGroupPool("u2");
-    verify(ccdService).clearStaticIpv6("u2");
   }
 
   @Test

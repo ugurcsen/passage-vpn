@@ -442,6 +442,20 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 
 ---
 
+## Refactoring & Quality Improvement (v0.2.0-alpha.1)
+
+> Detailed plan with per-task tracking: `docs/refactor_milestone.md`.
+> Phases A–G covering backend decomposition, security hardening, frontend
+> architecture migration, dependency cleanup, test coverage, CI/CD, and docs.
+
+- [ ] Phase A — Backend god class decomposition (CcdService, UserAdminService, DaemonService, InternalController)
+- [ ] Phase B — Backend security & quality (naming, Argon2id, CORS, rate-limit, docs)
+- [ ] Phase C — Frontend feature-folder migration + page decomposition
+- [ ] Phase D — Frontend dependency cleanup (dead deps, deprecated pkg, no-explicit-any, tests)
+- [ ] Phase E — Backend missing test coverage (config classes, IPv6 edge cases)
+- [ ] Phase F — CI/CD hardening (security scanning, integration smoke, release polish)
+- [ ] Phase G — Documentation & cross-cutting (architecture, API docs, env-var audit)
+
 ## Cross-cutting
 - [ ] Environment-variable-driven configuration everywhere
 - [ ] No secrets in code; `.env` only

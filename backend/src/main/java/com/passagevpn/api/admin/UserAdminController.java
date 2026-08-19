@@ -31,10 +31,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserAdminController {
 
   private final UserAdminService userAdminService;
+  private final UserIpAdminService userIpAdminService;
   private final UserRepository userRepository;
 
-  public UserAdminController(UserAdminService userAdminService, UserRepository userRepository) {
+  public UserAdminController(
+      UserAdminService userAdminService,
+      UserIpAdminService userIpAdminService,
+      UserRepository userRepository) {
     this.userAdminService = userAdminService;
+    this.userIpAdminService = userIpAdminService;
     this.userRepository = userRepository;
   }
 
@@ -128,17 +133,17 @@ public class UserAdminController {
       Authentication authentication,
       @PathVariable String id,
       @Valid @RequestBody StaticIpRequest request) {
-    return userAdminService.setStaticIp(actor(authentication), id, request.staticIp());
+    return userIpAdminService.setStaticIp(actor(authentication), id, request.staticIp());
   }
 
   @PostMapping("/{id}/static-ip/allocate")
   public UserDto allocateStaticIp(Authentication authentication, @PathVariable String id) {
-    return userAdminService.allocateStaticIp(actor(authentication), id);
+    return userIpAdminService.allocateStaticIp(actor(authentication), id);
   }
 
   @DeleteMapping("/{id}/static-ip")
   public UserDto clearStaticIp(Authentication authentication, @PathVariable String id) {
-    return userAdminService.clearStaticIp(actor(authentication), id);
+    return userIpAdminService.clearStaticIp(actor(authentication), id);
   }
 
   @PutMapping("/{id}/static-ipv6")
@@ -146,17 +151,17 @@ public class UserAdminController {
       Authentication authentication,
       @PathVariable String id,
       @Valid @RequestBody StaticIpv6Request request) {
-    return userAdminService.setStaticIpv6(actor(authentication), id, request.staticIpv6());
+    return userIpAdminService.setStaticIpv6(actor(authentication), id, request.staticIpv6());
   }
 
   @PostMapping("/{id}/static-ipv6/allocate")
   public UserDto allocateStaticIpv6(Authentication authentication, @PathVariable String id) {
-    return userAdminService.allocateStaticIpv6(actor(authentication), id);
+    return userIpAdminService.allocateStaticIpv6(actor(authentication), id);
   }
 
   @DeleteMapping("/{id}/static-ipv6")
   public UserDto clearStaticIpv6(Authentication authentication, @PathVariable String id) {
-    return userAdminService.clearStaticIpv6(actor(authentication), id);
+    return userIpAdminService.clearStaticIpv6(actor(authentication), id);
   }
 
   @GetMapping("/{id}/settings")
