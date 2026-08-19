@@ -47,7 +47,13 @@ public class OpenVpnNode {
   @Column(name = "admin_host")
   private String adminHost;
 
-  /** Management interface password for this gateway (used to open management sessions). */
+  /**
+   * Management interface password for this gateway (used to open management sessions).
+   *
+   * <p>TODO: stored in plaintext — necessary for the management client to authenticate. At-rest
+   * encryption is a future improvement; the database file should be protected at the
+   * filesystem/infrastructure level.
+   */
   @Column(name = "mgmt_password")
   private String mgmtPassword;
 

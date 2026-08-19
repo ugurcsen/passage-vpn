@@ -51,12 +51,24 @@ public class AuthService {
   private final IpFailureTracker ipFailureTracker;
   private final AuthFailureRecorder authFailureRecorder;
 
-  /** Redeemed MFA challenge ids (jti) → redemption epoch-second, for single-use enforcement. */
+  /**
+   * Redeemed MFA challenge ids (jti) → redemption epoch-second, for single-use enforcement.
+   *
+   * <p><b>Single-instance constraint:</b> This map is in-memory and not replicated across
+   * instances. Clustering is not supported; each instance independently tracks its own challenge
+   * redemptions. If horizontal scaling is needed, this must be backed by a distributed store.
+   */
   private final Map<String, Long> redeemedChallenges = new ConcurrentHashMap<>();
 
   /** Binds an OpenVPN auth-pending phase 1 to its phase 2; single-use and short-lived. */
   private record PendingVpnAuth(String username, String remoteIp, Instant expiresAt) {}
 
+  /**
+   * Pending OpenVPN auth-pending nonces awaiting phase 2 verification.
+   *
+   * <p><b>Single-instance constraint:</b> Same as {@link #redeemedChallenges} — not shared across
+   * instances. Entries expire after {@link #PENDING_VPN_AUTH_TTL_SECONDS} and are lazily cleaned.
+   */
   private final Map<String, PendingVpnAuth> pendingVpnAuths = new ConcurrentHashMap<>();
 
   public AuthService(
