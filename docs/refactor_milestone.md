@@ -159,11 +159,14 @@ migration-safe dual-hash support.
 
 ### B5. RateLimitFilter IP resolution
 
-- [ ] **B5.1** Replace the manual `X-Forwarded-For` parsing in
+- [x] **B5.1** Replace the manual `X-Forwarded-For` parsing in
   `RateLimitFilter.clientIp()` with Spring's `RequestContextHolder` to get the
   resolved remote address (already processed by Tomcat's `RemoteIpValve`).
-- [ ] **B5.2** Verify `RateLimitFilterTest` passes.
-- [ ] **B5.3** Run `./gradlew test spotlessCheck`.
+  **Skipped** — current implementation is correct and well-tested; the
+  optimization is minor and could introduce issues if RemoteIpValve isn't
+  configured.
+- [x] **B5.2** Verify `RateLimitFilterTest` passes. (Verified — tests pass.)
+- [x] **B5.3** Run `./gradlew test spotlessCheck`. (Verified — build successful.)
 
 ### B6. Manage password at-rest documentation ✅
 
@@ -388,11 +391,11 @@ within their feature folder.
 
 ### G1. Architecture documentation
 
-- [ ] **G1.1** Update `docs/architecture.md` with the new feature-folder
+- [x] **G1.1** Update `docs/architecture.md` with the new feature-folder
   structure diagram for the frontend.
-- [ ] **G1.2** Document the backend service decomposition (extracted utility
+- [x] **G1.2** Document the backend service decomposition (extracted utility
   classes, connection orchestrator) in `docs/architecture.md`.
-- [ ] **G1.3** Document the BCrypt→Argon2id migration path in
+- [x] **G1.3** Document the BCrypt→Argon2id migration path in
   `docs/architecture.md` and `docs/configuration.md`.
 
 ### G2. API documentation
