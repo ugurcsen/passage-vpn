@@ -310,20 +310,20 @@ within their feature folder.
 
 ### D4. Fragile test selectors
 
-- [ ] **D4.1** Audit all `querySelector("input[type='checkbox']")` patterns in
+- [x] **D4.1** Audit all `querySelector("input[type='checkbox']")` patterns in
   test files. Replace with MUI's accessible `role="checkbox"` selectors
   (`screen.getByRole("checkbox", { name: /label/ })`) where possible.
-- [ ] **D4.2** Run `npm run test` — all green.
+- [x] **D4.2** Run `npm run test` — all green.
 
 ### D5. Missing test coverage
 
-- [ ] **D5.1** Add test for `ConfirmDialog` component.
-- [ ] **D5.2** Add test for `useBrand` hook.
-- [ ] **D5.3** Add test for `useToast` hook.
-- [ ] **D5.4** Add test for `roles.ts` utility.
+- [x] **D5.1** Add test for `ConfirmDialog` component.
+- [x] **D5.2** Add test for `useBrand` hook.
+- [x] **D5.3** Add test for `useToast` hook.
+- [x] **D5.4** Add test for `roles.ts` utility.
 - [ ] **D5.5** Add API failure path tests for pages with light coverage:
   `ConfigReportPage`, `StatusPage`, `BackupsPage`, `MaintenancePage`.
-- [ ] **D5.6** Run `npm run test:coverage` — verify thresholds met.
+- [x] **D5.6** Run `npm run test:coverage` — verify thresholds met.
 
 ---
 
@@ -331,25 +331,25 @@ within their feature folder.
 
 ### E1. Untested utility/config classes
 
-- [ ] **E1.1** Add `SecurityConfigTest.java` — verify the security filter chain
+- [x] **E1.1** Add `SecurityConfigTest.java` — verify the security filter chain
   configuration (public endpoints, protected endpoints, CORS config).
-- [ ] **E1.2** Add `PassagePropertiesTest.java` — verify property binding and
+- [x] **E1.2** Add `PassagePropertiesTest.java` — verify property binding and
   validation (JWT secret min length, default values).
-- [ ] **E1.3** Add `AgentPropertiesTest.java` and `InternalPropertiesTest.java`
+- [x] **E1.3** Add `AgentPropertiesTest.java` and `InternalPropertiesTest.java`
   — verify property binding.
-- [ ] **E1.4** Add `PostAuthHookServiceTest.java` — test script execution,
+- [x] **E1.4** Add `PostAuthHookServiceTest.java` — test script execution,
   timeout, stderr capture, and hook failure behavior.
-- [ ] **E1.5** Add `AuthFailureRecorderTest.java` — test auth failure recording.
-- [ ] **E1.6** Run `./gradlew test jacocoTestCoverageVerification spotlessCheck`.
+- [x] **E1.5** Add `AuthFailureRecorderTest.java` — test auth failure recording.
+- [x] **E1.6** Run `./gradlew test jacocoTestCoverageVerification spotlessCheck`.
 
 ### E2. IPv6 edge case tests for CcdService
 
-- [ ] **E2.1** Add IPv6 canonical formatting tests to `CcdServiceTest` (or the
+- [x] **E2.1** Add IPv6 canonical formatting tests to `CcdServiceTest` (or the
   new `Ipv6UtilTest`): loopback `::1`, IPv4-mapped `::ffff:192.168.1.1`, link-
   local `fe80::1`, ULA `fd00::1`, full expansion vs zero compression.
-- [ ] **E2.2** Add IPv6 pool allocation edge cases: `/128` single-host pool,
+- [x] **E2.2** Add IPv6 pool allocation edge cases: `/128` single-host pool,
   pool exhaustion, boundary allocation (last IP in range).
-- [ ] **E2.3** Run `./gradlew test spotlessCheck`.
+- [x] **E2.3** Run `./gradlew test spotlessCheck`.
 
 ---
 

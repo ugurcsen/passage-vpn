@@ -35,6 +35,10 @@ jobs:
       - name: Frontend deps
         working-directory: frontend
         run: npm ci
+      - name: Frontend dependency audit (F1.2)
+        working-directory: frontend
+        run: npm audit --audit-level=high
+        continue-on-error: true
       - name: Frontend lint + build + test (with coverage gate)
         working-directory: frontend
         run: |
@@ -51,3 +55,42 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Build service images
         run: docker compose build backend frontend openvpn
+
+  smoke-test:
+    name: Smoke test (backend health check)
+    runs-on: ubuntu-latest
+    needs: docker-build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build backend image
+        run: docker compose build backend
+      - name: Start backend service
+        run: |
+          mkdir -p .github
+          printf 'PASSAGE_JWT_SECRET=01234567890123456789012345678901\n' > .env
+          printf 'PASSAGE_OPENVPN_MGMT_PASSWORD=ci-test-password\n' >> .env
+          printf 'PASSAGE_DATA_DIR=/var/lib/passage\n' >> .env
+          docker compose up -d --no-deps backend
+      - name: Wait for backend to be healthy
+        run: |
+          echo "Waiting for backend container to be healthy..."
+          timeout 120 bash -c '
+            until docker inspect --format="{{.State.Health.Status}}" passage-backend 2>/dev/null | grep -q healthy; do
+              sleep 2
+            done
+          '
+          echo "Backend is healthy."
+      - name: Verify /actuator/health endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health)
+          if [ "$STATUS" -ne 200 ]; then
+            echo "ERROR: /actuator/health returned HTTP $STATUS (expected 200)"
+            docker compose logs backend
+            exit 1
+          fi
+          echo "/actuator/health returned HTTP 200"
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

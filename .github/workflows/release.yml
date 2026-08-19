@@ -23,9 +23,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: true
-      - name: Backend test + spotless
+      - name: Backend test + jacoco + spotless
         working-directory: backend
-        run: ./gradlew test spotlessCheck
+        run: ./gradlew test jacocoTestCoverageVerification spotlessCheck
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
