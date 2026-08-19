@@ -4,17 +4,10 @@ import {
   Box,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
   IconButton,
-  MenuItem,
   Paper,
   Stack,
   Switch,
-  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -25,73 +18,8 @@ import EditIcon from "@mui/icons-material/Edit";
 import { api, endpoints, type Daemon, type OpenVpnNode } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-
-interface DaemonForm {
-  name: string;
-  daemonIndex: string;
-  port: string;
-  proto: "udp" | "tcp" | "udp6" | "tcp6";
-  subnet: string;
-  subnetMask: string;
-  dnsServers: string;
-  domain: string;
-  extraRoutes: string[];
-  fullTunnel: boolean;
-  clientCertNotRequired: boolean;
-  authUserPass: boolean;
-  adminHost: string;
-  nodeId: string;
-  ipv6Enabled: boolean;
-  ipv6Subnet: string;
-  enabled: boolean;
-}
-
-const EMPTY_FORM: DaemonForm = {
-  name: "",
-  daemonIndex: "",
-  port: "",
-  proto: "udp",
-  subnet: "",
-  subnetMask: "255.255.255.0",
-  dnsServers: "1.1.1.1, 8.8.8.8",
-  domain: "",
-  extraRoutes: [],
-  fullTunnel: true,
-  clientCertNotRequired: false,
-  authUserPass: true,
-  adminHost: "",
-  nodeId: "",
-  ipv6Enabled: false,
-  ipv6Subnet: "fd00:1::/64",
-  enabled: true,
-};
-
-/** Profile types a daemon serves, derived from its flag combination. */
-function daemonRole(d: Daemon): string {
-  if (d.clientCertNotRequired) return "Generic";
-  if (!d.authUserPass) return "Auto-login";
-  return "User-locked / Server-locked";
-}
-
-function dcoLabel(d: Daemon): string {
-  if (d.dco === true) return "DCO";
-  if (d.dco === false) return "Userspace";
-  return "—";
-}
-
-function splitList(value: string): string[] {
-  return value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-const IPV4_CIDR = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/;
-const IPV6_CIDR = /^[0-9a-fA-F:.]+\/\d{1,3}$/;
-
-function isValidCidr(value: string): boolean {
-  return IPV4_CIDR.test(value) || IPV6_CIDR.test(value);
-}
+import { DaemonFormDialog } from "./DaemonFormDialog";
+import { EMPTY_FORM, daemonRole, dcoLabel, isValidCidr, rowToForm, splitList, type DaemonForm } from "./helpers";
 
 export function DaemonsPage() {
   const toast = useToast();
@@ -201,25 +129,7 @@ export function DaemonsPage() {
 
   const openEdit = (row: Daemon) => {
     setEditing(row.id);
-    setForm({
-      name: row.name ?? "",
-      daemonIndex: String(row.daemonIndex),
-      port: String(row.port),
-      proto: row.proto,
-      subnet: row.subnet,
-      subnetMask: row.subnetMask,
-      dnsServers: row.dnsServers.join(", "),
-      domain: row.domain ?? "",
-      extraRoutes: [...row.extraRoutes],
-      fullTunnel: row.fullTunnel,
-      clientCertNotRequired: row.clientCertNotRequired,
-      authUserPass: row.authUserPass,
-      adminHost: row.adminHost ?? "",
-      nodeId: row.nodeId ?? "",
-      ipv6Enabled: row.ipv6Enabled,
-      ipv6Subnet: row.ipv6Subnet ?? "fd00:1::/64",
-      enabled: row.enabled,
-    });
+    setForm(rowToForm(row));
     setNewRoute("");
     setRouteError(null);
     setDialogOpen(true);
@@ -379,218 +289,21 @@ export function DaemonsPage() {
         />
       </Paper>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editing ? "Edit daemon" : "New daemon"}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="Name"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g. Generic access"
-                sx={{ flex: 1 }}
-              />
-              <TextField
-                label="Daemon index"
-                value={form.daemonIndex}
-                onChange={(e) => setForm({ ...form, daemonIndex: e.target.value })}
-                required
-                sx={{ width: 140 }}
-                helperText="0 is the primary daemon"
-              />
-            </Stack>
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="Port"
-                value={form.port}
-                onChange={(e) => setForm({ ...form, port: e.target.value })}
-                sx={{ width: 140 }}
-                helperText="Empty = auto-assign from published range"
-              />
-              <TextField
-                select
-                label="Protocol"
-                value={form.proto}
-                onChange={(e) =>
-                  setForm({ ...form, proto: e.target.value as "udp" | "tcp" | "udp6" | "tcp6" })
-                }
-                sx={{ width: 140 }}
-              >
-                <MenuItem value="udp">UDP</MenuItem>
-                <MenuItem value="tcp">TCP</MenuItem>
-                <MenuItem value="udp6">UDP6</MenuItem>
-                <MenuItem value="tcp6">TCP6</MenuItem>
-              </TextField>
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="Admin host"
-                value={form.adminHost}
-                onChange={(e) => setForm({ ...form, adminHost: e.target.value })}
-                placeholder="vpn.example.com"
-                sx={{ flex: 1 }}
-              />
-              <TextField
-                select
-                label="VPN node"
-                value={form.nodeId}
-                onChange={(e) => setForm({ ...form, nodeId: e.target.value })}
-                helperText="Empty = local deployment"
-                sx={{ width: 220 }}
-              >
-                <MenuItem value="">Local (this server)</MenuItem>
-                {(nodes ?? [])
-                  .filter((n) => n.enabled)
-                  .map((n) => (
-                    <MenuItem key={n.id} value={n.id}>
-                      {n.name}
-                    </MenuItem>
-                  ))}
-              </TextField>
-            </Stack>
-            </Stack>
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="Subnet"
-                value={form.subnet}
-                onChange={(e) => setForm({ ...form, subnet: e.target.value })}
-                required
-                placeholder="10.8.0.0"
-                sx={{ flex: 1 }}
-              />
-              <TextField
-                label="Subnet mask"
-                value={form.subnetMask}
-                onChange={(e) => setForm({ ...form, subnetMask: e.target.value })}
-                required
-                placeholder="255.255.255.0"
-                sx={{ width: 160 }}
-              />
-            </Stack>
-            <TextField
-              label="DNS servers (comma separated)"
-              value={form.dnsServers}
-              onChange={(e) => setForm({ ...form, dnsServers: e.target.value })}
-              placeholder="1.1.1.1, 8.8.8.8"
-            />
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="DNS domain"
-                value={form.domain}
-                onChange={(e) => setForm({ ...form, domain: e.target.value })}
-                sx={{ flex: 1 }}
-              />
-            </Stack>
-            <Stack spacing={1}>
-              <Typography variant="body2" color="text.secondary">
-                Extra routes (split tunnel only)
-              </Typography>
-              <Stack direction="row" spacing={1}>
-                <TextField
-                  size="small"
-                  value={newRoute}
-                  onChange={(e) => {
-                    setNewRoute(e.target.value);
-                    setRouteError(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addRoute();
-                    }
-                  }}
-                  placeholder="192.168.0.0/24 or fd00::/64"
-                  error={!!routeError}
-                  helperText={routeError}
-                  sx={{ flex: 1 }}
-                />
-                <Button variant="outlined" onClick={addRoute}>
-                  Add
-                </Button>
-              </Stack>
-              {form.extraRoutes.length > 0 && (
-                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 0.5 }}>
-                  {form.extraRoutes.map((route) => (
-                    <Chip
-                      key={route}
-                      label={route}
-                      color={route.includes(":") ? "info" : "default"}
-                      onDelete={() => removeRoute(route)}
-                      size="small"
-                    />
-                  ))}
-                </Stack>
-              )}
-              <Typography variant="caption" color="text.secondary">
-                IPv4: 192.168.0.0/24 — IPv6: fd00::/8
-              </Typography>
-            </Stack>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.fullTunnel}
-                  onChange={(e) => setForm({ ...form, fullTunnel: e.target.checked })}
-                />
-              }
-              label="Full tunnel (route all traffic through VPN)"
-            />
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.ipv6Enabled}
-                  onChange={(e) => setForm({ ...form, ipv6Enabled: e.target.checked })}
-                />
-              }
-              label="Enable IPv6 (dual-stack tunnel)"
-            />
-            {form.ipv6Enabled && (
-              <TextField
-                label="IPv6 subnet"
-                value={form.ipv6Subnet}
-                onChange={(e) => setForm({ ...form, ipv6Subnet: e.target.value })}
-                helperText="Client subnet in CIDR form, e.g. fd00:1::/64"
-              />
-            )}
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.clientCertNotRequired}
-                  onChange={(e) => setForm({ ...form, clientCertNotRequired: e.target.checked })}
-                />
-              }
-              label="Client cert not required (serves GENERIC profiles)"
-            />
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.authUserPass}
-                  onChange={(e) => setForm({ ...form, authUserPass: e.target.checked })}
-                />
-              }
-              label="Username/password auth (disable for AUTO_LOGIN cert-only daemon)"
-            />
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.enabled}
-                  onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
-                />
-              }
-              label="Enabled"
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled={!form.daemonIndex || !form.subnet || !form.subnetMask}
-            onClick={() => save.mutate()}
-          >
-            {editing ? "Save" : "Create"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <DaemonFormDialog
+        open={dialogOpen}
+        editing={!!editing}
+        form={form}
+        nodes={nodes ?? []}
+        newRoute={newRoute}
+        routeError={routeError}
+        onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
+        onAddRoute={addRoute}
+        onRemoveRoute={removeRoute}
+        onChangeNewRoute={setNewRoute}
+        onClearRouteError={() => setRouteError(null)}
+        onClose={() => setDialogOpen(false)}
+        onSave={() => save.mutate()}
+      />
 
       <ConfirmDialog
         open={!!confirm}
