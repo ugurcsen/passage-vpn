@@ -238,31 +238,31 @@ is updated to import from the new location.
 After feature-folder migration, break the largest pages into focused sub-components
 within their feature folder.
 
-- [ ] **C3.1** `UsersPage` (1199 lines) — extract:
+- [x] **C3.1** `UsersPage` (1199 lines) — extract:
   - `UserCreateDialog.tsx` — create user form
   - `PasswordResetDialog.tsx` — password reset form
   - `MfaSetupDialog.tsx` — MFA provisioning flow (QR, verify, enable)
   - `UserColumns.tsx` — DataGrid column definitions
   - `useUserMutations.ts` — mutation hooks (create, update, delete, ban, reset
     password, MFA)
-- [ ] **C3.2** `SettingsPage` (726 lines) — extract:
+- [x] **C3.2** `SettingsPage` (726 lines) — extract:
   - `NetworkConfigDialog.tsx` — network settings form
   - `AdvancedSettingsDialog.tsx` — raw JSON editor
   - `KnownSettingsGrid.tsx` — typed settings table
   - `useSettingsMutations.ts` — mutation hooks
-- [ ] **C3.3** `DaemonsPage` (610 lines) — extract:
+- [x] **C3.3** `DaemonsPage` (610 lines) — extract:
   - `DaemonCreateDialog.tsx` — daemon create/edit form
   - `RouteChipList.tsx` — reusable chip-based route editor (shared with SettingsPage)
   - `DaemonColumns.tsx` — DataGrid column definitions
-- [ ] **C3.4** `DashboardPage` (525 lines) — extract:
+- [x] **C3.4** `DashboardPage` (525 lines) — extract:
   - `StatCards.tsx` — stat card row
   - `TrafficChart.tsx` — MUI X Charts traffic visualization
   - `RecentConnections.tsx` — recent connections table
-- [ ] **C3.5** `GroupsPage` (430 lines) — extract:
+- [x] **C3.5** `GroupsPage` (430 lines) — extract:
   - `GroupCreateDialog.tsx`
   - `MemberEditor.tsx` — chip-based member picker
   - `GroupColumns.tsx`
-- [ ] **C3.6** Run `npm run test && npm run lint && npm run build` — all green.
+- [x] **C3.6** Run `npm run test && npm run lint && npm run build` — all green.
 
 ### C4. Decompose extracted hooks into feature hooks
 
