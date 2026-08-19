@@ -267,6 +267,7 @@ export function AccessRulesPage() {
             size="small"
             checked={row.enabled}
             onChange={() => toggleEnabled.mutate(row)}
+            inputProps={{ name: "enabled", "aria-label": `Toggle enabled for rule ${row.id}` }}
           />
         );
       },

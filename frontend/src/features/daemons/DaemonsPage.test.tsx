@@ -178,9 +178,8 @@ describe("DaemonsPage", () => {
     renderPage();
     await screen.findAllByText("Primary");
 
-    const switchEl = document.body.querySelector("input[type='checkbox']");
-    expect(switchEl).not.toBeNull();
-    await user.click(switchEl as Element);
+    const switchEl = screen.getByRole("checkbox", { name: "Toggle enabled for Primary" });
+    await user.click(switchEl);
 
     const fetchMock = vi.mocked(fetch);
     await waitFor(() => {

@@ -253,9 +253,8 @@ describe("AccessRulesPage", () => {
     renderPage();
     await screen.findAllByText("All users");
 
-    const switchEl = document.body.querySelector("input[type='checkbox']");
-    expect(switchEl).not.toBeNull();
-    await user.click(switchEl as Element);
+    const switchEl = screen.getByRole("checkbox", { name: "Toggle enabled for rule r1" });
+    await user.click(switchEl);
 
     const fetchMock = vi.mocked(fetch);
     await waitFor(() => {

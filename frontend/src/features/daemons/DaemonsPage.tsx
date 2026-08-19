@@ -196,7 +196,7 @@ export function DaemonsPage() {
       renderCell: (params) => {
         const row = params.row as Daemon;
         return (
-          <Switch size="small" checked={row.enabled} onChange={() => toggleEnabled.mutate(row)} />
+          <Switch size="small" checked={row.enabled} onChange={() => toggleEnabled.mutate(row)} inputProps={{ name: "enabled", "aria-label": `Toggle enabled for ${row.name}` }} />
         );
       },
     },
