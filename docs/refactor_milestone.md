@@ -321,7 +321,7 @@ within their feature folder.
 - [x] **D5.2** Add test for `useBrand` hook.
 - [x] **D5.3** Add test for `useToast` hook.
 - [x] **D5.4** Add test for `roles.ts` utility.
-- [ ] **D5.5** Add API failure path tests for pages with light coverage:
+- [x] **D5.5** Add API failure path tests for pages with light coverage:
   `ConfigReportPage`, `StatusPage`, `BackupsPage`, `MaintenancePage`.
 - [x] **D5.6** Run `npm run test:coverage` — verify thresholds met.
 

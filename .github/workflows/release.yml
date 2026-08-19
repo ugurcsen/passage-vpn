@@ -101,6 +101,21 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate changelog
+        id: changelog
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          PREV_TAG=$(git tag --sort=-v:refname | grep -A1 "^${TAG}$" | tail -1)
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "$TAG" ]; then
+            CHANGES=$(git log --oneline --no-decorate "${TAG}" | head -50)
+          else
+            CHANGES=$(git log --oneline --no-decorate "${PREV_TAG}..${TAG}")
+          fi
+          echo "changes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
       - name: Stage deploy-only files and build tarball
         run: |
           TAG="${GITHUB_REF_NAME}"
@@ -113,3 +128,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: passage-vpn-${{ github.ref_name }}.tar.gz
+          body: |
+            ## Changes
+            ${{ steps.changelog.outputs.changes }}
+            
+            ## Installation
+            See [installation.md](docs/installation.md) for setup instructions.
