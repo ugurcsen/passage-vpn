@@ -9,6 +9,17 @@ BACKEND_DIR  := backend
 FRONTEND_DIR := frontend
 ENV_FILE     := .env
 
+# Append the PostgreSQL override file when .env requests the postgres profile
+# (same behavior as install.sh --profile=postgres). A plain 'docker compose up'
+# would otherwise run the postgres profile against the SQLite URL pinned in
+# docker-compose.yml and crash at startup.
+ifeq ($(shell grep -q '^PASSAGE_PROFILE=postgres' $(ENV_FILE) 2>/dev/null && echo yes),yes)
+COMPOSE_ARGS := -f docker-compose.yml -f docker-compose.postgres.yml
+else
+COMPOSE_ARGS := -f docker-compose.yml
+endif
+COMPOSE_CMD  := $(COMPOSE) $(COMPOSE_ARGS)
+
 .PHONY: help up down build logs ps restart \
         backend-dev frontend-dev \
         test test-backend test-frontend \
@@ -22,24 +33,24 @@ help: ## Show this help
 # ---------- containers ----------
 
 up: ## Build and start all services
-	$(COMPOSE) up -d --build
+	$(COMPOSE_CMD) up -d --build
 
 down: ## Stop services (keep data)
-	$(COMPOSE) down
+	$(COMPOSE_CMD) down
 
 logs: ## Tail logs for all services
-	$(COMPOSE) logs -f --tail=200
+	$(COMPOSE_CMD) logs -f --tail=200
 
 ps: ## Show service status
-	$(COMPOSE) ps
+	$(COMPOSE_CMD) ps
 
 build: ## Build backend + frontend + images
 	$(MAKE) -C $(BACKEND_DIR) build 2>/dev/null || $(BACKEND_DIR)/gradlew -p $(BACKEND_DIR) build
 	$(MAKE) -C $(FRONTEND_DIR) build 2>/dev/null || (cd $(FRONTEND_DIR) && npm run build)
-	$(COMPOSE) build
+	$(COMPOSE_CMD) build
 
 restart: ## Restart all services
-	$(COMPOSE) restart
+	$(COMPOSE_CMD) restart
 
 # ---------- local development ----------
 
@@ -125,7 +136,7 @@ clean: ## Remove build artifacts (keep data)
 	rm -rf $(FRONTEND_DIR)/dist $(FRONTEND_DIR)/node_modules release
 
 reset: ## Stop services and wipe runtime data (danger!)
-	$(COMPOSE) down -v
+	$(COMPOSE_CMD) down -v
 	rm -rf data
 	@echo "Runtime data removed."
 

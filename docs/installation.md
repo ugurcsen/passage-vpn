@@ -87,6 +87,19 @@ Repeat step 3 with the new tag — `docker compose pull` fetches the new images 
 `docker compose up -d` recreates the containers. Runtime data (DB, PKI, configs,
 logs) lives in Docker named volumes and is preserved.
 
+For a PostgreSQL install, the `postgres` profile must always run with the
+override file — the base `docker-compose.yml` pins the SQLite URL, so a plain
+`docker compose up -d` would start the backend with the PostgreSQL driver
+against the SQLite path and crash at startup:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml pull
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+```
+
+On a full checkout (`make up`), the Makefile detects `PASSAGE_PROFILE=postgres`
+in `.env` and appends the override file automatically.
+
 ## Development: build from source
 
 ```bash
