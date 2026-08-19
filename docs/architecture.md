@@ -129,6 +129,7 @@ Package root `com.passagevpn` (`backend/src/main/java/com/passage/vpn`):
 | `dns` | DNS overrides (`DnsRecord`), scoped resolution, conflict detection. |
 | `ccd` | client-config-dir rendering (static IPs, pushed per-user options). |
 | `network` | Daemon registry, server config generation, dnsmasq config, connection registry, node registry (`OpenVpnNode`), script sync. |
+| `network.util` | `Ipv6Util` (IPv6 parsing/compression), `IpPoolAllocator` (subnet-aware IP pool management). |
 | `monitor` | Management clients, status polling, WebSocket push (`/ws`), traffic aggregation, session history. |
 | `node` | Agent registration service (remote gateway nodes). |
 | `setting` | Settings service: server/group/user settings stored as JSON in TEXT columns, inheritance and validation. |
@@ -139,6 +140,18 @@ Package root `com.passagevpn` (`backend/src/main/java/com/passage/vpn`):
 | `api`, `internal`, `api/portal` | HTTP surface: admin API, portal self-service, script-facing endpoints. |
 | `system` | Maintenance, smoke tests, demo/seed mode, application restarter. |
 | `common` | `ApiException`/`ApiError`, global exception handler, process runner, app metadata. |
+
+## 3.1 Extracted Services (refactored)
+
+The following services were extracted from god classes during the Phase A
+refactoring to improve separation of concerns and testability:
+
+| Extracted Service | Extracted From | Responsibility |
+|---|---|---|
+| `Ipv6Util` | `CcdService` | IPv6 address parsing, compression, expansion, and network calculations. |
+| `IpPoolAllocator` | `CcdService` | Subnet-aware IP pool management for automatic address allocation. |
+| `UserIpAdminService` | `UserAdminService` | User IP address management: static IPs, pool allocation, IPv6 support. |
+| `ConnectionOrchestrator` | `UserAdminService` | VPN connection management: kill, kick, max-connections enforcement. |
 
 ## 4. API surface and security
 
@@ -309,8 +322,12 @@ above.
 - React 18 + TypeScript, Vite, MUI v6 (dark by default), TanStack Query for
   server state, React Hook Form + Zod for forms, `@mui/x-data-grid` for list
   views.
-- Feature pages under `frontend/src/pages`; a single API client in
-  `frontend/src/lib/api.ts`; WebSocket hook for live monitoring events.
+- Feature-folder structure under `frontend/src/features/<feature>/`; each
+  feature contains its page component, sub-components, hooks, and tests.
+  Shared components in `src/components/`, hooks in `src/hooks/`, utilities in
+  `src/lib/`.
+- Single API client in `frontend/src/lib/api.ts`; WebSocket hook for live
+  monitoring events.
 - The setup wizard gates login until setup is complete; a first-run admin can
   be created via the wizard, `make seed-admin`, or demo data via
   `make seed-demo` / `PASSAGE_DEMO_MODE=true`.

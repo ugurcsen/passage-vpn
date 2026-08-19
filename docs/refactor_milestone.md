@@ -377,9 +377,9 @@ within their feature folder.
 
 ### F3. Release workflow polish
 
-- [ ] **F3.1** Add `release.yml` step to generate `CHANGELOG.md` from commit
+- [x] **F3.1** Add `release.yml` step to generate `CHANGELOG.md` from commit
   messages between the previous tag and the new tag.
-- [ ] **F3.2** Add GitHub Release body with auto-generated notes from the tag
+- [x] **F3.2** Add GitHub Release body with auto-generated notes from the tag
   range.
 
 ---
