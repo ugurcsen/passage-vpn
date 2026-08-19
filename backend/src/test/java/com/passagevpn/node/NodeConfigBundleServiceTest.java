@@ -40,6 +40,7 @@ class NodeConfigBundleServiceTest {
             "token",
             null,
             null,
+            null,
             new PassageProperties.OpenVpn(
                 "127.0.0.1",
                 7505,

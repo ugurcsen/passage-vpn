@@ -78,6 +78,7 @@ class MaintenanceServiceTest {
             "secret",
             null,
             null,
+            null,
             new PassageProperties.OpenVpn(
                 "openvpn",
                 7505,

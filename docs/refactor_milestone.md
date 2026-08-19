@@ -142,15 +142,14 @@ migration-safe dual-hash support.
   and wrong-password rejection paths.
 - [x] **B2.5** `./gradlew test spotlessCheck` — all 1005 tests pass.
 
-### B3. CORS origin tightening
+### B3. CORS origin tightening ✅
 
-- [ ] **B3.1** Add `passage.cors.allowed-origins` property to
-  `PassageProperties` (defaults to `*` for local dev).
-- [ ] **B3.2** Update the CORS configuration to use the property instead of
-  hardcoded `"*"`.
-- [ ] **B3.3** Document in `.env.example` and `docs/configuration.md`:
-  `PASSAGE_CORS_ORIGINS=https://vpn.example.com`.
-- [ ] **B3.4** Run `./gradlew test spotlessCheck`.
+- [x] **B3.1** Added `Cors` record to `PassageProperties` with `allowedOrigins` field and
+  `patterns()` helper (splits comma-separated string, defaults to `*`).
+- [x] **B3.2** Updated `SecurityConfig.corsConfigurationSource()` to use
+  `passageProperties.cors().patterns()` instead of hardcoded `"*"`.
+- [x] **B3.3** Documented in `.env.example`: `PASSAGE_CORS_ORIGINS=*`.
+- [x] **B3.4** `./gradlew test spotlessCheck` — all 1005 tests pass.
 
 ### B4. AuthService in-memory state documentation
 

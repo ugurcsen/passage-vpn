@@ -31,7 +31,7 @@ class SecurityBootstrapCheckTest {
             1194,
             1195,
             1195);
-    return new PassageProperties("./data", "OpenVPN Panel", token, jwt, auth, openvpn);
+    return new PassageProperties("./data", "OpenVPN Panel", token, jwt, auth, null, openvpn);
   }
 
   @Test

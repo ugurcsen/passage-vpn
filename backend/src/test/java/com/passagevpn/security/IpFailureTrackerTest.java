@@ -36,6 +36,7 @@ class IpFailureTrackerTest {
             "internal-token",
             new PassageProperties.Jwt("secret-secret-secret", 300, 14),
             auth,
+            null,
             openvpn);
     return new IpFailureTracker(properties);
   }

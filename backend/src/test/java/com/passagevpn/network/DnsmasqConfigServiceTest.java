@@ -46,6 +46,7 @@ class DnsmasqConfigServiceTest {
                 null,
                 null,
                 null,
+                null,
                 new PassageProperties.OpenVpn(
                     null,
                     0,

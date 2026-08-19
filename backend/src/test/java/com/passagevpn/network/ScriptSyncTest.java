@@ -39,7 +39,7 @@ class ScriptSyncTest {
             1195,
             1195);
     PassageProperties properties =
-        new PassageProperties("./data", "OpenVPN Panel", token, jwt, auth, openvpn);
+        new PassageProperties("./data", "OpenVPN Panel", token, jwt, auth, null, openvpn);
     return new ScriptSync(properties);
   }
 

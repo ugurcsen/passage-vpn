@@ -9,7 +9,19 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "passage")
 public record PassageProperties(
-    String dataDir, String brandName, String internalToken, Jwt jwt, Auth auth, OpenVpn openvpn) {
+    String dataDir,
+    String brandName,
+    String internalToken,
+    Jwt jwt,
+    Auth auth,
+    Cors cors,
+    OpenVpn openvpn) {
+
+  public PassageProperties {
+    if (cors == null) {
+      cors = new Cors(null);
+    }
+  }
 
   public static final String DEFAULT_INTERNAL_TOKEN = "change-me-internal-token";
 
@@ -37,6 +49,19 @@ public record PassageProperties(
       public static Argon2 defaults() {
         return new Argon2(3, 65536, 4, 16, 32);
       }
+    }
+  }
+
+  public record Cors(String allowedOrigins) {
+    /** Parsed origin patterns; defaults to {@code *} for local development. */
+    public java.util.List<String> patterns() {
+      if (allowedOrigins == null || allowedOrigins.isBlank()) {
+        return java.util.List.of("*");
+      }
+      return java.util.Arrays.stream(allowedOrigins.split(","))
+          .map(String::trim)
+          .filter(s -> !s.isEmpty())
+          .toList();
     }
   }
 

@@ -39,7 +39,8 @@ class ConfigWriterTest {
             1194,
             1195,
             1195);
-    return new PassageProperties(tempDir.toString(), "OpenVPN Panel", "token", jwt, auth, openvpn);
+    return new PassageProperties(
+        tempDir.toString(), "OpenVPN Panel", "token", jwt, auth, null, openvpn);
   }
 
   @Test

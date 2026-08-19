@@ -22,7 +22,7 @@ class BrandServiceTest {
   @BeforeEach
   void setUp() {
     settingsService = mock(SettingsService.class);
-    properties = new PassageProperties("./data", "OpenVPN Panel", "secret", null, null, null);
+    properties = new PassageProperties("./data", "OpenVPN Panel", "secret", null, null, null, null);
     brandService = new BrandService(settingsService, properties);
   }
 

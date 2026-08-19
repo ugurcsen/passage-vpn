@@ -72,7 +72,7 @@ class AgentRegistrationServiceTest {
             null,
             null);
     PassageProperties opnl =
-        new PassageProperties("./data", "OpenVPN Panel", "secret-token", null, null, null);
+        new PassageProperties("./data", "OpenVPN Panel", "secret-token", null, null, null, null);
     return new AgentRegistrationService(
         properties, opnl, new ObjectMapper(), mock(AgentTls.class), HttpClient.newHttpClient());
   }
@@ -125,7 +125,7 @@ class AgentRegistrationServiceTest {
             null,
             null);
     PassageProperties opnl =
-        new PassageProperties("./data", "OpenVPN Panel", "secret-token", null, null, null);
+        new PassageProperties("./data", "OpenVPN Panel", "secret-token", null, null, null, null);
     AgentRegistrationService service =
         new AgentRegistrationService(
             properties, opnl, new ObjectMapper(), mock(AgentTls.class), HttpClient.newHttpClient());
@@ -150,7 +150,7 @@ class AgentRegistrationServiceTest {
             null,
             null);
     PassageProperties opnl =
-        new PassageProperties("./data", "OpenVPN Panel", "secret-token", null, null, null);
+        new PassageProperties("./data", "OpenVPN Panel", "secret-token", null, null, null, null);
     AgentRegistrationService service =
         new AgentRegistrationService(
             properties, opnl, new ObjectMapper(), mock(AgentTls.class), HttpClient.newHttpClient());

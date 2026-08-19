@@ -31,6 +31,7 @@ class WsAuthHandshakeInterceptorTest {
             "internal-token",
             new PassageProperties.Jwt("j".repeat(64), 900, 14),
             new PassageProperties.Auth("local", 5, 300, 300, 20, 60, null),
+            null,
             new PassageProperties.OpenVpn(
                 "openvpn",
                 7505,
