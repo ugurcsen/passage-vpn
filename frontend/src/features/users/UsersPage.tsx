@@ -1,107 +1,44 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Alert,
   Box,
   Button,
-  Checkbox,
   Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  FormControlLabel,
-  FormGroup,
-  IconButton,
   InputAdornment,
   MenuItem,
   Paper,
   Stack,
-  Switch,
   TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
-import { DataGrid, type GridColDef, type GridRowSelectionModel } from "@mui/x-data-grid";
+import { DataGrid, type GridRowSelectionModel } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import BlockIcon from "@mui/icons-material/Block";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ClearIcon from "@mui/icons-material/Clear";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import KeyIcon from "@mui/icons-material/Key";
-import LockResetIcon from "@mui/icons-material/LockReset";
 import SearchIcon from "@mui/icons-material/Search";
-import TuneIcon from "@mui/icons-material/Tune";
-import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
-import { api, copyToClipboard, endpoints, type MfaSetup } from "@/lib/api";
+import { api, endpoints } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/useToast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import type { Role } from "@/hooks/useAuth";
+import {
+  type DeleteOptions,
+  type UserRow,
+  type GroupRow,
+  type UserForm,
+  EMPTY_DELETE_OPTIONS,
+  EMPTY_FORM,
+} from "./types";
+import { getUserColumns } from "./UserColumns";
+import { UserFormDialog } from "./UserFormDialog";
+import { MfaDialog } from "./MfaDialog";
+import { CcdSettingsDialog } from "./CcdSettingsDialog";
+import { DeleteDialog } from "./DeleteDialog";
+import { ResetPasswordDialog } from "./ResetPasswordDialog";
 
-interface UserRow {
-  id: string;
-  username: string;
-  fullName?: string;
-  email?: string;
-  role: Role;
-  mfaEnabled: boolean;
-  mfaRequired?: boolean;
-  banned: boolean;
-  mustChangePassword: boolean;
-  groups: string[];
-  adminGroupIds?: string[];
-  adminGroupNames?: string[];
-  createdAt?: string;
-  lastLoginAt?: string;
-  staticIp?: string;
-  staticIpv6?: string;
-}
-
-interface GroupRow {
-  id: string;
-  name: string;
-  description?: string;
-  parentId?: string;
-  memberCount: number;
-}
-
-interface DeleteOptions {
-  deleteAccessRules: boolean;
-  clearCcd: boolean;
-}
-
-const EMPTY_DELETE_OPTIONS: DeleteOptions = {
-  deleteAccessRules: false,
-  clearCcd: false,
-};
-
-interface UserForm {
-  username: string;
-  password: string;
-  fullName: string;
-  email: string;
-  role: Role;
-  groupIds: string[];
-  adminGroupIds: string[];
-}
-
-const EMPTY_FORM: UserForm = {
-  username: "",
-  password: "",
-  fullName: "",
-  email: "",
-  role: "USER",
-  groupIds: [],
-  adminGroupIds: [],
-};
-
-function formatDateTime(iso?: string) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString();
+interface DeleteTarget {
+  ids: string[];
+  usernames: string;
 }
 
 export function UsersPage() {
@@ -117,10 +54,7 @@ export function UsersPage() {
     confirmLabel: string;
     action: () => void;
   } | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{
-    ids: string[];
-    usernames: string;
-  } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteOptions, setDeleteOptions] = useState<DeleteOptions>(EMPTY_DELETE_OPTIONS);
   const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
   const [resetPassword, setResetPassword] = useState("");
@@ -129,19 +63,8 @@ export function UsersPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "disabled">("all");
   const [mfaTarget, setMfaTarget] = useState<UserRow | null>(null);
-  const [mfaSetup, setMfaSetup] = useState<MfaSetup | null>(null);
-  const [mfaCode, setMfaCode] = useState("");
-  const [mfaDisableConfirm, setMfaDisableConfirm] = useState(false);
   const [ccdTarget, setCcdTarget] = useState<UserRow | null>(null);
-  const [ccdDns, setCcdDns] = useState("");
-  const [ccdDomain, setCcdDomain] = useState("");
-  const [ccdRoutes, setCcdRoutes] = useState("");
-  const [ccdMfaOnConnect, setCcdMfaOnConnect] = useState(false);
-  const [ccdTunnelMode, setCcdTunnelMode] = useState("" as "" | "full" | "split");
-  const [ccdStaticIp, setCcdStaticIp] = useState("");
-  const [ccdStaticIpv6, setCcdStaticIpv6] = useState("");
 
-  const canManageMfa = currentUser?.role === "ADMIN";
   const isAdmin = currentUser?.role === "ADMIN";
   const canManageRow = (row: UserRow) => isAdmin || row.role === "USER";
 
@@ -192,10 +115,7 @@ export function UsersPage() {
   const banMutation = useMutation({
     mutationFn: (row: UserRow) =>
       api(endpoints.users + `/${row.id}/${row.banned ? "unban" : "ban"}`, { method: "POST" }),
-    onSuccess: () => {
-      toast.success("User status updated");
-      invalidate();
-    },
+    onSuccess: () => { toast.success("User status updated"); invalidate(); },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Update failed"),
   });
 
@@ -205,217 +125,25 @@ export function UsersPage() {
         method: "POST",
         body: JSON.stringify({ password: resetPassword }),
       }),
-    onSuccess: () => {
-      toast.success("Password reset");
-      setResetTarget(null);
-      setResetPassword("");
-      invalidate();
-    },
+    onSuccess: () => { toast.success("Password reset"); setResetTarget(null); setResetPassword(""); invalidate(); },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Reset failed"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: ({ id, options }: { id: string; options: DeleteOptions }) =>
       api(endpoints.users + `/${id}`, { method: "DELETE", body: JSON.stringify(options) }),
-    onSuccess: () => {
-      toast.success("User deleted");
-      setDeleteTarget(null);
-      invalidate();
-    },
+    onSuccess: () => { toast.success("User deleted"); setDeleteTarget(null); invalidate(); },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Delete failed"),
   });
 
-  const mfaSetupMutation = useMutation({
-    mutationFn: (row: UserRow) =>
-      api<MfaSetup>(endpoints.users + `/${row.id}/mfa/setup`, { method: "POST" }),
-    onSuccess: (data) => {
-      setMfaSetup(data);
-      setMfaCode("");
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "MFA setup failed"),
-  });
-
-  const mfaEnableMutation = useMutation({
-    mutationFn: () =>
-      api(endpoints.users + `/${mfaTarget?.id}/mfa/enable`, {
-        method: "POST",
-        body: JSON.stringify({ code: mfaCode }),
-      }),
-    onSuccess: () => {
-      toast.success("MFA enabled");
-      closeMfaDialog();
-      invalidate();
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Enable failed"),
-  });
-
-  const mfaDisableMutation = useMutation({
-    mutationFn: () =>
-      api(endpoints.users + `/${mfaTarget?.id}/mfa/disable`, { method: "POST" }),
-    onSuccess: () => {
-      toast.success("MFA disabled");
-      setMfaDisableConfirm(false);
-      closeMfaDialog();
-      invalidate();
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Disable failed"),
-  });
-
-  const openMfaDialog = (row: UserRow) => {
-    setMfaTarget(row);
-    setMfaSetup(null);
-    setMfaCode("");
-    setMfaDisableConfirm(false);
-  };
-
-  const closeMfaDialog = () => {
-    setMfaTarget(null);
-    setMfaSetup(null);
-    setMfaCode("");
-    setMfaDisableConfirm(false);
-  };
-
-  const copySecret = async () => {
-    if (!mfaSetup) return;
-    const ok = await copyToClipboard(mfaSetup.secret);
-    if (ok) toast.success("Secret copied");
-    else toast.error("Copy failed");
-  };
-
-  const openCcdEditor = async (row: UserRow) => {
-    setCcdTarget(row);
-    setCcdDns("");
-    setCcdDomain("");
-    setCcdRoutes("");
-    setCcdMfaOnConnect(false);
-    setCcdTunnelMode("");
-    setCcdStaticIp(row.staticIp ?? "");
-    setCcdStaticIpv6(row.staticIpv6 ?? "");
-    try {
-      const settings = await api<Record<string, unknown>>(
-        endpoints.users + `/${row.id}/settings`,
-      );
-      setCcdDns(Array.isArray(settings.dns_servers) ? settings.dns_servers.join(", ") : String(settings.dns_servers ?? ""));
-      setCcdDomain(String(settings.dns_domain ?? ""));
-      setCcdRoutes(Array.isArray(settings.route_restriction) ? settings.route_restriction.join(", ") : String(settings.route_restriction ?? ""));
-      setCcdMfaOnConnect(settings.require_mfa_on_connect === true);
-      const mode = settings.tunnel_mode;
-      setCcdTunnelMode(mode === "full" || mode === "split" ? mode : "");
-    } catch {
-      toast.error("Failed to load per-user settings");
-    }
-  };
-
-  const closeCcdEditor = () => setCcdTarget(null);
-
-  const saveCcdSettings = useMutation({
-    mutationFn: async () => {
-      if (!ccdTarget) return;
-      const base = endpoints.users + `/${ccdTarget.id}/settings`;
-      await api(base + "/dns_servers", { method: "PUT", body: JSON.stringify(ccdDns) });
-      await api(base + "/dns_domain", { method: "PUT", body: JSON.stringify(ccdDomain) });
-      await api(base + "/route_restriction", { method: "PUT", body: JSON.stringify(ccdRoutes) });
-      await api(base + "/require_mfa_on_connect", {
-        method: "PUT",
-        body: JSON.stringify(ccdMfaOnConnect),
-      });
-      await api(base + "/tunnel_mode", { method: "PUT", body: JSON.stringify(ccdTunnelMode) });
-    },
-    onSuccess: () => {
-      toast.success("Per-user settings saved");
-      invalidate();
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Save failed"),
-  });
-
-  const saveStaticIp = useMutation({
-    mutationFn: async (ip: string) => {
-      if (!ccdTarget) return;
-      if (ip.trim()) {
-        await api(endpoints.users + `/${ccdTarget.id}/static-ip`, {
-          method: "PUT",
-          body: JSON.stringify({ staticIp: ip.trim() }),
-        });
-      } else {
-        await api(endpoints.users + `/${ccdTarget.id}/static-ip`, { method: "DELETE" });
-      }
-    },
-    onSuccess: () => {
-      toast.success("Static IP updated");
-      invalidate();
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Update failed"),
-  });
-
-  const allocateStaticIp = useMutation({
-    mutationFn: async () => {
-      if (!ccdTarget) return;
-      return api(endpoints.users + `/${ccdTarget.id}/static-ip/allocate`, { method: "POST" });
-    },
-    onSuccess: (updated) => {
-      toast.success("Static IP allocated");
-      const row = updated as unknown as UserRow;
-      setCcdStaticIp(row.staticIp ?? "");
-      invalidate();
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Allocation failed"),
-  });
-
-  const saveStaticIpv6 = useMutation({
-    mutationFn: async (ip: string) => {
-      if (!ccdTarget) return;
-      if (ip.trim()) {
-        await api(endpoints.users + `/${ccdTarget.id}/static-ipv6`, {
-          method: "PUT",
-          body: JSON.stringify({ staticIpv6: ip.trim() }),
-        });
-      } else {
-        await api(endpoints.users + `/${ccdTarget.id}/static-ipv6`, { method: "DELETE" });
-      }
-    },
-    onSuccess: () => {
-      toast.success("Static IPv6 updated");
-      invalidate();
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Update failed"),
-  });
-
-  const allocateStaticIpv6 = useMutation({
-    mutationFn: async () => {
-      if (!ccdTarget) return;
-      return api(endpoints.users + `/${ccdTarget.id}/static-ipv6/allocate`, { method: "POST" });
-    },
-    onSuccess: (updated) => {
-      toast.success("Static IPv6 allocated");
-      const row = updated as unknown as UserRow;
-      setCcdStaticIpv6(row.staticIpv6 ?? "");
-      invalidate();
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Allocation failed"),
-  });
-
   const bulkMutation = useMutation({
-    mutationFn: ({
-      action,
-      ids,
-      options,
-    }: {
-      action: "ban" | "unban" | "delete";
-      ids: string[];
-      options?: DeleteOptions;
-    }) =>
+    mutationFn: ({ action, ids, options }: { action: "ban" | "unban" | "delete"; ids: string[]; options?: DeleteOptions }) =>
       api(endpoints.users + "/bulk", {
         method: "POST",
-        body: JSON.stringify({
-          action: action.toUpperCase(),
-          ids,
-          ...(options ? { options } : {}),
-        }),
+        body: JSON.stringify({ action: action.toUpperCase(), ids, ...(options ? { options } : {}) }),
       }),
     onSuccess: (_data, vars) => {
-      toast.success(
-        `${vars.ids.length} user${vars.ids.length === 1 ? "" : "s"} ${vars.action === "delete" ? "deleted" : vars.action + "ed"}`,
-      );
+      toast.success(`${vars.ids.length} user${vars.ids.length === 1 ? "" : "s"} ${vars.action === "delete" ? "deleted" : vars.action + "ed"}`);
       setSelection([]);
       setDeleteTarget(null);
       invalidate();
@@ -430,11 +158,7 @@ export function UsersPage() {
 
   const confirmBulk = (action: "ban" | "unban" | "delete") => {
     const ids = selection.map(String);
-    const config = {
-      ban: { verb: "Disable", label: "Disable" },
-      unban: { verb: "Enable", label: "Enable" },
-      delete: { verb: "Delete", label: "Delete" },
-    } as const;
+    const config = { ban: { verb: "Disable", label: "Disable" }, unban: { verb: "Enable", label: "Enable" }, delete: { verb: "Delete", label: "Delete" } } as const;
     const { verb, label } = config[action];
     if (action === "delete") {
       openDeleteDialog(ids, `${ids.length} selected user${ids.length === 1 ? "" : "s"}`);
@@ -448,12 +172,7 @@ export function UsersPage() {
     });
   };
 
-  const openCreate = () => {
-    setEditing(null);
-    setForm(EMPTY_FORM);
-    setDialogOpen(true);
-  };
-
+  const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setDialogOpen(true); };
   const openEdit = (row: UserRow) => {
     setEditing(row.id);
     setForm({
@@ -468,172 +187,16 @@ export function UsersPage() {
     setDialogOpen(true);
   };
 
-  const columns: GridColDef[] = [
-    { field: "username", headerName: "Username", flex: 1.2, minWidth: 140 },
-    { field: "fullName", headerName: "Full name", flex: 1, minWidth: 100 },
-    {
-      field: "groups",
-      headerName: "Groups",
-      width: 160,
-      valueGetter: (_, row) => (row as UserRow).groups.join(", "),
-      renderCell: (params) => (
-        <Stack direction="row" spacing={0.5} sx={{ py: 0.5, flexWrap: "wrap" }}>
-          {(params.value as string).split(", ").filter(Boolean).slice(0, 2).map((g) => (
-            <Chip key={g} label={g} size="small" variant="outlined" />
-          ))}
-        </Stack>
-      ),
-    },
-    {
-      field: "adminGroupNames",
-      headerName: "Manages",
-      width: 160,
-      valueGetter: (_, row) => (row as UserRow).adminGroupNames?.join(", ") ?? "",
-      renderCell: (params) => (
-        <Stack direction="row" spacing={0.5} sx={{ py: 0.5, flexWrap: "wrap" }}>
-          {(params.value as string).split(", ").filter(Boolean).slice(0, 2).map((g) => (
-            <Chip key={g} label={g} size="small" variant="outlined" color="warning" />
-          ))}
-        </Stack>
-      ),
-    },
-    {
-      field: "role",
-      headerName: "Role",
-      width: 100,
-      renderCell: (params) => (
-        <Chip
-          label={params.value as string}
-          size="small"
-          color={params.value === "ADMIN" ? "secondary" : params.value === "GROUP_ADMIN" ? "warning" : "default"}
-        />
-      ),
-    },
-    {
-      field: "mfaEnabled",
-      headerName: "MFA",
-      width: 100,
-      renderCell: (params) => {
-        const row = params.row as UserRow;
-        if (row.mfaEnabled) {
-          return <Chip label="On" size="small" color="success" />;
-        }
-        return row.mfaRequired ? (
-          <Chip label="Required" size="small" color="warning" />
-        ) : (
-          <Chip label="Off" size="small" />
-        );
-      },
-    },
-    {
-      field: "banned",
-      headerName: "Status",
-      width: 100,
-      renderCell: (params) =>
-        params.value ? <Chip label="Disabled" size="small" color="error" /> : <Chip label="Active" size="small" color="success" />,
-    },
-    {
-      field: "lastLoginAt",
-      headerName: "Last login",
-      width: 150,
-      valueGetter: (_, row) => (row as UserRow).lastLoginAt ?? "",
-      renderCell: (params) => <Typography variant="body2">{formatDateTime(params.value as string)}</Typography>,
-    },
-    {
-      field: "staticIp",
-      headerName: "Static IP",
-      width: 130,
-      valueGetter: (_, row) => (row as UserRow).staticIp ?? "",
-      renderCell: (params) =>
-        params.value ? (
-          <Chip label={params.value as string} size="small" variant="outlined" color="info" />
-        ) : (
-          <Typography variant="body2" color="text.secondary">
-            —
-          </Typography>
-        ),
-    },
-    {
-      field: "staticIpv6",
-      headerName: "Static IPv6",
-      width: 190,
-      valueGetter: (_, row) => (row as UserRow).staticIpv6 ?? "",
-      renderCell: (params) =>
-        params.value ? (
-          <Chip label={params.value as string} size="small" variant="outlined" color="secondary" />
-        ) : (
-          <Typography variant="body2" color="text.secondary">
-            —
-          </Typography>
-        ),
-    },
-    {
-      field: "actions",
-      headerName: "Actions",
-      width: 250,
-      sortable: false,
-      filterable: false,
-      renderCell: (params) => {
-        const row = params.row as UserRow;
-        return (
-          <Stack direction="row">
-            {canManageRow(row) && (
-              <Tooltip title="Edit">
-                <IconButton size="small" onClick={() => openEdit(row)}>
-                  <LockResetIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-            {canManageRow(row) && (
-              <Tooltip title={row.banned ? "Enable" : "Disable"}>
-                <IconButton size="small" onClick={() => banMutation.mutate(row)}>
-                  {row.banned ? <CheckCircleIcon fontSize="small" color="success" /> : <BlockIcon fontSize="small" />}
-                </IconButton>
-              </Tooltip>
-            )}
-            {canManageRow(row) && (
-              <Tooltip title="Reset password">
-                <IconButton size="small" onClick={() => setResetTarget(row)}>
-                  <KeyIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-            {canManageRow(row) && (
-              <Tooltip title="CCD settings">
-                <IconButton size="small" onClick={() => openCcdEditor(row)} data-testid={`edit-ccd-${row.username}`}>
-                  <TuneIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-            {canManageMfa && (
-              <Tooltip title="Manage MFA">
-                <IconButton
-                  size="small"
-                  onClick={() => openMfaDialog(row)}
-                  data-testid={`manage-mfa-${row.username}`}
-                >
-                  <VerifiedUserIcon
-                    fontSize="small"
-                    color={row.mfaEnabled ? "success" : "action"}
-                  />
-                </IconButton>
-              </Tooltip>
-            )}
-            {canManageRow(row) && (
-              <Tooltip title="Delete">
-                <IconButton
-                  size="small"
-                  onClick={() => openDeleteDialog([row.id], row.username)}
-                >
-                  <DeleteIcon fontSize="small" color="error" />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Stack>
-        );
-      },
-    },
-  ];
+  const columns = getUserColumns({
+    isAdmin,
+    canManageRow,
+    onEdit: openEdit,
+    onBan: (row) => banMutation.mutate(row),
+    onResetPassword: setResetTarget,
+    onCcdSettings: setCcdTarget,
+    onManageMfa: setMfaTarget,
+    onDelete: openDeleteDialog,
+  });
 
   const filteredRows = (users ?? []).filter((u) =>
     statusFilter === "all" ? true : statusFilter === "active" ? !u.banned : u.banned,
@@ -642,25 +205,19 @@ export function UsersPage() {
   return (
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-        <Typography variant="h5" fontWeight={700}>
-          Users
-        </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-          New user
-        </Button>
+        <Typography variant="h5" fontWeight={700}>Users</Typography>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>New user</Button>
       </Box>
       <Stack direction="row" spacing={1.5} sx={{ mb: 2 }} alignItems="center" flexWrap="wrap">
         <TextField
           size="small"
-          placeholder="Search username, name, email…"
+          placeholder="Search username, name, email\u2026"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ width: 320 }}
           InputProps={{
             startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
+              <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>
             ),
           }}
         />
@@ -679,36 +236,9 @@ export function UsersPage() {
         {selection.length > 0 && (
           <>
             <Stack direction="row" spacing={1} sx={{ ml: 1 }}>
-              <Button
-                size="small"
-                variant="outlined"
-                color="warning"
-                startIcon={<BlockIcon />}
-                disabled={bulkMutation.isPending}
-                onClick={() => confirmBulk("ban")}
-              >
-                Disable
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                color="success"
-                startIcon={<CheckCircleIcon />}
-                disabled={bulkMutation.isPending}
-                onClick={() => confirmBulk("unban")}
-              >
-                Enable
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                color="error"
-                startIcon={<DeleteIcon />}
-                disabled={bulkMutation.isPending}
-                onClick={() => confirmBulk("delete")}
-              >
-                Delete
-              </Button>
+              <Button size="small" variant="outlined" color="warning" startIcon={<BlockIcon />} disabled={bulkMutation.isPending} onClick={() => confirmBulk("ban")}>Disable</Button>
+              <Button size="small" variant="outlined" color="success" startIcon={<CheckCircleIcon />} disabled={bulkMutation.isPending} onClick={() => confirmBulk("unban")}>Enable</Button>
+              <Button size="small" variant="outlined" color="error" startIcon={<DeleteIcon />} disabled={bulkMutation.isPending} onClick={() => confirmBulk("delete")}>Delete</Button>
             </Stack>
             <Chip label={`${selection.length} selected`} color="info" size="small" />
           </>
@@ -729,455 +259,54 @@ export function UsersPage() {
         />
       </Paper>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editing ? `Edit ${form.username}` : "New user"}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Username"
-              value={form.username}
-              onChange={(e) => setForm({ ...form, username: e.target.value })}
-              disabled={!!editing}
-              required
-            />
-            <TextField
-              label={editing ? "New password (blank keeps current)" : "Password"}
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              required={!editing}
-              helperText={editing ? "At least 8 characters when changing." : "At least 8 characters."}
-            />
-            <TextField
-              label="Full name"
-              value={form.fullName}
-              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-            />
-            <TextField
-              label="Email"
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
-            {isAdmin && (
-              <TextField
-                select
-                label="Role"
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
-              >
-                <MenuItem value="USER">User</MenuItem>
-                <MenuItem value="GROUP_ADMIN">Group admin</MenuItem>
-                <MenuItem value="ADMIN">Admin</MenuItem>
-              </TextField>
-            )}
-            {isAdmin && form.role === "GROUP_ADMIN" && (
-              <TextField
-                select
-                label="Managed groups"
-                value={form.adminGroupIds}
-                onChange={(e) =>
-                  setForm({ ...form, adminGroupIds: e.target.value as unknown as string[] })
-                }
-                SelectProps={{ multiple: true }}
-                required
-                helperText="Root groups this account manages, including all subgroups."
-              >
-                {(groups ?? []).map((g) => (
-                  <MenuItem key={g.id} value={g.id}>
-                    {g.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
-            <TextField
-              select
-              label="Groups"
-              value={form.groupIds}
-              onChange={(e) =>
-                setForm({ ...form, groupIds: e.target.value as unknown as string[] })
-              }
-              SelectProps={{ multiple: true }}
-              helperText="Groups inherit settings resolved per user."
-            >
-              {(groups ?? []).map((g) => (
-                <MenuItem key={g.id} value={g.id}>
-                  {g.name}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled={!form.username || (!form.password && !editing)}
-            onClick={() => saveUser.mutate()}
-          >
-            {editing ? "Save" : "Create"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <UserFormDialog
+        open={dialogOpen}
+        editing={editing}
+        form={form}
+        isAdmin={isAdmin}
+        groups={groups ?? []}
+        onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+        onClose={() => setDialogOpen(false)}
+        onSave={() => saveUser.mutate()}
+      />
 
-      <Dialog open={!!resetTarget} onClose={() => setResetTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Reset password</DialogTitle>
-        <DialogContent>
-          <TextField
-            label={`New password for ${resetTarget?.username ?? ""}`}
-            type="password"
-            value={resetPassword}
-            onChange={(e) => setResetPassword(e.target.value)}
-            fullWidth
-            sx={{ mt: 1 }}
-            autoFocus
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setResetTarget(null)}>Cancel</Button>
-          <Button variant="contained" disabled={resetPassword.length < 8} onClick={() => resetMutation.mutate()}>
-            Reset
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ResetPasswordDialog
+        target={resetTarget}
+        password={resetPassword}
+        onPasswordChange={setResetPassword}
+        onClose={() => setResetTarget(null)}
+        onReset={() => resetMutation.mutate()}
+      />
 
-      <Dialog open={!!mfaTarget} onClose={closeMfaDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Manage MFA — {mfaTarget?.username}</DialogTitle>
-        <DialogContent>
-          {mfaTarget?.mfaEnabled && !mfaSetup ? (
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <Alert severity="success">Two-factor authentication is enabled.</Alert>
-              {mfaTarget.mfaRequired && (
-                <Alert severity="warning">
-                  MFA is required by policy; it cannot be disabled for this user while the setting
-                  is active.
-                </Alert>
-              )}
-              {mfaDisableConfirm ? (
-                <>
-                  <Alert severity="warning">
-                    Disable MFA for {mfaTarget.username}? They will no longer be asked for a code at
-                    sign-in.
-                  </Alert>
-                  <Button
-                    color="error"
-                    variant="contained"
-                    disabled={mfaDisableMutation.isPending}
-                    onClick={() => mfaDisableMutation.mutate()}
-                  >
-                    {mfaDisableMutation.isPending ? <CircularProgress size={18} /> : "Disable MFA"}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  color="error"
-                  variant="outlined"
-                  disabled={mfaTarget.mfaRequired}
-                  onClick={() => setMfaDisableConfirm(true)}
-                >
-                  Disable MFA
-                </Button>
-              )}
-            </Stack>
-          ) : mfaSetup ? (
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <Alert severity="info">
-                Scan the QR code with Google Authenticator (or any TOTP app), then enter the
-                6-digit code to enable two-factor authentication.
-              </Alert>
-              <Box sx={{ display: "flex", justifyContent: "center" }}>
-                <img src={mfaSetup.qrDataUrl} alt="TOTP QR code" width={180} height={180} />
-              </Box>
-              <TextField
-                label="Secret"
-                value={mfaSetup.secret}
-                fullWidth
-                slotProps={{
-                  input: {
-                    readOnly: true,
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <Tooltip title="Copy secret">
-                          <IconButton size="small" onClick={copySecret}>
-                            <ContentCopyIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
-              <TextField
-                label="Verification code"
-                value={mfaCode}
-                onChange={(e) => setMfaCode(e.target.value)}
-                fullWidth
-                inputProps={{ inputMode: "numeric", maxLength: 6 }}
-                helperText="Confirm the code to finish enabling MFA."
-              />
-            </Stack>
-          ) : (
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <Alert severity="info">
-                Two-factor authentication is disabled for this user. Set it up to require a code
-                from an authenticator app at sign-in.
-              </Alert>
-              <Button
-                variant="contained"
-                disabled={mfaSetupMutation.isPending}
-                onClick={() => mfaSetupMutation.mutate(mfaTarget!)}
-              >
-                {mfaSetupMutation.isPending ? <CircularProgress size={18} /> : "Set up MFA"}
-              </Button>
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          {mfaSetup ? (
-            <>
-              <Button onClick={() => setMfaSetup(null)}>Back</Button>
-              <Button
-                variant="contained"
-                disabled={mfaCode.length < 6 || mfaEnableMutation.isPending}
-                onClick={() => mfaEnableMutation.mutate()}
-              >
-                {mfaEnableMutation.isPending ? <CircularProgress size={18} /> : "Enable"}
-              </Button>
-            </>
-          ) : (
-            <Button onClick={closeMfaDialog}>Close</Button>
-          )}
-        </DialogActions>
-      </Dialog>
+      <MfaDialog
+        target={mfaTarget}
+        onClose={() => setMfaTarget(null)}
+        onSaved={invalidate}
+      />
 
-      <Dialog open={!!ccdTarget} onClose={closeCcdEditor} maxWidth="sm" fullWidth>
-        <DialogTitle>CCD settings — {ccdTarget?.username}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={3} sx={{ mt: 1 }}>
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                Static IP
-              </Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <TextField
-                  size="small"
-                  placeholder="e.g. 10.8.0.42"
-                  value={ccdStaticIp}
-                  onChange={(e) => setCcdStaticIp(e.target.value)}
-                  sx={{ flex: 1 }}
-                  helperText={ccdTarget?.staticIp ? "Override the group pool allocation." : "Leave empty to clear."}
-                />
-                <Button
-                  variant="outlined"
-                  startIcon={<TuneIcon />}
-                  disabled={saveStaticIp.isPending}
-                  onClick={() => saveStaticIp.mutate(ccdStaticIp)}
-                >
-                  Set
-                </Button>
-                <Button
-                  variant="contained"
-                  disabled={allocateStaticIp.isPending}
-                  onClick={() => allocateStaticIp.mutate()}
-                  title="Allocate next free IP from the group pool"
-                >
-                  {allocateStaticIp.isPending ? <CircularProgress size={18} /> : "Allocate"}
-                </Button>
-                {ccdTarget?.staticIp && (
-                  <Tooltip title="Clear static IP">
-                    <IconButton
-                      size="small"
-                      disabled={saveStaticIp.isPending}
-                      onClick={() => {
-                        setCcdStaticIp("");
-                        saveStaticIp.mutate("");
-                      }}
-                    >
-                      <ClearIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Stack>
-            </Box>
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                Static IPv6
-              </Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <TextField
-                  size="small"
-                  placeholder="e.g. fd00:1::42"
-                  value={ccdStaticIpv6}
-                  onChange={(e) => setCcdStaticIpv6(e.target.value)}
-                  sx={{ flex: 1 }}
-                  helperText={
-                    ccdTarget?.staticIpv6
-                      ? "Override the group pool allocation."
-                      : "Leave empty to clear."
-                  }
-                />
-                <Button
-                  variant="outlined"
-                  startIcon={<TuneIcon />}
-                  disabled={saveStaticIpv6.isPending}
-                  onClick={() => saveStaticIpv6.mutate(ccdStaticIpv6)}
-                >
-                  Set
-                </Button>
-                <Button
-                  variant="contained"
-                  disabled={allocateStaticIpv6.isPending}
-                  onClick={() => allocateStaticIpv6.mutate()}
-                  title="Allocate next free IPv6 from the group pool"
-                >
-                  {allocateStaticIpv6.isPending ? <CircularProgress size={18} /> : "Allocate IPv6"}
-                </Button>
-                {ccdTarget?.staticIpv6 && (
-                  <Tooltip title="Clear static IPv6">
-                    <IconButton
-                      size="small"
-                      disabled={saveStaticIpv6.isPending}
-                      onClick={() => {
-                        setCcdStaticIpv6("");
-                        saveStaticIpv6.mutate("");
-                      }}
-                    >
-                      <ClearIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Stack>
-            </Box>
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                Per-user settings (override group/server defaults)
-              </Typography>
-              <Stack spacing={2}>
-                <TextField
-                  label="DNS servers"
-                  size="small"
-                  placeholder="e.g. 1.1.1.1, 8.8.8.8"
-                  value={ccdDns}
-                  onChange={(e) => setCcdDns(e.target.value)}
-                  helperText="Comma-separated DNS servers pushed to this client."
-                />
-                <TextField
-                  label="DNS domain"
-                  size="small"
-                  placeholder="e.g. vpn.example.com"
-                  value={ccdDomain}
-                  onChange={(e) => setCcdDomain(e.target.value)}
-                  helperText="Search domain pushed to this client."
-                />
-                <TextField
-                  label="Tunnel mode"
-                  size="small"
-                  select
-                  value={ccdTunnelMode}
-                  onChange={(e) => setCcdTunnelMode(e.target.value as "" | "full" | "split")}
-                  helperText="Full routes all traffic through the VPN; split routes only the networks below. Empty inherits the group/server default."
-                >
-                  <MenuItem value="">Inherit default</MenuItem>
-                  <MenuItem value="full">Full tunnel</MenuItem>
-                  <MenuItem value="split">Split tunnel</MenuItem>
-                </TextField>
-                <TextField
-                  label="Route restriction"
-                  size="small"
-                  placeholder="e.g. 10.0.0.0/8, 192.168.0.0/16"
-                  value={ccdRoutes}
-                  onChange={(e) => setCcdRoutes(e.target.value)}
-                  helperText="Comma-separated CIDRs this client may reach. Empty allows all."
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={ccdMfaOnConnect}
-                      onChange={(e) => setCcdMfaOnConnect(e.target.checked)}
-                    />
-                  }
-                  label="Require MFA on connect"
-                />
-              </Stack>
-            </Box>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeCcdEditor}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled={saveCcdSettings.isPending}
-            onClick={() => saveCcdSettings.mutate()}
-          >
-            {saveCcdSettings.isPending ? <CircularProgress size={18} /> : "Save"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <CcdSettingsDialog
+        target={ccdTarget}
+        onClose={() => setCcdTarget(null)}
+        onSaved={invalidate}
+      />
 
-      <Dialog
+      <DeleteDialog
         open={!!deleteTarget}
-        onClose={
-          deleteMutation.isPending || bulkMutation.isPending
-            ? undefined
-            : () => setDeleteTarget(null)
-        }
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Delete {deleteTarget?.usernames}</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 1 }}>
-            This cannot be undone. The user's certificate is revoked and removed. Optionally clean
-            up related resources:
-          </DialogContentText>
-          <FormGroup>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={deleteOptions.deleteAccessRules}
-                  onChange={(e) =>
-                    setDeleteOptions((o) => ({ ...o, deleteAccessRules: e.target.checked }))
-                  }
-                />
-              }
-              label="Delete access rules"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={deleteOptions.clearCcd}
-                  onChange={(e) => setDeleteOptions((o) => ({ ...o, clearCcd: e.target.checked }))}
-                />
-              }
-              label="Clear static IP"
-            />
-          </FormGroup>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            disabled={deleteMutation.isPending || bulkMutation.isPending}
-            onClick={() => setDeleteTarget(null)}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            disabled={deleteMutation.isPending || bulkMutation.isPending}
-            onClick={() => {
-              if (!deleteTarget) return;
-              const options = deleteOptions;
-              if (deleteTarget.ids.length === 1) {
-                deleteMutation.mutate({ id: deleteTarget.ids[0], options });
-              } else {
-                bulkMutation.mutate({ action: "delete", ids: deleteTarget.ids, options });
-              }
-            }}
-          >
-            {deleteMutation.isPending || bulkMutation.isPending ? "Working..." : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        target={deleteTarget}
+        options={deleteOptions}
+        isPending={deleteMutation.isPending || bulkMutation.isPending}
+        onOptionsChange={(patch) => setDeleteOptions((o) => ({ ...o, ...patch }))}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          const options = deleteOptions;
+          if (deleteTarget.ids.length === 1) {
+            deleteMutation.mutate({ id: deleteTarget.ids[0], options });
+          } else {
+            bulkMutation.mutate({ action: "delete", ids: deleteTarget.ids, options });
+          }
+        }}
+      />
 
       <ConfirmDialog
         open={!!confirm}
@@ -1187,13 +316,8 @@ export function UsersPage() {
         confirmLabel={confirm?.confirmLabel ?? "Confirm"}
         loading={bulkMutation.isPending || deleteMutation.isPending}
         onCancel={() => setConfirm(null)}
-        onConfirm={() => {
-          confirm?.action();
-          setConfirm(null);
-        }}
+        onConfirm={() => { confirm?.action(); setConfirm(null); }}
       />
     </Box>
   );
 }
-
-export type { UserRow, GroupRow };
