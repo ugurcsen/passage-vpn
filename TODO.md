@@ -373,6 +373,7 @@ Legend: `[ ]` = pending, `[x]` = done, `[~]` = partial.
 - [x] Inter-group connectivity rules (dstGroupId target → pool range / member IPs)
 - [x] NAT vs routing mode (network_mode setting; apply-rules skips MASQUERADE in routed mode)
 - [x] Domain-based control via dnsmasq (advanced)
+- [x] DNS option v2 (`--dns` directive) for macOS/iOS split-DNS fix — scoped resolvers via `SupplementalMatchDomains` (OpenVPN3 v3.11+, beta.26)
 
 ### 3.3 Connection profiles (.ovpn)
 - [x] `OvpnGenerator` — 4 profile types: user-locked, auto-login, server-locked, generic

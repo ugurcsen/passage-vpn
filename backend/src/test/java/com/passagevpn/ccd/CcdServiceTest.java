@@ -858,11 +858,15 @@ class CcdServiceTest {
     service.writeUserCcd(alice);
 
     List<String> lines = java.nio.file.Files.readAllLines(ccdPath("alice"));
+    // DNS option v2: scoped resolvers for macOS/iOS split-DNS fix.
     assertThat(lines)
         .contains(
-            "push \"dhcp-option DNS 1.1.1.1\"",
-            "push \"dhcp-option DNS 8.8.8.8\"",
+            "push \"dns server 0 address 1.1.1.1\"",
+            "push \"dns server 1 address 8.8.8.8\"",
+            "push \"dns server 0 resolve-domains .vpn.local\"",
+            "push \"dns search-domains vpn.local\"",
             "push \"dhcp-option DOMAIN vpn.local\"");
+    assertThat(lines).doesNotContain("push \"dhcp-option DNS");
   }
 
   @Test

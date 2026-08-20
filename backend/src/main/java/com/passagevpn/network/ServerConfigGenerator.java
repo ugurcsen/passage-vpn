@@ -116,22 +116,49 @@ public class ServerConfigGenerator {
   private String renderDnsPushes(ServerConfig config) {
     StringBuilder sb = new StringBuilder();
     String dnsmasq = dnsmasqServerIp(config.subnet());
-    if (dnsmasq != null) {
-      sb.append("push \"dhcp-option DNS ").append(dnsmasq).append("\"\n");
+    boolean hasDomain = config.domain() != null && !config.domain().isBlank();
+
+    if (hasDomain) {
+      // DNS option v2 (OpenVPN3 v3.11+): scoped resolvers via SupplementalMatchDomains.
+      // Fixes split-DNS on macOS/iOS where the old --dhcp-option approach incorrectly
+      // binds DNS to en0 (Wi-Fi) instead of the VPN tun interface.
+      if (dnsmasq != null) {
+        sb.append("push \"dns server 0 address ").append(dnsmasq).append("\"\n");
+        sb.append("push \"dns server 0 resolve-domains .")
+            .append(config.domain())
+            .append("\"\n");
+      }
+      int priority = 1;
+      for (String dns : config.dnsServers()) {
+        if (dnsmasq != null && dns.equals(dnsmasq)) {
+          continue;
+        }
+        sb.append("push \"dns server ").append(priority).append(" address ").append(dns)
+            .append("\"\n");
+        priority++;
+      }
+      sb.append("push \"dns search-domains ").append(config.domain()).append("\"\n");
+    } else {
+      // Legacy fallback: --dhcp-option for older clients or when no domain is configured.
+      if (dnsmasq != null) {
+        sb.append("push \"dhcp-option DNS ").append(dnsmasq).append("\"\n");
+      }
+      for (String dns : config.dnsServers()) {
+        if (dnsmasq != null && dns.equals(dnsmasq)) {
+          continue;
+        }
+        sb.append("push \"dhcp-option DNS ").append(dns).append("\"\n");
+      }
     }
+
     if (ipv6Active(config)) {
       String dnsmasq6 = ipv6ServerIp(config.ipv6Subnet());
       if (dnsmasq6 != null) {
         sb.append("push \"dhcp-option DNS6 ").append(dnsmasq6).append("\"\n");
       }
     }
-    for (String dns : config.dnsServers()) {
-      if (dnsmasq != null && dns.equals(dnsmasq)) {
-        continue;
-      }
-      sb.append("push \"dhcp-option DNS ").append(dns).append("\"\n");
-    }
-    if (config.domain() != null && !config.domain().isBlank()) {
+
+    if (hasDomain) {
       sb.append("push \"dhcp-option DOMAIN ").append(config.domain()).append("\"\n");
     }
     return sb.toString();

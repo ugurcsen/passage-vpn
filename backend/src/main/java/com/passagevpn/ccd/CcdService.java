@@ -465,15 +465,36 @@ public class CcdService {
 
   private void appendDns(List<String> lines, Map<String, Object> effective) {
     String dns = stringSetting(effective, SettingKeys.DNS_SERVERS);
-    if (dns != null && !dns.isBlank()) {
-      for (String server : dns.split(",")) {
-        if (!server.isBlank()) {
-          lines.add("push \"dhcp-option DNS " + server.trim() + "\"");
+    String domain = stringSetting(effective, SettingKeys.DNS_DOMAIN);
+    boolean hasDomain = domain != null && !domain.isBlank();
+
+    if (hasDomain) {
+      // DNS option v2: scoped resolvers via SupplementalMatchDomains (macOS/iOS fix).
+      int priority = 0;
+      if (dns != null && !dns.isBlank()) {
+        for (String server : dns.split(",")) {
+          if (!server.isBlank()) {
+            lines.add(
+                "push \"dns server " + priority + " address " + server.trim() + "\"");
+            priority++;
+          }
+        }
+        // Scope DNS resolution for the domain to these servers.
+        lines.add("push \"dns server 0 resolve-domains ." + domain.trim() + "\"");
+      }
+      lines.add("push \"dns search-domains " + domain.trim() + "\"");
+    } else {
+      // Legacy fallback: --dhcp-option for older clients or when no domain is configured.
+      if (dns != null && !dns.isBlank()) {
+        for (String server : dns.split(",")) {
+          if (!server.isBlank()) {
+            lines.add("push \"dhcp-option DNS " + server.trim() + "\"");
+          }
         }
       }
     }
-    String domain = stringSetting(effective, SettingKeys.DNS_DOMAIN);
-    if (domain != null && !domain.isBlank()) {
+
+    if (hasDomain) {
       lines.add("push \"dhcp-option DOMAIN " + domain.trim() + "\"");
     }
   }

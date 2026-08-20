@@ -8,6 +8,37 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.26 — 2026-08-21
+
+Twenty-sixth **beta** milestone (SemVer pre-release): Fixes macOS/iOS split-tunnel
+DNS resolution by adopting OpenVPN's DNS option v2 (`--dns` directive).
+
+### Root cause
+OpenVPN3 (used by OpenVPN Connect on macOS/iOS) had a bug where `--dhcp-option DNS`
+scoped DNS resolvers to the Wi-Fi interface (`en0`) instead of the VPN tunnel (`utun*`),
+causing `nslookup` to work (it queries the DNS server directly) but `ping`/`getaddrinfo()`
+to fail (they use the OS DNS stack, which was misconfigured). This was tracked as
+OpenVPN/openvpn3#254 (closed) and #358 (open).
+
+### Fix
+Server now pushes the new `--dns` directive (DNS option v2, OpenVPN3 v3.11+) instead of
+`--dhcp-option DNS` when a `domain` is configured. The v2 directive correctly creates
+DNS config scoped to the VPN interface via `SupplementalMatchDomains`, fixing the
+macOS/iOS DNS scoping bug. Backward compatible: clients that don't support `--dns` will
+still receive `--dhcp-option DNS`.
+
+### Changes
+- `ServerConfigGenerator.renderDnsPushes()`: emits `dns server N address` + `dns server 0 resolve-domains .domain` + `dns search-domains domain` when domain configured
+- `CcdService.appendDns()`: per-user CCD files emit `--dns server` syntax when domain present
+- Legacy `--dhcp-option DNS` fallback preserved when domain is not set
+
+### Required admin action
+Populate the `domain` field in the daemon configuration (e.g. `int-s1.divlop.com`) via the
+admin UI for `--dns` scoped DNS to take effect. Without a domain, the legacy `--dhcp-option DNS`
+is used.
+
+---
+
 ## v0.1.0-beta.25 — 2026-08-20
 
 Twenty-fifth **beta** milestone (SemVer pre-release): Removes deprecated
@@ -27,9 +58,8 @@ server-side pushes (`server-ipv6`, `push "route-ipv6"` / `push "redirect-gateway
   clients).
 
 ### Known limitation
-- OpenVPN Connect on macOS/iOS still has a split-tunnel DNS scoping bug
-  (OpenVPN/openvpn3#254). Tunnelblick is recommended as a workaround for
-  macOS users until the upstream bug is fixed.
+- OpenVPN Connect on macOS/iOS had a split-tunnel DNS scoping bug (OpenVPN/openvpn3#254,
+  now closed). Fixed in v0.1.0-beta.26 via DNS option v2 when `domain` is configured.
 
 ---
 
