@@ -8,6 +8,31 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.25 — 2026-08-20
+
+Twenty-fifth **beta** milestone (SemVer pre-release): Removes deprecated
+`tun-ipv6` directive from client profiles. The directive was deprecated in
+OpenVPN 2.4 and is rejected by Tunnelblick and OpenVPN Connect ≥ 3.4, preventing
+macOS/iOS users from connecting. IPv6 dual-stack continues to work via
+server-side pushes (`server-ipv6`, `push "route-ipv6"` / `push "redirect-gateway ipv6"`).
+
+### Client profile compatibility
+- **OvpnGenerator**: `tun-ipv6` is no longer embedded in `.ovpn` profiles.
+  Full-tunnel profiles still include `redirect-gateway ipv6`; split-tunnel
+  profiles rely entirely on server-side pushes for IPv6 routing.
+- **IPv6 behavior unchanged**: The server already pushes `server-ipv6` and
+  `push "route-ipv6"` (split) or `push "redirect-gateway ipv6"` (full) via
+  `daemon.conf`. Removing the client-side directive has no functional impact
+  on clients that support server pushes (OpenVPN community, WireGuard-style
+  clients).
+
+### Known limitation
+- OpenVPN Connect on macOS/iOS still has a split-tunnel DNS scoping bug
+  (OpenVPN/openvpn3#254). Tunnelblick is recommended as a workaround for
+  macOS users until the upstream bug is fixed.
+
+---
+
 ## v0.1.0-beta.24 — 2026-08-19
 
 Twenty-fourth **beta** milestone (SemVer pre-release): PostgreSQL is no longer

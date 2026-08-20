@@ -45,7 +45,7 @@ class OvpnGeneratorTest {
             "",
             false,
             true);
-    assertThat(profile).contains("tun-ipv6");
+    assertThat(profile).doesNotContain("tun-ipv6");
     assertThat(profile).contains("redirect-gateway ipv6");
   }
 
@@ -138,7 +138,7 @@ class OvpnGeneratorTest {
             "vpn.example.com", splitConfig.port(), splitConfig.proto(), true, false);
     String profile =
         generator.render(ProfileType.GENERIC, List.of(ep), "CA", "TA", "", "", false, false);
-    assertThat(profile).contains("tun-ipv6");
+    assertThat(profile).doesNotContain("tun-ipv6");
     assertThat(profile).doesNotContain("redirect-gateway ipv6");
   }
 }

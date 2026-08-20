@@ -69,20 +69,18 @@ public class OvpnGenerator {
           case GENERIC -> block("ca", caCert);
         };
 
-    // Request an IPv6-capable tunnel and route all IPv6 traffic through it when
-    // the server runs dual-stack. Server pushes alone are ignored by several
-    // clients (notably OpenVPN Connect), so the directives are embedded in the
-    // profile itself.
+    // IPv6 is configured via server-side pushes (`server-ipv6`, `push "route-ipv6"`
+    // / `push "redirect-gateway ipv6"`). The deprecated `tun-ipv6` directive is
+    // omitted because Tunnelblick and OpenVPN Connect ≥ 3.4 reject it.
     //
     // Split-tunnel profiles must NOT embed `redirect-gateway ipv6` because
     // OpenVPN Connect on macOS interprets it as a full-tunnel directive and
     // redirects ALL IPv4 traffic into the VPN as well (adds 0/1 + 128/1 routes).
-    // Only `tun-ipv6` is emitted; the server pushes IPv6 routes via daemon.conf.
     boolean dualStack = effective.get(0).ipv6Enabled();
     boolean fullTun = effective.get(0).fullTunnel();
     String ipv6 = "";
-    if (dualStack) {
-      ipv6 = fullTun ? "tun-ipv6\nredirect-gateway ipv6" : "tun-ipv6";
+    if (dualStack && fullTun) {
+      ipv6 = "redirect-gateway ipv6";
     }
 
     return CLIENT_PREAMBLE
