@@ -124,16 +124,17 @@ public class ServerConfigGenerator {
       // binds DNS to en0 (Wi-Fi) instead of the VPN tun interface.
       if (dnsmasq != null) {
         sb.append("push \"dns server 0 address ").append(dnsmasq).append("\"\n");
-        sb.append("push \"dns server 0 resolve-domains .")
-            .append(config.domain())
-            .append("\"\n");
+        sb.append("push \"dns server 0 resolve-domains .").append(config.domain()).append("\"\n");
       }
       int priority = 1;
       for (String dns : config.dnsServers()) {
         if (dnsmasq != null && dns.equals(dnsmasq)) {
           continue;
         }
-        sb.append("push \"dns server ").append(priority).append(" address ").append(dns)
+        sb.append("push \"dns server ")
+            .append(priority)
+            .append(" address ")
+            .append(dns)
             .append("\"\n");
         priority++;
       }

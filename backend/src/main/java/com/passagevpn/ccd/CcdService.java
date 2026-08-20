@@ -474,8 +474,7 @@ public class CcdService {
       if (dns != null && !dns.isBlank()) {
         for (String server : dns.split(",")) {
           if (!server.isBlank()) {
-            lines.add(
-                "push \"dns server " + priority + " address " + server.trim() + "\"");
+            lines.add("push \"dns server " + priority + " address " + server.trim() + "\"");
             priority++;
           }
         }
