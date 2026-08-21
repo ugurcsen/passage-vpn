@@ -1,4 +1,4 @@
-import { createContext, useCallback, useState, type ReactNode } from "react";
+import { createContext, useCallback, useMemo, useState, type ReactNode } from "react";
 import { Alert, Snackbar } from "@mui/material";
 
 type Severity = "success" | "error" | "info" | "warning";
@@ -37,13 +37,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const value: ToastContextValue = {
-    toast: show,
-    success: (m) => show(m, { severity: "success" }),
-    error: (m) => show(m, { severity: "error", autoHideDuration: 6000 }),
-    info: (m) => show(m, { severity: "info" }),
-    warning: (m) => show(m, { severity: "warning" }),
-  };
+  const value = useMemo<ToastContextValue>(
+    () => ({
+      toast: show,
+      success: (m) => show(m, { severity: "success" }),
+      error: (m) => show(m, { severity: "error", autoHideDuration: 6000 }),
+      info: (m) => show(m, { severity: "info" }),
+      warning: (m) => show(m, { severity: "warning" }),
+    }),
+    [show],
+  );
 
   return (
     <ToastContext.Provider value={value}>

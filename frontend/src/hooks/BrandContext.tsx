@@ -1,4 +1,4 @@
-import { createContext, useCallback, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { apiPublic, endpoints, type Brand } from "@/lib/api";
 
 /** Fallback brand used before the public endpoint responds (and in tests). */
@@ -36,5 +36,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  return <BrandContext.Provider value={{ brand, refresh }}>{children}</BrandContext.Provider>;
+  const value = useMemo<BrandContextValue>(() => ({ brand, refresh }), [brand, refresh]);
+
+  return <BrandContext.Provider value={value}>{children}</BrandContext.Provider>;
 }
