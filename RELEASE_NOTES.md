@@ -8,6 +8,50 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.28 — 2026-08-21
+
+Twenty-eighth **beta** milestone (SemVer pre-release): makes DNS overrides
+actually resolve on macOS. Live diagnostics showed that the DNS option v2
+approach from v0.1.0-beta.26 registers the VPN resolver only as a
+*supplemental* (scoped) resolver, which macOS does not reliably consult —
+queries leaked out of the tunnel and DNS overrides never resolved through the
+system resolver, even though `scutil --dns` listed them. Includes everything
+from `v0.1.0-beta.27` plus the changes below.
+
+### Root cause (live-diagnosed)
+With a `domain` configured, OpenVPN Connect 3.8.1 mapped
+`dns server 0 address <tun-ip>` + `resolve-domains .<domain>` to a supplemental
+resolver (`SupplementalMatchDomains`). macOS `getaddrinfo()` does not consult
+such unscoped supplemental resolvers: `s1.divlop.com` resolved to its public
+IP and `int-s1.divlop.com` failed entirely, while `dig @11.9.0.1` answered
+both with the override address. The routing table already sends traffic for
+the tun server IP through the tunnel, so interface scoping is unnecessary —
+a default resolver on the tun works on every platform.
+
+### Fix
+- `ServerConfigGenerator.renderDnsPushes()`: when a domain is configured, the
+  VPN dnsmasq resolver is pushed as an **unscoped default** resolver
+  (`dns server 0 address <tun-ip>`); the ineffective
+  `resolve-domains .<domain>` push is removed.
+- Admin-configured extra DNS servers (`dnsServers`) remain pushed as
+  priorities 1..n behind the VPN resolver as fallbacks.
+- Legacy `--dhcp-option DNS` path (no domain configured) and per-user CCD DNS
+  pushes (`CcdService.appendDns`) are unchanged.
+- `ServerConfigGeneratorTest` updated: asserts the default-resolver push,
+  absence of `resolve-domains`, and fallback ordering.
+
+### Required admin action
+Unchanged from v0.1.0-beta.26: populate the `domain` field in the daemon
+configuration. After deploying, re-save the daemon settings so configs are
+re-rendered, reconnect clients, and verify with `scutil --dns` (default
+resolver #1 = tun IP) and `dscacheutil -q host -a name <host>.<domain>`
+(should return the override address).
+
+### Verified
+Backend suite green (`./gradlew test` + `spotlessApply` BUILD SUCCESSFUL).
+
+---
+
 ## v0.1.0-beta.27 — 2026-08-21
 
 Twenty-seventh **beta** milestone (SemVer pre-release): Security dependency
