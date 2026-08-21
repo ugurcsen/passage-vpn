@@ -8,6 +8,41 @@ Legend: `[x]` released, `[~]` partial.
 
 ---
 
+## v0.1.0-beta.27 — 2026-08-21
+
+Twenty-seventh **beta** milestone (SemVer pre-release): Security dependency
+refresh for the frontend — clears all 8 Dependabot alerts on the default branch
+(1 critical, 1 high, 6 moderate). No functional changes; no admin action
+required.
+
+### Dependency upgrades
+- **vitest / @vitest/coverage-v8 2.x → 3.2.7**: fixes the critical Vitest UI
+  advisory (GHSA-5xrq-8626-4rwp, arbitrary file read/exec when the Vitest UI
+  server is listening). Also removes the nested `vite@5.4.21` /
+  `esbuild@0.21.5` tree that carried the high-severity Vite advisories
+  (GHSA-4w7w-66w2-5vf9 path traversal, GHSA-fx2h-pf6j-xcff `server.fs.deny`
+  bypass, GHSA-v6wh-96g9-6wx3 launch-editor NTLM disclosure) and the esbuild
+  dev-server request-theft issue (GHSA-67mh-4wv8-2f99).
+- **react-router-dom 6.30.4 → 7.18.2**: fixes three moderates — open redirect
+  via backslash in `<Link>`/`useNavigate` (GHSA-wrjc-x8rr-h8h6), open redirect
+  leading to XSS (GHSA-jjmj-jmhj-qwj2), and arbitrary constructor injection via
+  `deserializeErrors()` in SSR hydration (GHSA-337j-9hxr-rhxg).
+
+The top-level `vite@6.4.3` was already patched and is unchanged.
+
+### Compat fix: memoized context values
+React Router v7 exposed an infinite update loop: `ToastContext` recreated its
+context value (and the unstable `error` callback) on every render, so
+`MfaEnrollPage`'s redirect effect re-fired each cycle before navigation could
+unmount it — hanging the test suite and eventually OOM-ing the runner.
+`ToastContext` and `BrandContext` now memoize their provider values.
+
+### Verification
+`npm audit` reports 0 vulnerabilities; lint clean; 35/35 test files (197 tests)
+pass; production build succeeds.
+
+---
+
 ## v0.1.0-beta.26 — 2026-08-21
 
 Twenty-sixth **beta** milestone (SemVer pre-release): Fixes macOS/iOS split-tunnel
