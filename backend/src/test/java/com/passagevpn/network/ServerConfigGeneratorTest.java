@@ -66,9 +66,10 @@ class ServerConfigGeneratorTest {
     assertThat(conf).doesNotContain("redirect-gateway");
     assertThat(conf).contains("proto tcp");
     assertThat(conf).contains("port 1195");
-    // DNS option v2: scoped resolvers for macOS/iOS split-DNS fix.
+    // DNS option v2: the VPN resolver is pushed as the unscoped default resolver
+    // (macOS ignores supplemental/scoped resolvers), extras follow as fallbacks.
     assertThat(conf).contains("push \"dns server 0 address 10.9.0.1\"");
-    assertThat(conf).contains("push \"dns server 0 resolve-domains .corp.example.com\"");
+    assertThat(conf).doesNotContain("resolve-domains");
     assertThat(conf).contains("push \"dns server 1 address 9.9.9.9\"");
     assertThat(conf).contains("push \"dns search-domains corp.example.com\"");
     assertThat(conf).contains("push \"dhcp-option DOMAIN corp.example.com\"");

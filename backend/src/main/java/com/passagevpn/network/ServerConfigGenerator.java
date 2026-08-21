@@ -119,12 +119,15 @@ public class ServerConfigGenerator {
     boolean hasDomain = config.domain() != null && !config.domain().isBlank();
 
     if (hasDomain) {
-      // DNS option v2 (OpenVPN3 v3.11+): scoped resolvers via SupplementalMatchDomains.
-      // Fixes split-DNS on macOS/iOS where the old --dhcp-option approach incorrectly
-      // binds DNS to en0 (Wi-Fi) instead of the VPN tun interface.
+      // DNS option v2: the VPN resolver is pushed as an unscoped DEFAULT resolver.
+      // Scope-only resolvers (resolve-domains) are registered by clients as
+      // supplemental resolvers, which macOS does not reliably consult — queries
+      // leak out of the tunnel (en0) and DNS overrides never resolve. Routing
+      // already sends traffic for the tun server IP through the tunnel, so a
+      // default resolver on the tun works on every platform; configured extra
+      // servers follow as fallbacks in case dnsmasq is unreachable.
       if (dnsmasq != null) {
         sb.append("push \"dns server 0 address ").append(dnsmasq).append("\"\n");
-        sb.append("push \"dns server 0 resolve-domains .").append(config.domain()).append("\"\n");
       }
       int priority = 1;
       for (String dns : config.dnsServers()) {
